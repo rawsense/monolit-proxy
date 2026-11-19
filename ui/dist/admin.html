@@ -129,7 +129,7 @@ const DS_KEY = (k) => (document.documentElement.dataset.store ? document.documen
 })();
 </script>
 <script>document.documentElement.classList.add('js')</script>
-<script src="_/admin.js?v=a03a5e8d3f" defer></script>
+<script src="_/admin.js?v=d140ffbc74" defer></script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="mp-mark" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2.5" fill="currentColor"/></symbol></svg>
@@ -334,6 +334,10 @@ const DS_KEY = (k) => (document.documentElement.dataset.store ? document.documen
         <button type="button" class="alist-row" id="mp-d-regen"><span class="alist-ic"><i data-lucide="key-round"></i></span><span class="alist-tx"><b>Выдать новую ссылку</b><span>Старая перестанет работать</span></span></button>
         <button type="button" class="alist-row mp-danger" id="mp-d-del"><span class="alist-ic"><i data-lucide="trash-2"></i></span><span class="alist-tx"><b>Удалить пользователя</b><span>Подписка удалится насовсем</span></span></button>
       </div>
+    </div>
+    <div class="mp-section" id="mp-d-links-sec" hidden>
+      <span class="t-label">Отдельные подключения</span>
+      <div class="alist mp-actions" id="mp-d-links"></div>
     </div>
   </div>
   <div class="sheet-foot"><button class="btn btn-primary" type="submit" form="mp-d-form"><span>Сохранить</span></button></div>

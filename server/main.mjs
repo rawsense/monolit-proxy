@@ -280,6 +280,11 @@ async function adminApi(req, res, path) {
     if (b.kit) db.prepare('UPDATE users SET kit_id = ? WHERE id = ?').run(Number(b.kit) === nodes.defKit().id ? 0 : Number(b.kit) || 0, r.lastInsertRowid);
     await queueSync(); return json(res, 200, { user: { ...publicUser(userById(r.lastInsertRowid)), url: subUrl(userById(r.lastInsertRowid)) } });
   }
+  if (m && m[2] === '/links' && req.method === 'GET') {
+    // отдельные ссылки на каждое подключение: для приложений, которые подписку целиком не берут
+    const u = userById(Number(m[1])); if (!u) return json(res, 404, { error: 'Нет такого пользователя' });
+    return json(res, 200, { links: nodes.linkList(u, serverCtx()) });
+  }
   if (m && !m[2] && req.method === 'PATCH') {
     const u = userById(Number(m[1])); if (!u) return json(res, 404, { error: 'Нет такого пользователя' });
     const b = await readBody(req);

@@ -88,6 +88,7 @@
       nu.url = 'https://' + S.settings.domain + '/s/' + nu.token; S.users.push(fix(nu)); return { user: nu }
     }
     if (u && method === 'PATCH') { if (body.unblock || 'devices' in body) u.block_until = 0; delete body.unblock; Object.assign(u, body); return { user: fix(u) } }
+    if (u && path.endsWith('/links')) return { links: [['Stockholm', 'Vision', 'vless://00000000-0000-4000-8000-000000000000@' + S.settings.domain + ':443?security=tls#Stockholm'], ['Stockholm', 'Hysteria2', 'hysteria2://demo@' + S.settings.domain + ':443#Stockholm'], ['Mobile', 'Reality', 'vless://00000000-0000-4000-8000-000000000000@185.104.248.17:443?security=reality#Mobile']].map(([name, proto, url]) => ({ name, proto, url })) }
     if (u && path.endsWith('/reset')) { u.used = u.up = u.down = 0; fix(u); return {} }
     if (u && path.endsWith('/regen')) { u.token = 'demo' + Date.now().toString(36); u.url = 'https://' + S.settings.domain + '/s/' + u.token; return { user: u } }
     if (u && method === 'DELETE') { S.users = S.users.filter((x) => x !== u); return {} }
@@ -325,7 +326,20 @@
     const box = $('mp-d-chart'); box._key = ''; box.replaceChildren()
     try { const r = await api('GET', 'api/traffic?days=30&user=' + id); if (openId === id) drawChart(box, r.days, 'Трафик по дням') } catch (e) {}
   }
-  function openDetail(id) { openId = Number(id); fillDetail(); $('mp-detail').showModal(); loadUserChart(openId) }
+  // Ссылки на каждое подключение по отдельности: нажатие на строку копирует
+  let userLinks = []
+  async function loadUserLinks(id) {
+    const box = $('mp-d-links'), sec = $('mp-d-links-sec')
+    try { const r = await api('GET', `api/users/${id}/links`); if (openId !== id) return; userLinks = r.links || [] } catch (e) { if (openId !== id) return; userLinks = [] }
+    box.innerHTML = userLinks.map((l, i) => `<button type="button" class="alist-row" data-i="${i}"><span class="alist-ic"><i data-lucide="copy"></i></span><span class="alist-tx"><b>${esc(l.name)}</b><span>${esc(l.proto)}</span></span></button>`).join('')
+    sec.hidden = !userLinks.length; window.lucide?.createIcons()
+  }
+  $('mp-d-links').addEventListener('click', (e) => {
+    const l = userLinks[e.target.closest('[data-i]')?.dataset.i]; if (!l) return
+    navigator.clipboard?.writeText(l.url).catch(() => {})
+    toast({ type: 'success', title: 'Ссылка скопирована', text: `${l.name}, ${l.proto}` })
+  })
+  function openDetail(id) { openId = Number(id); $('mp-d-links-sec').hidden = true; fillDetail(); $('mp-detail').showModal(); loadUserChart(openId); loadUserLinks(openId) }
   $('mp-d-unblock').addEventListener('click', (e) => busy(e.currentTarget, async () => {
     const u = cur(); if (!u) return
     try { const r = await api('PATCH', 'api/users/' + u.id, { unblock: true }); putUser(r.user); fillDetail(false); toast({ type: 'success', title: 'Доступ открыт', text: u.name }) } catch (err) { fail(err) }
@@ -352,7 +366,7 @@
     busy(document.querySelector('[form="mp-d-form"]'), async () => {
       try {
         const r = await api('PATCH', 'api/users/' + u.id, { name: dForm.name.value, note: dForm.note.value, limit: parseGb(dForm.limit.value), expire: fromDateInput(dForm.expire.value), enabled: dForm.enabled.checked, period: dForm.period.value, devices: Number(dForm.devices.value) || 0, kit: Number(dForm.kit.value) || undefined })
-        putUser(r.user); fillDetail(); toast({ type: 'success', title: 'Сохранено', text: ST[r.user.state][0] + ', ' + left(r.user) })
+        putUser(r.user); fillDetail(); loadUserLinks(u.id); toast({ type: 'success', title: 'Сохранено', text: ST[r.user.state][0] + ', ' + left(r.user) })
       } catch (err) { fail(err) }
     })
   })
@@ -392,7 +406,7 @@
   $('mp-d-regen').addEventListener('click', async () => {
     const u = cur(); if (!u) return
     if (!await confirmAct('Выдать новую ссылку?', `Старая ссылка для «${u.name}» перестанет работать, в приложение нужно будет добавить новую`, 'Выдать новую')) return
-    try { const r = await api('POST', `api/users/${u.id}/regen`); putUser(r.user); fillDetail(false); toast({ type: 'success', title: 'Новая ссылка готова', text: 'Отправьте её заново, старая больше не работает' }) } catch (e) { fail(e) }
+    try { const r = await api('POST', `api/users/${u.id}/regen`); putUser(r.user); fillDetail(false); loadUserLinks(u.id); toast({ type: 'success', title: 'Новая ссылка готова', text: 'Отправьте её заново, старая больше не работает' }) } catch (e) { fail(e) }
   })
   $('mp-d-del').addEventListener('click', async () => {
     const u = cur(); if (!u) return

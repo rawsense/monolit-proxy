@@ -122,19 +122,20 @@ export function createNodes({ db, xray, log, dayOf, server, users }) {
     }
     return out;
   }
-  function links(u, srv) {
-    const fp = srv.fp || 'firefox', d = srv.domain, out = [];
+  function linkList(u, srv) {
+    const fp = srv.fp || 'firefox', d = srv.domain, out = [], push = (l, url) => out.push({ name: l.name, proto: PROTO[l.proto], url });
     for (const l of forUser(u)) {
       const e = entry(l), n = e && byId(e), name = encodeURIComponent(l.name);
-      if (e && l.proto === 'hy2') out.push(`hysteria2://${encodeURIComponent(lineUuid(u.hy2, l.id))}@${n.domain}:443?sni=${n.domain}&alpn=h3#${name}`);
-      else if (e && l.proto === 'vision') out.push(`vless://${lineUuid(u.uuid, l.id)}@${n.domain}:${VISION_PORT}?encryption=none&security=tls&type=tcp&flow=xtls-rprx-vision&sni=${n.domain}&fp=${fp}#${name}`);
-      else if (e) out.push(`vless://${lineUuid(u.uuid, l.id)}@${n.addr}:443?encryption=none&security=reality&type=tcp&flow=xtls-rprx-vision&sni=${sni(n)}&fp=${fp}&pbk=${n.pub}&sid=${n.sid}#${name}`);
-      else if (l.proto === 'vision') out.push(`vless://${u.uuid}@${d}:${srv.ports.vision}?encryption=none&security=tls&type=tcp&flow=xtls-rprx-vision&sni=${d}&fp=${fp}#${name}`);
-      else if (l.proto === 'xhttp' && srv.xhttpPath) out.push(`vless://${u.uuid}@${d}:443?encryption=none&security=tls&type=xhttp&mode=stream-up&path=%2F${encodeURIComponent(srv.xhttpPath)}&sni=${d}&fp=${fp}&alpn=h2#${name}`);
-      else if (l.proto === 'hy2') out.push(`hysteria2://${encodeURIComponent(u.hy2)}@${d}:${srv.ports.hy2}?sni=${d}&alpn=h3#${name}`);
+      if (e && l.proto === 'hy2') push(l, `hysteria2://${encodeURIComponent(lineUuid(u.hy2, l.id))}@${n.domain}:443?sni=${n.domain}&alpn=h3#${name}`);
+      else if (e && l.proto === 'vision') push(l, `vless://${lineUuid(u.uuid, l.id)}@${n.domain}:${VISION_PORT}?encryption=none&security=tls&type=tcp&flow=xtls-rprx-vision&sni=${n.domain}&fp=${fp}#${name}`);
+      else if (e) push(l, `vless://${lineUuid(u.uuid, l.id)}@${n.addr}:443?encryption=none&security=reality&type=tcp&flow=xtls-rprx-vision&sni=${sni(n)}&fp=${fp}&pbk=${n.pub}&sid=${n.sid}#${name}`);
+      else if (l.proto === 'vision') push(l, `vless://${u.uuid}@${d}:${srv.ports.vision}?encryption=none&security=tls&type=tcp&flow=xtls-rprx-vision&sni=${d}&fp=${fp}#${name}`);
+      else if (l.proto === 'xhttp' && srv.xhttpPath) push(l, `vless://${u.uuid}@${d}:443?encryption=none&security=tls&type=xhttp&mode=stream-up&path=%2F${encodeURIComponent(srv.xhttpPath)}&sni=${d}&fp=${fp}&alpn=h2#${name}`);
+      else if (l.proto === 'hy2') push(l, `hysteria2://${encodeURIComponent(u.hy2)}@${d}:${srv.ports.hy2}?sni=${d}&alpn=h3#${name}`);
     }
     return out;
   }
+  const links = (u, srv) => linkList(u, srv).map((x) => x.url);
 
   // ---------- конфиг Xray для ноды ----------
   function nodeConfig(n) {
@@ -356,5 +357,5 @@ export function createNodes({ db, xray, log, dayOf, server, users }) {
     return bad('Нет такого действия', 404);
   }
 
-  return { kindsOn, linkClients, ensureLinks, render, links, onlineMap, http, api, state, kitOf, defKit, nodeConfig, usable };
+  return { kindsOn, linkClients, ensureLinks, render, links, linkList, onlineMap, http, api, state, kitOf, defKit, nodeConfig, usable };
 }
