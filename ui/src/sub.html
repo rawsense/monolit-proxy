@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ru" data-store="monolit-sub" data-theme-default="system" data-accent-default="slate">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Подписка monolit proxy</title>
+<link rel="icon" href="mark.svg" type="image/svg+xml">
+<!--css--><link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="../ds/tokens/colors.css"><link rel="stylesheet" href="../ds/tokens/accents.css"><link rel="stylesheet" href="../ds/tokens/palettes.css">
+<link rel="stylesheet" href="../ds/tokens/motion.css">
+<link rel="stylesheet" href="../ds/tokens/type.css">
+<link rel="stylesheet" href="../ds/tokens/space.css">
+<link rel="stylesheet" href="../ds/tokens/icons.css">
+<link rel="stylesheet" href="../ds/tokens/components.css">
+<link rel="stylesheet" href="../ds/tokens/inputs.css">
+<link rel="stylesheet" href="../ds/tokens/layers.css">
+<link rel="stylesheet" href="../ds/tokens/data.css">
+<link rel="stylesheet" href="../ds/tokens/soft.css">
+<link rel="stylesheet" href="monolit.css">
+<link rel="stylesheet" href="sub.css"><!--/css-->
+<script src="../ds/js/theme.js"></script>
+<script>document.documentElement.classList.add('js'); window.SUB = "__SUB__"</script>
+<!--js--><script src="icons.js" defer></script>
+<script src="../ds/js/layers.js" defer></script>
+<script src="../ds/js/inputs.js" defer></script>
+<script src="../ds/js/data.js" defer></script>
+<script src="qr.js" defer></script>
+<script src="sub.js" defer></script><!--/js-->
+</head>
+<body>
+<main class="mp-wrap mp-page">
+  <!-- Пропуск: сколько осталось, имя, трафик -->
+  <section class="mp-pass" aria-label="Подписка">
+    <div class="mp-pass-head">
+      <span class="mp-logo"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2.5" fill="currentColor"/></svg><span class="mp-wm">monolit proxy</span></span>
+      <span class="mp-pass-st" id="s-st"><i></i><span>работает</span></span>
+    </div>
+    <div class="mp-pass-mid">
+      <span id="s-big-k">осталось</span>
+      <b class="mp-pass-big" id="s-big">24 дня</b>
+      <span id="s-exp"></span>
+    </div>
+    <div class="mp-pass-foot">
+      <div class="mp-pass-row"><h1 id="s-name">Подписка</h1><span id="s-used"></span></div>
+      <div class="progress" role="progressbar" aria-label="Израсходовано" id="s-prog"><i></i></div>
+    </div>
+  </section>
+
+  <div class="alert alert-warning" id="s-alert" hidden><i data-lucide="triangle-alert"></i><div><b id="s-alert-t">Подписка не работает</b><span>Напишите тому, кто дал ссылку. После продления всё заработает само</span></div></div>
+
+  <!-- Три действия -->
+  <div class="mp-acts">
+    <a class="mp-act mp-act-main" id="s-add" href="#"><i data-lucide="plus"></i><span>Добавить</span></a>
+    <button class="mp-act" type="button" id="s-copy"><span class="mp-act-sw"><span class="mp-act-a"><i data-lucide="copy"></i><span>Скопировать</span></span><span class="mp-act-b" aria-hidden="true"><svg class="lucide" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path pathLength="1" d="M20 6 9 17l-5-5"/></svg><span>Скопировано</span></span></span></button>
+    <button class="mp-act" type="button" data-open="s-qr-dlg"><i data-lucide="qr-code"></i><span>QR-код</span></button>
+  </div>
+
+  <!-- Как подключиться -->
+  <section class="mp-card mp-connect" aria-labelledby="s-h">
+    <div class="mp-connect-head"><h2 id="s-h">Как подключиться</h2>
+      <div class="seg" role="group" aria-label="Приложение" id="s-apps"><span class="thumb"></span>
+        <button type="button" aria-pressed="true" data-app="incy">INCY</button><button type="button" aria-pressed="false" data-app="happ">Happ</button></div></div>
+
+    <div class="mp-step">
+      <span class="mp-num">1</span>
+      <div class="mp-step-tx"><b id="s-t1">Установите INCY</b><span>Бесплатно и без регистрации</span></div>
+      <div class="mp-step-act"><a class="btn btn-secondary btn-sm" id="s-store" href="#" target="_blank" rel="noopener"><i data-lucide="download"></i><span>App Store</span></a>
+        <p class="mp-other" id="s-other"></p></div>
+    </div>
+
+    <div class="mp-step">
+      <span class="mp-num">2</span>
+      <div class="mp-step-tx"><b>Добавьте подписку</b><span id="s-t2">Нажмите «Добавить» на карточке выше, INCY откроется сам</span></div>
+    </div>
+
+    <div class="mp-step">
+      <span class="mp-num">3</span>
+      <div class="mp-step-tx"><b>Включите</b><span id="s-connect">Нажмите большую кнопку в приложении</span></div>
+    </div>
+  </section>
+
+  <p class="mp-foot" id="s-support" hidden><a class="link" id="s-support-a" href="#" target="_blank" rel="noopener">Написать в поддержку</a></p>
+</main>
+
+<dialog class="dialog" id="s-qr-dlg" aria-labelledby="s-qr-t">
+  <div class="dialog-head"><div><h2 id="s-qr-t">QR-код этой страницы</h2><p>Наведите камеру другого телефона, и там откроется эта страница</p></div>
+    <button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="dialog-main"><div class="mp-qr" id="s-qr"></div></div>
+</dialog>
+</body>
+</html>

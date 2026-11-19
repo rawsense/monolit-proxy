@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="ru" data-store="monolit" data-theme-default="system" data-accent-default="slate" data-auth="user">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>monolit proxy</title>
+<link rel="icon" href="_/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="_/admin.css?v=4343625fca">
+<script>/* Тема: предпочтение light | dark | system.
+   Подключать в <head> БЕЗ defer — тема ставится до первой отрисовки, без мигания чужой темы.
+   Переключатели: любые кнопки с data-theme-v="light|dark|system" (aria-checked ставится сам).
+   Тема по умолчанию: <html data-theme-default="dark">, иначе dark.
+   API: setThemePref(pref, animate), getThemePref(); событие window 'themechange' {theme, pref}. */
+// Вид спиннера по умолчанию на всех страницах — меняется этой строкой:
+// 'tail' | 'ring' | 'rays' | 'dots' | 'bars' | 'grid' | 'square' | 'arc'
+const SPINNER = 'tail';
+/* Свои настройки у сайта продукта: <html data-store="coreless"> → ключи 'coreless:ds-theme' и т. п.
+   Иначе выбор на витрине (тот же адрес) перекрашивал бы лендинг: у продукта свой акцент и свой режим. */
+const DS_KEY = (k) => (document.documentElement.dataset.store ? document.documentElement.dataset.store + ':' : '') + k;
+(() => {
+  const root = document.documentElement;
+  if (!root.dataset.spinner) root.dataset.spinner = SPINNER;
+  if (innerWidth <= 960) root.classList.add('nav-compact');   // шапка-бургер до первой отрисовки; точный порог считает nav.js   // страница может задать свой: <html data-spinner="dots">
+  const mqDark = matchMedia('(prefers-color-scheme: dark)');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  let pref = null;
+  try { pref = localStorage.getItem(DS_KEY('ds-theme')) } catch (e) {}
+  if (!['light', 'dark', 'system'].includes(pref)) pref = root.dataset.themeDefault || 'dark';
+
+  const resolve = (p) => (p === 'system' ? (mqDark.matches ? 'dark' : 'light') : p);
+  const paint = () => document.querySelectorAll('[data-theme-v]').forEach((b) => b.setAttribute('aria-checked', b.dataset.themeV === pref));
+  const apply = (theme, animate) => {
+    const go = () => { root.dataset.theme = theme; dispatchEvent(new CustomEvent('themechange', { detail: { theme, pref } })) };
+    // плавная смена — через View Transitions (кадр-снимок растворяется), без перекраски каждого элемента
+    // во скрытой вкладке браузер пропускает переход (тема всё равно меняется) — гасим отказ промиса, чтобы не шуметь в консоли
+    if (animate && document.startViewTransition && !reduce.matches) { const vt = document.startViewTransition(go); vt.ready.catch(() => {}); vt.finished.catch(() => {}) }
+    else go();
+  };
+
+  root.dataset.theme = resolve(pref);   // до отрисовки
+
+  window.setThemePref = (p, animate) => {
+    pref = p; apply(resolve(p), animate); paint();
+    try { localStorage.setItem(DS_KEY('ds-theme'), p) } catch (e) {}
+  };
+  window.getThemePref = () => pref;
+  window.paintThemeControls = paint;
+
+  mqDark.addEventListener('change', () => { if (pref === 'system') apply(resolve('system'), true) });
+  // другая вкладка или окно-образец (iframe) сменили тему — подхватываем
+  addEventListener('storage', (e) => { if (e.key === DS_KEY('ds-theme') && ['light', 'dark', 'system'].includes(e.newValue)) { pref = e.newValue; apply(resolve(pref), false); paint() } });
+  document.addEventListener('click', (e) => { const b = e.target.closest('[data-theme-v]'); if (b) setThemePref(b.dataset.themeV, true) });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', paint); else paint();
+})();
+
+// Заголовки: короткий предлог или союз не остаётся в конце строки («договорённости о / сменах»).
+// После него ставится неразрывный пробел; data-typo-off на элементе — отключить.
+(() => {
+  const RE = /(^|[\s(« ])(в|во|на|о|об|обо|с|со|к|ко|у|и|а|но|по|за|из|от|до|для|без|не|при|про|над|под|или|ни) /gi;
+  const fix = (root) => root.querySelectorAll('h1, h2, h3, h4, .sec-title, .hero-title').forEach((h) => {
+    if (h.closest('[data-typo-off]')) return;
+    const w = document.createTreeWalker(h, NodeFilter.SHOW_TEXT);
+    for (let n; (n = w.nextNode());) { const t = n.textContent.replace(RE, '$1$2 ').replace(RE, '$1$2 '); if (t !== n.textContent) n.textContent = t }
+  });
+  window.typoFix = fix;   // для заголовков, вставленных скриптом позже
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => fix(document)); else fix(document);
+})();
+
+/* Режим цвета: mono (Vercel) | accent (Linear, по умолчанию) | tint (Supabase) | rich («Выраженная»: фон и слои в тон акцента) — tokens/palettes.css.
+   Кнопки data-palette-v="…" (aria-checked ставится сам). API: setPalette(p, animate), getPalette(); событие 'palettechange'. */
+(() => {
+  const root = document.documentElement, OK = ['mono', 'accent', 'tint', 'rich'];
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  let pal = null;
+  try { pal = localStorage.getItem(DS_KEY('ds-palette')) } catch (e) {}
+  if (!OK.includes(pal)) pal = root.dataset.paletteDefault || 'accent';
+  const put = () => { if (pal === 'accent') delete root.dataset.palette; else root.dataset.palette = pal };
+  put();   // до отрисовки
+  const paint = () => document.querySelectorAll('[data-palette-v]').forEach((b) => b.setAttribute('aria-checked', b.dataset.paletteV === pal));
+  window.setPalette = (p, animate) => {
+    if (!OK.includes(p)) return; pal = p;
+    const go = () => { put(); paint(); dispatchEvent(new CustomEvent('palettechange', { detail: { palette: p } })) };
+    if (animate && document.startViewTransition && !reduce.matches) { const vt = document.startViewTransition(go); vt.ready.catch(() => {}); vt.finished.catch(() => {}) } else go();
+    try { localStorage.setItem(DS_KEY('ds-palette'), p) } catch (e) {}
+  };
+  window.getPalette = () => pal;
+  addEventListener('storage', (e) => { if (e.key === DS_KEY('ds-palette') && OK.includes(e.newValue)) { pal = e.newValue; put(); paint() } });
+  document.addEventListener('click', (e) => { const b = e.target.closest('[data-palette-v]'); if (b) setPalette(b.dataset.paletteV, true) });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', paint); else paint();
+})();
+
+/* Бесконечные анимации, которых не видно, стоят на паузе (класс .anim-off, стиль — в components.css).
+   Спиннеры с анимацией своих свойств (@property: arc, square, bars, grid, dots) и скелеты перерисовываются
+   на каждом кадре в основном потоке — даже за экраном. 15 таких на странице съедали треть кадра,
+   и любая анимация поверх (окно, список) начинала «лагать». Замер: кадр в покое 18–24 мс → 6 мс (CPU ×4) */
+(() => {
+  const SEL = '.spinner, .skeleton';
+  const io = new IntersectionObserver((es) => es.forEach((e) => e.target.classList.toggle('anim-off', !e.isIntersecting)), { rootMargin: '64px' });
+  const watch = (n) => { if (n.nodeType !== 1) return; if (n.matches(SEL)) io.observe(n); n.querySelectorAll(SEL).forEach((x) => io.observe(x)) };
+  const start = () => {
+    watch(document.body);
+    new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach(watch))).observe(document.body, { childList: true, subtree: true });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+
+/* Акцентный цвет: evory (по умолчанию) и ещё 17 подобранных вручную (список OK ниже) — tokens/accents.css (только проверенные тона).
+   Кнопки data-accent-v="…" (aria-checked ставится сам). API: setAccent(name, animate), getAccent(); событие 'accentchange'. */
+(() => {
+  const root = document.documentElement, OK = ['evory', 'ink', 'slate', 'petrol', 'aubergine', 'wine', 'terracotta', 'moss', 'ochre', 'brick', 'dustrose', 'lilac', 'heather', 'azure', 'seawave', 'sage', 'pine', 'graphite'];
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  let acc = null;
+  try { acc = localStorage.getItem(DS_KEY('ds-accent')) } catch (e) {}
+  if (!OK.includes(acc)) acc = root.dataset.accentDefault || 'evory';
+  const put = () => { if (acc === 'evory') delete root.dataset.accent; else root.dataset.accent = acc };
+  put();   // до отрисовки
+  const paint = () => document.querySelectorAll('[data-accent-v]').forEach((b) => b.setAttribute('aria-checked', b.dataset.accentV === acc));
+  window.setAccent = (a, animate) => {
+    if (!OK.includes(a)) return; acc = a;
+    const go = () => { put(); paint(); dispatchEvent(new CustomEvent('accentchange', { detail: { accent: a } })) };
+    if (animate && document.startViewTransition && !reduce.matches) { const vt = document.startViewTransition(go); vt.ready.catch(() => {}); vt.finished.catch(() => {}) } else go();
+    try { localStorage.setItem(DS_KEY('ds-accent'), a) } catch (e) {}
+  };
+  window.getAccent = () => acc;
+  addEventListener('storage', (e) => { if (e.key === DS_KEY('ds-accent') && OK.includes(e.newValue)) { acc = e.newValue; put(); paint() } });
+  document.addEventListener('click', (e) => { const b = e.target.closest('[data-accent-v]'); if (b) setAccent(b.dataset.accentV, true) });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', paint); else paint();
+})();
+</script>
+<script>document.documentElement.classList.add('js')</script>
+<script src="_/admin.js?v=2b61a06ad7" defer></script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="mp-mark" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2.5" fill="currentColor"/></symbol></svg>
+
+<!-- Вход -->
+<main class="mp-login" id="mp-login" hidden>
+  <form class="mp-login-card" id="mp-login-form" novalidate>
+    <span class="mp-logo"><svg><use href="#mp-mark"/></svg><span class="mp-wm">monolit proxy</span></span>
+    <label class="field"><span class="label">Логин</span>
+      <input class="input" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+    <label class="field"><span class="label">Пароль <span class="opt mp-caps" id="mp-caps" aria-hidden="true">включён Caps Lock</span></span>
+      <input class="input" type="password" name="password" autocomplete="current-password" required></label>
+    <button class="btn btn-primary btn-block" type="submit"><span>Войти</span></button>
+  </form>
+</main>
+
+<div class="app-shell" id="mp-app" hidden>
+<aside class="side" data-narrow="1180" aria-label="Меню monolit proxy">
+  <div class="side-head">
+    <span class="side-ws mp-logo"><svg><use href="#mp-mark"/></svg><span class="side-tx mp-wm">monolit proxy</span></span>
+    <button class="icon-btn icon-btn-sm side-toggle" type="button" data-side-toggle aria-label="Свернуть меню"><i data-lucide="panel-left"></i></button>
+  </div>
+  <nav class="side-nav">
+    <a class="side-item" href="#" data-page="users" aria-current="page"><i data-lucide="users"></i><span class="side-tx">Пользователи</span><span class="side-count" id="mp-count-all">0</span></a>
+    <a class="side-item" href="#" data-page="nodes"><i data-lucide="waypoints"></i><span class="side-tx">Ноды</span><span class="side-count" id="nd-count">1</span><span class="side-dot" id="nd-dot" hidden></span></a>
+    <a class="side-item" href="#" data-page="subs"><i data-lucide="list-checks"></i><span class="side-tx">Подписки</span></a>
+    <a class="side-item" href="#" data-open="mp-srv"><i data-lucide="server"></i><span class="side-tx">Сервер</span></a>
+    <a class="side-item" href="#" data-open="mp-addr"><i data-lucide="map-pin"></i><span class="side-tx">Адрес</span><span class="side-dot" id="mp-addr-dot" hidden></span></a>
+    <a class="side-item" href="#" data-open="mp-routes"><i data-lucide="route"></i><span class="side-tx">Маршруты</span></a>
+    <a class="side-item" href="#" data-open="mp-warp"><i data-lucide="cloud"></i><span class="side-tx">WARP</span></a>
+    <a class="side-item" href="#" data-open="mp-proto"><i data-lucide="network"></i><span class="side-tx">Протоколы</span></a>
+    <a class="side-item" href="#" data-open="mp-hist"><i data-lucide="history"></i><span class="side-tx">История</span></a>
+    <a class="side-item" href="#" data-open="mp-tpl"><i data-lucide="file-code"></i><span class="side-tx">Шаблон autoXRAY</span></a>
+    <a class="side-item" href="#" data-open="mp-mnt"><i data-lucide="wrench"></i><span class="side-tx">Обслуживание</span></a>
+    <a class="side-item" href="#" data-open="mp-set"><i data-lucide="settings"></i><span class="side-tx">Настройки</span></a>
+  </nav>
+  <div class="side-foot"><span class="avatar" data-hue="1" id="mp-acc-av" aria-hidden="true">A</span><span class="side-tx mp-acc"><b id="mp-acc-login">admin</b><span id="mp-server-foot">Сервер</span></span>
+    <button class="icon-btn icon-btn-sm" type="button" id="mp-logout" aria-label="Выйти" data-tip="Выйти"><i data-lucide="log-out"></i></button></div>
+</aside>
+<main class="app-main"><div class="app-inner">
+  <div class="alert alert-danger mp-alert" id="mp-block-alert" hidden><i data-lucide="circle-alert"></i><div><b id="mp-block-t">IP сервера не открывается из России</b><span id="mp-block-p">Приложения в России не подключатся. Можно сменить IP или домен</span>
+    <div class="btn-row mp-alert-act"><button class="btn btn-secondary btn-sm" type="button" data-open="mp-addr"><span>Что делать</span></button></div></div></div>
+  <div class="alert alert-danger mp-alert" id="mp-xray-alert" hidden><i data-lucide="circle-alert"></i><div><b>Xray не отвечает</b><span id="mp-xray-err">Изменения применятся, когда он снова заработает</span></div></div>
+<section class="mp-page" id="mp-page-users">
+  <div class="app-head">
+    <div>
+      <div class="app-title"><h1>Пользователи</h1><span class="badge badge-success" id="mp-xray-badge"><span class="dot"></span>Xray работает</span></div>
+      <p class="app-sub" id="mp-sub">Загружаем</p>
+    </div>
+  </div>
+
+  <div class="mp-stats">
+    <div class="stat"><div class="stat-head"><span>Активны</span></div><div class="stat-num" id="mp-n-active">0</div><div class="stat-foot" id="mp-n-active-f">подписка работает</div></div>
+    <div class="stat"><div class="stat-head"><span>Истекли</span></div><div class="stat-num" id="mp-n-ended">0</div><div class="stat-foot">доступ закрыт</div></div>
+    <div class="stat"><div class="stat-head"><span>Трафик</span></div><div class="stat-num" id="mp-traffic">0</div><div class="stat-foot">у всех за всё время</div></div>
+    <button class="stat mp-stat-btn" type="button" data-open="mp-tpl"><div class="stat-head"><span>autoXRAY</span></div><div class="stat-num" id="mp-tpl-ver">—</div><div class="stat-foot" id="mp-tpl-foot">не загружен</div></button>
+  </div>
+
+  <section class="card mp-chart-card" id="mp-tr-card" hidden aria-label="Трафик по дням">
+    <div class="chart-head"><div class="mp-tr-h"><h4>Трафик за 30 дней</h4><b class="mp-tr-sum" id="mp-tr-sum">0</b></div><span class="mp-note" id="mp-tr-tz"></span></div>
+    <div class="mp-chart" id="mp-tr-chart"></div>
+  </section>
+
+  <div class="mp-tools">
+    <span class="input-wrap search"><i data-lucide="search"></i>
+      <input class="input" type="search" id="mp-search" placeholder="Поиск" data-hotkey="/" aria-label="Поиск" autocomplete="off">
+      <span class="trail"><span class="kbd">/</span><button type="button" class="icon-btn icon-btn-sm clear" aria-label="Очистить"><i data-lucide="x"></i></button></span></span>
+    <button class="btn btn-primary mp-add-btn" type="button" data-open="mp-add" aria-label="Добавить"><i data-lucide="plus"></i><span class="mp-add-tx">Добавить</span></button>
+  </div>
+  <div class="mp-list" id="mp-list">
+    <div class="table-wrap"><table class="table table-stack mp-table">
+      <thead><tr><th>Пользователь</th><th class="mp-st-col">Статус</th><th>Трафик</th><th class="mp-exp-col">Срок</th><th class="mp-seen-col">В сети</th></tr></thead>
+      <tbody id="mp-rows"></tbody>
+    </table></div>
+    <div class="state state-dashed" id="mp-empty" hidden><span class="state-ic"><i data-lucide="users"></i></span><h4 id="mp-empty-t">Пока никого</h4><p id="mp-empty-p">Добавьте первого человека, и у него появится своя ссылка на подписку</p></div>
+  </div>
+  <div class="mp-foot"><p class="hint">Данные обновляются раз в минуту</p></div>
+</section>
+
+<!-- Ноды -->
+<section class="mp-page" id="mp-page-nodes" hidden>
+  <div class="app-head">
+    <div>
+      <div class="app-title"><h1>Ноды</h1><span class="badge badge-success" id="nd-badge"><span class="dot"></span><span>Все на связи</span></span></div>
+      <p class="app-sub" id="nd-sub"></p>
+    </div>
+    <div class="btn-row"><button class="btn btn-primary" type="button" id="nd-add-btn"><i data-lucide="plus"></i><span>Добавить ноду</span></button></div>
+  </div>
+  <div class="mp-list mp-nd-list">
+    <div class="table-wrap"><table class="table table-stack mp-table mp-nd-table">
+      <thead><tr><th>Нода</th><th>Занята</th><th>Статус</th><th class="num">В сети</th><th class="num">За сутки</th></tr></thead>
+      <tbody id="nd-rows"></tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- Подписки -->
+<section class="mp-page" id="mp-page-subs" hidden>
+  <div class="app-head">
+    <div>
+      <div class="app-title"><h1>Подписки</h1></div>
+      <p class="app-sub">Что человек увидит в приложении</p>
+    </div>
+  </div>
+  <div class="mp-kit-bar">
+    <div class="tabs" role="tablist" aria-label="Наборы" id="kit-tabs"><span class="line"></span></div>
+    <button class="btn btn-ghost btn-sm mp-kit-new" type="button" id="kit-new" aria-label="Новый набор"><i data-lucide="plus"></i><span>Набор</span></button>
+  </div>
+  <div class="mp-kit" id="kit-box">
+    <div class="mp-kit-main">
+      <div class="alist mp-lines" id="ln-list"></div>
+      <div class="state state-dashed" id="ln-empty" hidden><span class="state-ic"><i data-lucide="list-checks"></i></span><h4>В наборе пусто</h4><p>Люди с этим набором не увидят в приложении ни одного сервера</p></div>
+      <div class="btn-row"><button class="btn btn-primary" type="button" id="ln-add"><i data-lucide="plus"></i><span>Добавить подключение</span></button></div>
+    </div>
+    <aside class="mp-kit-side">
+      <div class="mp-section">
+        <span class="t-label">Набор</span>
+        <label class="field"><span class="label">Название</span><input class="input" id="kit-name" maxlength="24" autocomplete="off"></label>
+        <label class="choice"><input type="checkbox" role="switch" class="switch" id="kit-def"><span>Для новых людей</span></label>
+      </div>
+      <div class="mp-section">
+        <span class="t-label">У кого</span>
+        <div class="mp-kit-who"><span class="avatars avatars-md" id="kit-avs"></span><button class="btn btn-secondary btn-sm" type="button" id="kit-who"><span>Изменить</span></button></div>
+      </div>
+      <div class="mp-section" id="kit-del-sec"><div class="btn-row"><button class="btn btn-ghost btn-sm mp-danger" type="button" id="kit-del"><i data-lucide="trash-2"></i><span>Удалить набор</span></button></div></div>
+    </aside>
+  </div>
+</section>
+</div></main>
+</div>
+
+<!-- Добавить -->
+<dialog class="dialog dialog-md dialog-scroll" id="mp-add" aria-labelledby="mp-add-t"><form novalidate id="mp-add-form">
+  <div class="dialog-head"><div><h2 id="mp-add-t">Новый пользователь</h2><p>Одна ссылка на все подключения набора</p></div>
+    <button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="dialog-main mp-form">
+    <label class="field"><span class="label">Имя</span><input class="input" name="name" maxlength="40" placeholder="Например, Маша" autocomplete="off" required></label>
+    <label class="field"><span class="label">Срок</span>
+      <select class="select" name="days"><option value="30" selected>30 дней</option><option value="90">90 дней</option><option value="180">Полгода</option><option value="365">Год</option><option value="0">Бессрочно</option></select></label>
+    <div class="mp-pair">
+      <label class="field"><span class="label">Лимит трафика, ГБ</span><input class="input" name="limit" inputmode="decimal" placeholder="Без лимита" autocomplete="off"></label>
+      <label class="field"><span class="label">Лимит считать</span><select class="select" name="period"><option value="" selected>За всё время</option><option value="month">Каждый месяц</option></select></label>
+    </div>
+    <label class="field"><span class="label">Устройств одновременно</span><select class="select" name="devices"><option value="" selected>Без ограничения</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="10">10</option></select>
+      <span class="hint">Считаются разные IP. Если их больше, доступ закроется на 10 минут</span></label>
+    <label class="field mp-kit-f"><span class="label">Набор подключений</span><select class="select" name="kit"></select></label>
+    <label class="field"><span class="label">Заметка <span class="opt">необязательно</span></span><input class="input" name="note" maxlength="200" autocomplete="off"></label>
+  </div>
+  <div class="dialog-foot"><button type="button" class="btn btn-ghost" data-close>Отмена</button><button class="btn btn-primary" type="submit"><span>Создать</span></button></div>
+</form></dialog>
+
+<!-- Ссылка после создания -->
+<dialog class="dialog dialog-md dialog-scroll" id="mp-made" aria-labelledby="mp-made-t">
+  <div class="dialog-head"><div><h2 id="mp-made-t">Ссылка готова</h2><p id="mp-made-p">Отправьте её, по ней откроется страница с инструкцией</p></div>
+    <button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="dialog-main mp-form">
+    <span class="copy-field"><input class="input" readonly id="mp-made-url" aria-label="Ссылка на подписку"><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать ссылку" id="mp-made-copy" data-copy=""></button></span>
+  </div>
+  <div class="dialog-foot"><button type="button" class="btn btn-primary" data-close>Готово</button></div>
+</dialog>
+
+<!-- Карточка пользователя -->
+<dialog class="sheet sheet-side mp-detail" id="mp-detail" aria-labelledby="mp-d-title">
+  <div class="sheet-head"><div><h2 id="mp-d-title">Пользователь</h2><p class="mp-did" id="mp-d-state"></p></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="sheet-body">
+    <div class="mp-section">
+      <span class="t-label">Ссылка на подписку</span>
+      <span class="copy-field"><input class="input" readonly id="mp-d-url" aria-label="Ссылка на подписку"><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать ссылку" id="mp-d-copy" data-copy=""></button></span>
+      <div class="btn-row"><a class="btn btn-secondary btn-sm" id="mp-d-open" href="#" target="_blank" rel="noopener"><i data-lucide="external-link"></i>Открыть страницу</a>
+        <button class="btn btn-secondary btn-sm" type="button" id="mp-d-qrbtn"><i data-lucide="qr-code"></i>QR-код</button></div>
+    </div>
+    <div class="mp-section">
+      <span class="t-label">Трафик</span>
+      <div class="mp-usage"><div class="mp-usage-num" id="mp-d-used"></div><div class="progress" role="progressbar" aria-label="Трафик" id="mp-d-prog"><i></i></div><p class="mp-note" id="mp-d-usage-note"></p></div>
+      <div class="mp-chart" id="mp-d-chart"></div>
+    </div>
+    <div class="mp-section">
+      <span class="t-label">Устройства</span>
+      <div class="alert alert-warning" id="mp-d-block" hidden><i data-lucide="triangle-alert"></i><div><b id="mp-d-block-t">Доступ закрыт</b><span>Подключилось больше устройств, чем разрешено</span></div></div>
+      <dl class="mp-kv" id="mp-d-ips"></dl>
+      <p class="mp-note" id="mp-d-dev-note"></p>
+      <div class="btn-row" id="mp-d-unblock-row" hidden><button class="btn btn-secondary btn-sm" type="button" id="mp-d-unblock"><i data-lucide="lock-open"></i><span>Открыть доступ сейчас</span></button></div>
+    </div>
+    <form class="mp-section mp-form" id="mp-d-form" novalidate>
+      <span class="t-label">Доступ</span>
+      <label class="choice"><input type="checkbox" role="switch" class="switch" name="enabled"><span>Подписка включена<small>Срабатывает сразу, без «Сохранить»</small></span></label>
+      <label class="field"><span class="label">Имя</span><input class="input" name="name" maxlength="40" autocomplete="off"></label>
+      <label class="field"><span class="label">Действует до</span><input class="input" type="date" name="expire"><span class="hint" id="mp-d-exp-hint">Оставьте пустым, если бессрочно</span></label>
+      <div class="btn-row mp-quick"><button class="btn btn-secondary btn-sm" type="button" data-add-days="30">+30 дней</button><button class="btn btn-secondary btn-sm" type="button" data-add-days="90">+90 дней</button><button class="btn btn-secondary btn-sm" type="button" data-add-days="365">+год</button><button class="btn btn-ghost btn-sm" type="button" id="mp-d-noexp">Очистить</button></div>
+      <div class="mp-pair">
+        <label class="field"><span class="label">Лимит трафика, ГБ</span><input class="input" name="limit" inputmode="decimal" placeholder="Без лимита" autocomplete="off"></label>
+        <label class="field"><span class="label">Лимит считать</span><select class="select" name="period"><option value="">За всё время</option><option value="month">Каждый месяц</option></select></label>
+      </div>
+      <label class="field"><span class="label">Устройств одновременно</span><select class="select" name="devices"><option value="" selected>Без ограничения</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="10">10</option></select><span class="hint">Считаются разные IP. Если их больше, доступ закроется на 10 минут</span></label>
+      <label class="field mp-kit-f"><span class="label">Набор подключений</span><select class="select" name="kit"></select></label>
+      <label class="field"><span class="label">Заметка</span><input class="input" name="note" maxlength="200" autocomplete="off"></label>
+    </form>
+    <div class="mp-section">
+      <span class="t-label">Редкие действия</span>
+      <div class="alist mp-actions">
+        <button type="button" class="alist-row" id="mp-d-reset"><span class="alist-ic"><i data-lucide="rotate-ccw"></i></span><span class="alist-tx"><b>Обнулить трафик</b><span>Счётчик с нуля, лимит тот же</span></span></button>
+        <button type="button" class="alist-row" id="mp-d-regen"><span class="alist-ic"><i data-lucide="key-round"></i></span><span class="alist-tx"><b>Выдать новую ссылку</b><span>Старая перестанет работать</span></span></button>
+        <button type="button" class="alist-row mp-danger" id="mp-d-del"><span class="alist-ic"><i data-lucide="trash-2"></i></span><span class="alist-tx"><b>Удалить пользователя</b><span>Подписка удалится насовсем</span></span></button>
+      </div>
+    </div>
+  </div>
+  <div class="sheet-foot"><button class="btn btn-primary" type="submit" form="mp-d-form"><span>Сохранить</span></button></div>
+</dialog>
+
+<dialog class="dialog" id="mp-qr-dlg" aria-labelledby="mp-qr-t">
+  <div class="dialog-head"><div><h2 id="mp-qr-t">QR-код</h2><p>Наведите камеру телефона, и откроется страница подписки</p></div>
+    <button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="dialog-main"><div class="mp-qr" id="mp-d-qr"></div></div>
+</dialog>
+
+<dialog class="dialog" id="mp-confirm" aria-labelledby="mp-c-t">
+  <div class="dialog-body"><h2 id="mp-c-t">Удалить?</h2><p id="mp-c-p"></p></div>
+  <div class="dialog-foot"><button class="btn btn-ghost" type="button" data-close>Отмена</button><button class="btn btn-danger" type="button" id="mp-c-ok"><span>Удалить</span></button></div>
+</dialog>
+
+
+<!-- Новая нода: команда и ожидание -->
+<dialog class="dialog dialog-md dialog-scroll" id="nd-add" aria-labelledby="nd-add-t"><form novalidate id="nd-add-form">
+  <div class="dialog-head"><div><h2 id="nd-add-t">Новая нода</h2><p>Запустите команду на новом сервере</p></div>
+    <button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="dialog-main mp-form">
+    <label class="field"><span class="label">Название</span><input class="input" name="name" maxlength="24" autocomplete="off"></label>
+    <div class="code mp-cmd"><div class="code-head"><span class="code-file"><i data-lucide="terminal"></i>от root</span><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать команду" id="nd-add-copy" data-copy=""></button></div><pre><code id="nd-add-cmd"></code></pre></div>
+    <div class="mp-wait" id="nd-add-wait"><span class="mp-wait-a"><span class="spinner"></span><span>Ждём сервер</span></span><span class="mp-wait-b"><span class="badge badge-success"><span class="dot"></span>На связи</span><span id="nd-add-ip"></span></span></div>
+  </div>
+  <div class="dialog-foot"><button type="button" class="btn btn-ghost" data-close>Закрыть</button><button class="btn btn-primary" type="submit" id="nd-add-ok" disabled><span>Готово</span></button></div>
+</form></dialog>
+
+<!-- Карточка ноды -->
+<dialog class="sheet sheet-side" id="nd-sheet" aria-labelledby="nd-s-t">
+  <div class="sheet-head"><div><h2 id="nd-s-t">Нода</h2><p class="mp-did" id="nd-s-ip"></p></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="sheet-body">
+    <div class="mp-section">
+      <div class="mp-srv-line"><span class="badge" id="nd-s-badge"><span class="dot"></span><span></span></span><span class="mp-note" id="nd-s-seen"></span></div>
+      <div class="alert alert-danger" id="nd-s-err" hidden><i data-lucide="circle-alert"></i><div><b>Xray на ноде не принял настройки</b><span id="nd-s-err-t"></span></div></div>
+      <dl class="mp-kv" id="nd-s-kv"></dl>
+    </div>
+    <form class="mp-section mp-form" id="nd-s-form" novalidate>
+      <span class="t-label">Настройки</span>
+      <label class="field"><span class="label">Название</span><input class="input" name="name" maxlength="24" autocomplete="off"></label>
+      <label class="field"><span class="label">Домен <span class="opt">необязательно</span></span><input class="input" name="domain" placeholder="msk.example.ru" autocomplete="off" spellcheck="false" autocapitalize="none"><span class="hint" id="nd-s-dom-h"></span></label>
+      <label class="field"><span class="label">Маскировка под сайт</span><input class="input" name="mask" autocomplete="off" spellcheck="false" autocapitalize="none"></label>
+    </form>
+    <div class="mp-section">
+      <span class="t-label">Редкие действия</span>
+      <div class="alist mp-actions">
+        <button type="button" class="alist-row" id="nd-s-again"><span class="alist-ic"><i data-lucide="terminal"></i></span><span class="alist-tx"><b>Команда для переустановки</b><span>Если сервер переставили с нуля</span></span></button>
+        <button type="button" class="alist-row mp-danger" id="nd-s-del"><span class="alist-ic"><i data-lucide="trash-2"></i></span><span class="alist-tx"><b>Убрать ноду</b><span>Её подключения пропадут из подписок</span></span></button>
+      </div>
+    </div>
+  </div>
+  <div class="sheet-foot"><button class="btn btn-primary" type="submit" form="nd-s-form"><span>Сохранить</span></button></div>
+</dialog>
+
+<!-- Подключение -->
+<dialog class="dialog dialog-md dialog-scroll" id="ln-dlg" aria-labelledby="ln-dlg-t"><form novalidate id="ln-form">
+  <div class="dialog-head"><div><h2 id="ln-dlg-t">Подключение</h2></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="dialog-main mp-form">
+    <label class="field"><span class="label">Название</span><input class="input" name="name" maxlength="40" autocomplete="off"></label>
+    <div class="mp-pair">
+      <label class="field"><span class="label">Сервер</span><select class="select" name="out"></select></label>
+      <label class="field"><span class="label">Мост</span><select class="select" name="via"></select></label>
+    </div>
+    <label class="field"><span class="label">Протокол</span><select class="select" name="proto"></select></label>
+  </div>
+  <div class="dialog-foot"><button type="button" class="btn btn-ghost mp-danger mp-ln-del" id="ln-del"><i data-lucide="trash-2"></i><span>Удалить</span></button><button type="button" class="btn btn-ghost" data-close>Отмена</button><button class="btn btn-primary" type="submit"><span>Сохранить</span></button></div>
+</form></dialog>
+
+<!-- Новый набор -->
+<dialog class="dialog" id="kit-dlg" aria-labelledby="kit-dlg-t"><form novalidate id="kit-form">
+  <div class="dialog-head"><div><h2 id="kit-dlg-t">Новый набор</h2></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="dialog-main mp-form"><label class="field"><span class="label">Название</span><input class="input" name="name" maxlength="24" autocomplete="off" required></label></div>
+  <div class="dialog-foot"><button type="button" class="btn btn-ghost" data-close>Отмена</button><button class="btn btn-primary" type="submit"><span>Создать</span></button></div>
+</form></dialog>
+
+<!-- У кого набор -->
+<dialog class="dialog dialog-md dialog-scroll" id="who-dlg" aria-labelledby="who-dlg-t"><form novalidate id="who-form">
+  <div class="dialog-head"><div><h2 id="who-dlg-t">У кого набор</h2></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="dialog-main"><div class="mp-checks" id="who-list"></div></div>
+  <div class="dialog-foot"><button type="button" class="btn btn-ghost" data-close>Отмена</button><button class="btn btn-primary" type="submit"><span>Сохранить</span></button></div>
+</form></dialog>
+
+<!-- Шаблон autoXRAY -->
+<dialog class="sheet sheet-side" id="mp-tpl" aria-labelledby="mp-tpl-t">
+  <div class="sheet-head"><h2 id="mp-tpl-t">Шаблон autoXRAY</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="sheet-body">
+    <div class="mp-section">
+      <p class="mp-note">Настройки приложений в подписках берутся из autoXRAY на GitHub: маршруты, отпечаток браузера, протоколы. Скрипт не запускается, из него берётся только шаблон, и каждая новая версия сначала проверяется самим Xray</p>
+      <div class="alert alert-warning" id="mp-tpl-rej" hidden><i data-lucide="triangle-alert"></i><div><b>Новая версия не прошла проверку</b><span id="mp-tpl-rej-t"></span></div></div>
+      <dl class="mp-kv" id="mp-tpl-kv"></dl>
+    </div>
+    <div class="mp-section">
+      <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-tpl-auto"><span>Обновлять сам<small>Раз в сутки; если выключить, новая версия будет ждать вашей кнопки</small></span></label>
+      <div class="btn-row"><button class="btn btn-secondary" type="button" id="mp-tpl-check"><i data-lucide="refresh-cw"></i><span>Проверить сейчас</span></button>
+        <button class="btn btn-ghost" type="button" id="mp-tpl-back"><i data-lucide="undo-2"></i><span>Вернуть прошлую</span></button></div>
+    </div>
+  </div>
+</dialog>
+
+<!-- Настройки -->
+<dialog class="sheet sheet-side" id="mp-set" aria-labelledby="mp-set-t">
+  <div class="sheet-head"><h2 id="mp-set-t">Настройки</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <form class="sheet-body mp-form" id="mp-set-form" novalidate>
+    <div class="mp-section">
+      <span class="t-label">Сервер</span>
+      <label class="field"><span class="label">Название в приложениях</span><input class="input" name="server_name" maxlength="24" autocomplete="off"><span class="hint">Так подписка будет подписана в Happ и INCY</span></label>
+      <label class="field"><span class="label">Отпечаток браузера</span>
+        <select class="select" name="fp"><option value="firefox">Firefox, как в autoXRAY</option><option value="chrome">Chrome</option><option value="safari">Safari</option><option value="ios">iOS</option><option value="android">Android</option><option value="edge">Edge</option></select></label>
+      <label class="field"><span class="label">Обновлять подписку в приложениях, часов</span><input class="input" name="update_hours" inputmode="numeric" autocomplete="off"></label>
+      <label class="field"><span class="label">Ссылка на поддержку <span class="opt">необязательно</span></span><input class="input" name="support_url" placeholder="https://t.me/ваш_ник" autocomplete="off" spellcheck="false"><span class="hint">Кнопка «Поддержка» в Happ и INCY</span></label>
+    </div>
+    <div class="mp-section">
+      <span class="t-label">Уведомления в Telegram</span>
+      <p class="mp-note">Напишем, если IP сервера перестанет открываться из России, и когда сменится адрес</p>
+      <label class="field"><span class="label">Токен бота</span><input class="input" name="tg_token" autocomplete="off" spellcheck="false" placeholder="123456789:AA…"><span class="hint">Создайте бота у @BotFather и напишите ему /start</span></label>
+      <label class="field"><span class="label">ID чата <span class="opt">найдём сами</span></span><input class="input" name="tg_chat" inputmode="numeric" autocomplete="off" spellcheck="false"><span class="hint">Пусто: возьмём из вашего сообщения боту при проверке</span></label>
+      <div class="btn-row"><button class="btn btn-secondary" type="button" id="mp-tg-test"><i data-lucide="send"></i><span>Проверить</span></button></div>
+    </div>
+    <div class="mp-section">
+      <span class="t-label">Вход</span>
+      <label class="field"><span class="label">Логин</span><input class="input" name="login" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+      <label class="field"><span class="label">Новый пароль <span class="opt">не меньше 8 символов</span></span><input class="input" type="password" name="password" autocomplete="new-password"></label>
+    </div>
+    <div class="mp-section">
+      <span class="t-label">Оформление</span>
+      <div class="mp-theme"><span>Тема</span><div class="tseg" role="group" aria-label="Тема"><button type="button" class="tseg-b" role="radio" data-theme-v="light" aria-label="Светлая"><i data-lucide="sun"></i></button><button type="button" class="tseg-b" role="radio" data-theme-v="dark" aria-label="Тёмная"><i data-lucide="moon"></i></button><button type="button" class="tseg-b" role="radio" data-theme-v="system" aria-label="Как в системе"><i data-lucide="monitor"></i></button></div></div>
+    </div>
+  </form>
+  <div class="sheet-foot"><button class="btn btn-primary" type="submit" form="mp-set-form"><span>Сохранить</span></button></div>
+</dialog>
+
+<!-- Обслуживание: обновление и бэкап срабатывают сразу, без «Сохранить» -->
+<dialog class="sheet sheet-side" id="mp-mnt" aria-labelledby="mp-mnt-t">
+  <div class="sheet-head"><h2 id="mp-mnt-t">Обслуживание</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="sheet-body">
+    <div class="mp-section">
+      <span class="t-label">Обновление</span>
+      <dl class="mp-kv" id="mp-up-kv"></dl>
+      <div class="alert alert-danger" id="mp-up-fail" hidden><i data-lucide="circle-alert"></i><div><b>Обновление не встало</b><span id="mp-up-fail-t"></span></div></div>
+      <div class="mp-up-new" id="mp-up-new" hidden><b id="mp-up-new-t"></b><p class="mp-note mp-up-notes" id="mp-up-notes"></p></div>
+      <p class="mp-note" id="mp-up-run" hidden></p>
+      <div class="btn-row"><button class="btn btn-primary" type="button" id="mp-up-go" hidden><i data-lucide="download"></i><span>Обновить</span></button>
+        <button class="btn btn-secondary" type="button" id="mp-up-check"><i data-lucide="refresh-cw"></i><span>Проверить</span></button></div>
+    </div>
+    <div class="mp-section">
+      <span class="t-label">Бэкап</span>
+      <p class="mp-note">В файле пользователи, ссылки подписок, маршруты, настройки и ключи WARP. Храните его как пароль: по нему можно подключиться</p>
+      <div class="btn-row"><a class="btn btn-secondary" id="mp-bk-get" href="api/backup" download><i data-lucide="download"></i>Скачать бэкап</a></div>
+      <label class="dz" data-max="64" data-accept=".json,application/json" tabindex="0" id="mp-bk-dz"><input type="file">
+        <span class="dz-ic"><i data-lucide="upload"></i></span><span><b>Восстановить: перетащите файл</b> или <u>выберите</u></span><span>monolit-….json, заменит всё на этом сервере</span></label>
+    </div>
+  </div>
+</dialog>
+
+<!-- Сервер -->
+<dialog class="sheet sheet-side" id="mp-srv" aria-labelledby="mp-srv-t">
+  <div class="sheet-head"><h2 id="mp-srv-t">Сервер</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="sheet-body">
+    <div class="alert alert-danger mp-alert" id="mp-srv-noagent" hidden><i data-lucide="circle-alert"></i><div><b>Помощник на сервере не отвечает</b><span id="mp-srv-noagent-t"></span></div></div>
+    <div class="mp-section" id="mp-srv-state">
+      <div class="mp-srv-line"><span class="badge badge-success" id="mp-srv-badge"><span class="dot"></span><span id="mp-srv-st">Xray работает</span></span><span class="mp-note" id="mp-srv-info"></span></div>
+      <dl class="mp-kv" id="mp-srv-kv"></dl>
+      <div class="alert alert-danger" id="mp-srv-nginx" hidden><i data-lucide="circle-alert"></i><div><b>nginx не работает</b><span>Админка и страницы подписок могут не открываться. Попробуйте «Перечитать настройки nginx» или посмотрите журнал</span></div></div>
+      <div class="alert alert-warning" id="mp-srv-cert" hidden><i data-lucide="triangle-alert"></i><div><b id="mp-srv-cert-t">Сертификат скоро закончится</b><span>Нажмите «Продлить сертификат». Если не продлится, приложения перестанут подключаться</span></div></div>
+    </div>
+    <div class="mp-section"><span class="t-label">Действия</span>
+      <div class="alist mp-actions" id="mp-srv-acts">
+        <button type="button" class="alist-row" data-act="restart" data-ask="Перезапустить Xray?|Подключения оборвутся на пару секунд, приложения переподключатся сами|Перезапустить"><span class="alist-ic"><i data-lucide="rotate-ccw"></i></span><span class="alist-tx"><b>Перезапустить Xray</b><span>Связь прервётся на пару секунд</span></span></button>
+        <button type="button" class="alist-row" data-act="reload"><span class="alist-ic"><i data-lucide="refresh-cw"></i></span><span class="alist-tx"><b>Перечитать настройки nginx</b><span>Сайты не прерываются</span></span></button>
+        <button type="button" class="alist-row" data-act="update" data-ask="Обновить Xray?|Поставим последнюю версию с GitHub и перезапустим. Подключения оборвутся на пару секунд|Обновить"><span class="alist-ic"><i data-lucide="download"></i></span><span class="alist-tx"><b>Обновить Xray</b><span id="mp-srv-ver">Последняя версия с GitHub</span></span></button>
+        <button type="button" class="alist-row" data-act="geo"><span class="alist-ic"><i data-lucide="globe"></i></span><span class="alist-tx"><b>Обновить базы адресов</b><span>geosite и geoip для маршрутов</span></span></button>
+        <button type="button" class="alist-row" data-act="cert"><span class="alist-ic"><i data-lucide="shield-check"></i></span><span class="alist-tx"><b>Продлить сертификат</b><span>Если осталось меньше 30 дней</span></span></button>
+        <button type="button" class="alist-row" data-act="journal"><span class="alist-ic"><i data-lucide="scroll-text"></i></span><span class="alist-tx"><b>Журнал Xray</b><span>Последние 100 строк</span></span></button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<!-- Адрес: доступность из России, домен, IP, способ -->
+<dialog class="sheet sheet-side" id="mp-addr" aria-labelledby="mp-addr-t">
+  <div class="sheet-head"><h2 id="mp-addr-t">Адрес</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="sheet-body">
+    <div class="mp-section">
+      <span class="t-label">Доступность из России</span>
+      <div class="mp-srv-line"><span class="badge" id="mp-w-badge"><span class="dot"></span><span id="mp-w-st">Не проверялся</span></span><span class="mp-note" id="mp-w-when"></span></div>
+      <dl class="mp-kv" id="mp-w-kv"></dl>
+      <p class="mp-note" id="mp-w-err" hidden></p>
+      <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-w-on"><span>Проверять сам<small id="mp-w-on-h">Через check-host.net, ему уходит только IP сервера</small></span></label>
+      <label class="field" id="mp-w-every-f"><span class="label">Как часто</span>
+        <select class="select" id="mp-w-every"><option value="30">Раз в 30 минут</option><option value="60">Раз в час</option><option value="180">Раз в 3 часа</option><option value="360">Раз в 6 часов</option></select></label>
+      <p class="mp-note" id="mp-w-tg"></p>
+      <div class="btn-row"><button class="btn btn-secondary" type="button" id="mp-w-check"><i data-lucide="refresh-cw"></i><span>Проверить сейчас</span></button></div>
+    </div>
+    <div class="mp-section">
+      <span class="t-label">Домен и IP</span>
+      <div class="alert alert-danger" id="mp-a-fail" hidden><i data-lucide="circle-alert"></i><div><b>Сменить не получилось</b><span id="mp-a-fail-t"></span></div></div>
+      <div class="alert alert-info" id="mp-a-run" hidden><i data-lucide="refresh-cw"></i><div><b>Меняем адрес</b><span id="mp-a-run-t">VPN и сайты прервутся примерно на минуту</span></div></div>
+      <div class="alert alert-warning" id="mp-a-foreign" hidden><i data-lucide="triangle-alert"></i><div><b>Xray настроен через autoXRAY</b><span>Адрес меняется переустановкой: bash install.sh --reconfigure --replace-autoxray</span></div></div>
+      <dl class="mp-kv" id="mp-a-kv"></dl>
+      <div class="alist" id="mp-a-alt" hidden></div>
+      <div class="btn-row"><button class="btn btn-primary" type="button" id="mp-a-edit"><i data-lucide="pencil"></i><span>Изменить</span></button></div>
+    </div>
+    <div class="mp-section" id="mp-o-sec" hidden>
+      <span class="t-label">Исходящий IP</span>
+      <dl class="mp-kv" id="mp-o-kv"></dl>
+      <p class="mp-note">С этого адреса сервер выходит в интернет: его видят сайты и приложения людей</p>
+      <div class="btn-row"><button class="btn btn-secondary" type="button" id="mp-o-edit"><i data-lucide="pencil"></i><span>Изменить</span></button></div>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="dialog dialog-md dialog-scroll" id="mp-o-dlg" aria-labelledby="mp-od-t"><form novalidate id="mp-o-form">
+  <div class="dialog-head"><div><h2 id="mp-od-t">Исходящий IP</h2><p>Сначала проверим, что с адреса есть выход в интернет. Xray перезапустится, VPN прервётся на несколько секунд</p></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="dialog-main mp-form">
+    <label class="field"><span class="label">Адрес</span><select class="select" name="ip" id="mp-o-ip"></select><span class="hint" id="mp-o-h">Подписки и DNS не меняются</span></label>
+  </div>
+  <div class="dialog-foot"><button type="button" class="btn btn-ghost" data-close>Отмена</button><button class="btn btn-primary" type="submit"><span>Применить</span></button></div>
+</form></dialog>
+
+<dialog class="dialog dialog-md dialog-scroll" id="mp-a-dlg" aria-labelledby="mp-ad-t"><form novalidate id="mp-a-form">
+  <div class="dialog-head"><div><h2 id="mp-ad-t">Домен и IP</h2><p>Перед сменой сохраним копии настроек. Не поднимется, вернём как было</p></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="dialog-main mp-form">
+    <label class="field"><span class="label">Домен</span><input class="input" name="domain" autocomplete="off" spellcheck="false" autocapitalize="none"><span class="hint" id="mp-a-dns">К нему подключаются приложения, на нём ссылки подписок</span></label>
+    <label class="choice" id="mp-a-keep-f" hidden><input type="checkbox" class="check" name="keep_old" checked><span>Оставить старый домен запасным<small>Старые ссылки подписок продолжат работать, приложения перейдут на новый домен при обновлении подписки</small></span></label>
+    <label class="field"><span class="label">Способ</span><select class="select" name="mode" id="mp-a-mode"></select><span class="hint" id="mp-a-mode-h"></span></label>
+    <label class="field" id="mp-a-ip-f" hidden><span class="label">Входящий IP</span><select class="select" name="ip2" id="mp-a-ip"></select><span class="hint">На нём Xray принимает подключения. Домен должен смотреть на этот адрес</span></label>
+    <label class="choice" id="mp-a-force-f" hidden><input type="checkbox" class="check" name="force"><span>Применить, хотя DNS не совпадает<small>Если сервер за NAT или запись ещё обновляется. Новый сертификат так не выпустится</small></span></label>
+  </div>
+  <div class="dialog-foot"><button type="button" class="btn btn-ghost" data-close>Отмена</button><button class="btn btn-primary" type="submit"><span>Применить</span></button></div>
+</form></dialog>
+
+<dialog class="dialog dialog-lg dialog-scroll" id="mp-log" aria-labelledby="mp-log-t">
+  <div class="dialog-head"><div><h2 id="mp-log-t">Журнал Xray</h2><p id="mp-log-p">Последние 100 строк</p></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="dialog-main"><div class="code mp-log"><div class="code-head"><span class="code-file"><i data-lucide="scroll-text"></i><span id="mp-log-file">journalctl -u xray</span></span><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать" id="mp-log-copy" data-copy=""></button></div><pre><code id="mp-log-text"></code></pre></div></div>
+</dialog>
+
+<!-- Маршруты -->
+<dialog class="sheet sheet-side mp-wide" id="mp-routes" aria-labelledby="mp-rt-t">
+  <div class="sheet-head"><h2 id="mp-rt-t">Маршруты</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="sheet-body">
+    <div class="alert alert-warning mp-foreign" hidden><i data-lucide="triangle-alert"></i><div><b>Xray настроен через autoXRAY</b><span>Чтобы управлять им здесь, переустановите: bash install.sh --reconfigure --replace-autoxray. Ключи, выданные autoXRAY, перестанут работать</span></div></div>
+    <div class="mp-section">
+      <p class="mp-note">Куда сервер отправляет адреса: напрямую, через WARP или в блок. Правила проверяются сверху вниз, всё остальное идёт напрямую</p>
+      <div class="mp-rt-check">
+      <form class="mp-inline" id="mp-rt-test" novalidate><span class="input-wrap search"><i data-lucide="globe"></i><input class="input" name="host" placeholder="Адрес для проверки" autocomplete="off" spellcheck="false" aria-label="Адрес для проверки"><span class="trail"><button type="button" class="icon-btn icon-btn-sm clear" aria-label="Очистить"><i data-lucide="x"></i></button></span></span><button class="btn btn-secondary" type="submit"><span>Проверить</span></button></form>
+      <div class="mp-rt-out" id="mp-rt-out" hidden>
+      <p class="mp-note" id="mp-rt-res"></p>
+      <dl class="mp-kv mp-reach" id="mp-rt-reach" hidden>
+        <div><dt>С вашего устройства</dt><dd data-k="device"></dd></div>
+        <div><dt>С сервера</dt><dd data-k="server"></dd></div>
+        <div><dt>Через WARP</dt><dd data-k="warp"></dd></div>
+      </dl>
+      <button class="btn btn-secondary btn-sm mp-reach-go" id="mp-rt-go" type="button" hidden><i data-lucide="cloud"></i><span>Пускать через WARP</span></button>
+      </div>
+      </div>
+    </div>
+    <div class="mp-section mp-managed">
+      <span class="t-label">Правила</span>
+      <div class="alist mp-rts" id="mp-rt-list"></div>
+      <div class="state state-dashed" id="mp-rt-empty" hidden><span class="state-ic"><i data-lucide="route"></i></span><h4>Правил нет</h4><p>Весь трафик идёт напрямую с адреса сервера</p></div>
+      <div class="btn-row mp-rt-foot"><button class="btn btn-primary" type="button" id="mp-rt-add"><i data-lucide="plus"></i>Добавить правило</button><button class="btn btn-ghost mp-danger" type="button" id="mp-rt-clear"><i data-lucide="trash-2"></i><span>Удалить все</span></button></div>
+    </div>
+    <div class="mp-section mp-managed">
+      <span class="t-label">Готовые наборы</span>
+      <div class="btn-row mp-presets" id="mp-rt-presets"></div>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="dialog dialog-md dialog-scroll" id="mp-rt-dlg" aria-labelledby="mp-rtd-t"><form novalidate id="mp-rt-form">
+  <div class="dialog-head"><div><h2 id="mp-rtd-t">Новое правило</h2><p>Применится сразу после проверки Xray</p></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="dialog-main mp-form">
+    <label class="field"><span class="label">Название <span class="opt">необязательно</span></span><input class="input" name="name" maxlength="40" autocomplete="off" placeholder="Например, Нейросети"></label>
+    <label class="field"><span class="label">Адреса</span><textarea class="textarea" name="values" rows="4" spellcheck="false" placeholder="chatgpt.com"></textarea>
+      <span class="hint">По одному в строке: сайт с поддоменами (example.com), geosite:netflix, geoip:ru, подсеть 1.2.3.0/24, порт 25 или bittorrent</span></label>
+    <div class="field"><span class="label">Куда</span>
+      <div class="seg" role="group" aria-label="Куда отправлять" id="mp-rt-to"><span class="thumb"></span><button type="button" aria-pressed="true" data-v="direct">Напрямую</button><button type="button" aria-pressed="false" data-v="warp">Через WARP</button><button type="button" aria-pressed="false" data-v="block">В блок</button></div>
+      <span class="hint" id="mp-rt-to-hint"></span></div>
+    <div class="btn-row mp-rt-more" id="mp-rt-more"><button class="btn btn-secondary btn-sm" type="button" data-move="-1"><i data-lucide="arrow-up"></i>Выше</button><button class="btn btn-secondary btn-sm" type="button" data-move="1"><i data-lucide="arrow-down"></i>Ниже</button><button class="btn btn-ghost btn-sm mp-danger" type="button" id="mp-rt-del"><i data-lucide="trash-2"></i>Удалить</button></div>
+  </div>
+  <div class="dialog-foot"><button type="button" class="btn btn-ghost" data-close>Отмена</button><button class="btn btn-primary" type="submit"><span>Сохранить</span></button></div>
+</form></dialog>
+
+<!-- WARP -->
+<dialog class="sheet sheet-side" id="mp-warp" aria-labelledby="mp-warp-t">
+  <div class="sheet-head"><h2 id="mp-warp-t">WARP</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="sheet-body">
+    <div class="alert alert-warning mp-foreign" hidden><i data-lucide="triangle-alert"></i><div><b>Xray настроен через autoXRAY</b><span>Чтобы управлять им здесь, переустановите: bash install.sh --reconfigure --replace-autoxray. Ключи, выданные autoXRAY, перестанут работать</span></div></div>
+    <div class="mp-section mp-managed">
+      <p class="mp-note">Выход через сеть Cloudflare для сайтов, которые не пускают адреса дата-центров. Сам по себе ничего не меняет: что через него идёт, решают маршруты</p>
+      <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-warp-on"><span>WARP включён<small id="mp-warp-on-h">Срабатывает сразу</small></span></label>
+      <dl class="mp-kv" id="mp-warp-kv"></dl>
+      <div class="btn-row"><button class="btn btn-secondary" type="button" id="mp-warp-check"><i data-lucide="eye"></i><span>Проверить</span></button><button class="btn btn-ghost" type="button" id="mp-warp-reg"><i data-lucide="refresh-cw"></i><span>Зарегистрировать заново</span></button></div>
+      <p class="mp-note" id="mp-warp-res" hidden></p>
+    </div>
+    <form class="mp-section mp-managed mp-form" id="mp-warp-plus" novalidate>
+      <span class="t-label">WARP+</span>
+      <label class="field"><span class="label">Ключ из приложения 1.1.1.1</span><input class="input" name="key" placeholder="xxxxxxxx-xxxxxxxx-xxxxxxxx" autocomplete="off" spellcheck="false"><span class="hint">Быстрее и без ограничений бесплатного WARP</span></label>
+      <div class="btn-row"><button class="btn btn-secondary" type="submit"><span>Применить ключ</span></button></div>
+    </form>
+  </div>
+</dialog>
+
+<!-- Протоколы -->
+<dialog class="sheet sheet-side" id="mp-proto" aria-labelledby="mp-proto-t">
+  <div class="sheet-head"><h2 id="mp-proto-t">Протоколы</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="sheet-body">
+    <div class="alert alert-warning mp-foreign" hidden><i data-lucide="triangle-alert"></i><div><b>Xray настроен через autoXRAY</b><span>Чтобы управлять им здесь, переустановите: bash install.sh --reconfigure --replace-autoxray. Ключи, выданные autoXRAY, перестанут работать</span></div></div>
+    <div class="mp-section mp-managed">
+      <span class="t-label">Входы VPN</span>
+      <label class="choice"><input type="checkbox" role="switch" class="switch" checked disabled><span>Vision<small>Основной вход на 443, через него открываются и сайты. Не выключается</small></span></label>
+      <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-pr-hy2" data-k="hy2"><span>Hysteria2<small id="mp-pr-hy2-h">UDP 443, быстрее на плохой связи</small></span></label>
+      <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-pr-xhttp" data-k="xhttp"><span>XHTTP<small id="mp-pr-xhttp-h">Через nginx, если TCP режут</small></span></label>
+      <p class="mp-note">Выключенный вход пропадёт из подписок, когда приложения их обновят</p>
+    </div>
+    <form class="mp-section mp-managed mp-form" id="mp-socks" novalidate>
+      <span class="t-label">SOCKS5</span>
+      <label class="choice"><input type="checkbox" role="switch" class="switch" name="on"><span>SOCKS5 с паролем<small>Для программ, которые не умеют VLESS</small></span></label>
+      <div class="mp-socks-f" id="mp-socks-f">
+        <label class="field"><span class="label">Порт</span><input class="input" name="port" inputmode="numeric" autocomplete="off"></label>
+        <label class="field"><span class="label">Логин</span><input class="input" name="user" autocomplete="off" spellcheck="false"></label>
+        <label class="field"><span class="label">Пароль</span><input class="input" name="pass" autocomplete="off" spellcheck="false"></label>
+      </div>
+      <span class="copy-field" id="mp-socks-cf"><input class="input" readonly id="mp-socks-url" aria-label="Адрес SOCKS5"><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать адрес" id="mp-socks-copy" data-copy=""></button></span>
+      <div class="btn-row"><button class="btn btn-secondary" type="submit"><span>Сохранить SOCKS5</span></button></div>
+    </form>
+    <div class="mp-section mp-managed" id="mp-mtg">
+      <span class="t-label">Telegram</span>
+      <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-mtg-on"><span>Прокси для Telegram<small id="mp-mtg-h">mtg, маскируется под сайт домена</small></span></label>
+      <span class="copy-field"><input class="input" readonly id="mp-mtg-url" aria-label="Ссылка на прокси Telegram"><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать ссылку" id="mp-mtg-copy" data-copy=""></button></span>
+    </div>
+  </div>
+</dialog>
+
+<!-- История -->
+<dialog class="sheet sheet-side" id="mp-hist" aria-labelledby="mp-hist-t">
+  <div class="sheet-head"><h2 id="mp-hist-t">История</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="sheet-body">
+    <div class="alert alert-warning mp-foreign" hidden><i data-lucide="triangle-alert"></i><div><b>Xray настроен через autoXRAY</b><span>Чтобы управлять им здесь, переустановите: bash install.sh --reconfigure --replace-autoxray. Ключи, выданные autoXRAY, перестанут работать</span></div></div>
+    <div class="mp-section mp-managed">
+      <p class="mp-note">Перед каждым изменением сохраняется прежний конфиг Xray. Вернуть можно любой, пользователи останутся как сейчас</p>
+      <ol class="tl" id="mp-hist-list"></ol>
+      <div class="state state-dashed" id="mp-hist-empty" hidden><span class="state-ic"><i data-lucide="history"></i></span><h4>Изменений ещё не было</h4><p>Они появятся здесь, когда вы поменяете маршруты, WARP или протоколы</p></div>
+    </div>
+  </div>
+</dialog>
+</body>
+</html>

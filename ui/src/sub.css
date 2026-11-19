@@ -1,0 +1,77 @@
+/* Страница подписки: пропуск сверху, три действия, шаги подключения. Одна колонка под телефон */
+*, *::before, *::after { box-sizing: border-box }
+html { color-scheme: dark; -webkit-tap-highlight-color: transparent }
+[data-theme="light"] { color-scheme: light }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-sans);
+  font-size: var(--fs-md); line-height: var(--lh-md); letter-spacing: var(--ls-md) }
+h1, h2, p { margin: 0 }
+[hidden] { display: none !important }
+
+.mp-wrap { width: min(520px, 100%); margin: 0 auto; padding: 0 var(--sp-4) }
+.mp-page { display: grid; gap: var(--sp-5); padding-top: var(--sp-5); padding-bottom: var(--sp-12) }
+.mp-note { color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-sm) }
+.alert div { display: grid; gap: 2px }
+
+/* Пропуск: тёмная карта в обеих темах, как вещь, а не часть страницы */
+.mp-pass { position: relative; overflow: hidden; display: grid; gap: var(--sp-6); padding: var(--sp-6); border-radius: var(--r-xl); color: #f4f6f8;
+  background: linear-gradient(150deg, #2b3542 0%, #161b22 60%, #10141a 100%); box-shadow: inset 0 0 0 1px #ffffff14 }
+.mp-pass::after { content: ""; position: absolute; right: -40px; top: -30px; width: 150px; height: 260px; border-radius: 28px; background: #ffffff08; transform: rotate(18deg); pointer-events: none }
+.mp-pass > * { position: relative; z-index: 1 }
+.mp-pass-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3) }
+.mp-pass .mp-logo { color: #f4f6f8 }
+.mp-pass .mp-logo svg { color: #8aa0b8 }
+.mp-pass-st { display: inline-flex; align-items: center; gap: 6px; color: #8fd6a5; font-size: var(--fs-sm); white-space: nowrap }
+.mp-pass-st i { width: 6px; height: 6px; border-radius: 50%; background: currentColor }
+.mp-pass-st.bad { color: #f0c94d }
+.mp-pass-mid { display: grid; gap: var(--sp-1) }
+.mp-pass-mid span { color: #ffffff8c; font-size: var(--fs-sm); line-height: var(--lh-sm) }
+.mp-pass-big { font-family: Geologica, var(--font-sans); font-weight: 600; font-size: 44px; line-height: 48px; letter-spacing: -.03em }
+.mp-pass-foot { display: grid; gap: var(--sp-2) }
+.mp-pass-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); font-size: var(--fs-sm) }
+.mp-pass-row h1 { min-width: 0; overflow-wrap: anywhere; font-size: var(--fs-lg); line-height: var(--lh-lg); font-weight: var(--w-medium) }
+.mp-pass-row span { color: #ffffff8c; white-space: nowrap }
+.mp-pass .progress { background: #ffffff1a }
+.mp-pass .progress > i { background: #c9d4df }
+
+/* Три действия плитками */
+.mp-acts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-2) }
+.mp-act { display: grid; justify-items: center; align-content: center; gap: var(--sp-2); min-height: 88px; padding: var(--sp-3) var(--sp-2); border: 0; border-radius: var(--r-lg);
+  background: var(--surface); box-shadow: inset 0 0 0 1px var(--border-subtle); color: var(--text); font: inherit; font-size: var(--fs-sm); line-height: var(--lh-sm);
+  text-decoration: none; text-align: center; cursor: pointer; --hd: var(--dur-hover-out);
+  transition: background-color var(--hd) var(--ease-hover), box-shadow var(--hd) var(--ease-hover), outline-color var(--dur-focus) var(--ease-out); outline: 2px solid transparent; outline-offset: 2px }
+.mp-act .lucide { width: 22px; height: 22px; color: var(--text-secondary) }
+.mp-act:focus-visible { outline-color: var(--focus) }
+@media (hover: hover) and (pointer: fine) { .mp-act:hover { --hd: var(--dur-hover-in); background: var(--surface-hover, var(--fill)) } }
+.mp-act-main { background: var(--text); color: var(--bg); box-shadow: none }
+.mp-act-main .lucide { color: inherit }
+@media (hover: hover) and (pointer: fine) { .mp-act-main:hover { background: color-mix(in srgb, var(--text) 88%, var(--bg)) } }
+/* «Скопировать» → «Скопировано»: как .btn[data-done] системы (components.css, .btn-stack) —
+   старая подпись уходит вверх, новая приходит снизу, галочка дорисовывается; те же токены и задержки */
+.mp-act-sw { display: grid }
+.mp-act-sw > span { grid-area: 1 / 1; display: grid; justify-items: center; gap: var(--sp-2);
+  transition-property: opacity, transform; transition-timing-function: var(--ease-out) }
+.mp-act-b { opacity: 0; transform: translateY(6px); transition-duration: var(--dur-state), var(--dur-slide) }
+.mp-act-a { transition-duration: var(--dur-state), var(--dur-slide); transition-delay: 120ms, 0s }
+.mp-act.done .mp-act-a { opacity: 0; transform: translateY(-6px); transition-duration: var(--dur-exit), var(--dur-enter); transition-delay: 0s }
+.mp-act.done .mp-act-b { opacity: 1; transform: none; transition-duration: var(--dur-enter), var(--dur-state); transition-delay: 60ms, 0s }
+.mp-act-b svg { color: var(--success-text) }
+.mp-act-b path { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 0s linear var(--dur-exit) }
+.mp-act.done .mp-act-b path { stroke-dashoffset: 0; transition: stroke-dashoffset var(--dur-state) var(--ease-out) 80ms }
+
+/* Как подключиться: три шага, номер слева, действие под текстом шага */
+.mp-connect { display: grid; padding: var(--sp-5) var(--sp-5) var(--sp-1); border-radius: var(--r-xl); background: var(--surface); box-shadow: inset 0 0 0 1px var(--border-subtle) }
+.mp-connect-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-3); padding-bottom: var(--sp-4) }
+.mp-connect-head h2 { font-size: var(--fs-lg); line-height: var(--lh-lg); font-weight: var(--w-medium) }
+.mp-step { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: var(--sp-3); row-gap: var(--sp-3); padding: var(--sp-4) 0; box-shadow: inset 0 1px 0 var(--border-subtle) }
+.mp-num { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--r-full); background: var(--fill); color: var(--text-secondary); font-size: var(--fs-sm); font-weight: var(--w-medium); font-variant-numeric: tabular-nums }
+.mp-step-tx { display: grid; gap: 2px; align-content: center; min-height: 28px; min-width: 0 }
+.mp-step-tx b { font-weight: var(--w-medium) }
+.mp-step-tx span { color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-sm) }
+.mp-step-act { grid-column: 2; display: grid; gap: var(--sp-2); justify-items: start; min-width: 0 }
+.mp-other { color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-sm) }
+@media (max-width: 380px) { .mp-connect { padding-left: var(--sp-4); padding-right: var(--sp-4) } .mp-pass { padding: var(--sp-5) } .mp-pass-big { font-size: 38px; line-height: 44px } }
+
+.mp-qr { justify-self: center; padding: var(--sp-3); border-radius: var(--r-lg); background: #fff; line-height: 0 }
+.mp-qr svg { width: 220px; height: 220px; display: block }
+#s-qr-dlg .dialog-main { display: grid }   /* отступ снизу — в системе: у окна без подвала */
+.mp-foot { text-align: center; font-size: var(--fs-sm) }

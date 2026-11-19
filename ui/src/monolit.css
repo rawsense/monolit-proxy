@@ -1,0 +1,6 @@
+/* Бренд monolit proxy: название Geologica 600, знак — цельная вертикальная плита. Общий для админки и страницы подписки */
+@font-face { font-family: Geologica; font-weight: 600; font-display: swap; src: url(geologica-600.woff2) format('woff2') }
+.mp-logo { display: inline-flex; align-items: center; gap: 8px; color: var(--text); text-decoration: none; white-space: nowrap }
+.mp-logo svg { width: 22px; height: 22px; flex: none; color: var(--accent) }
+[data-theme="light"] .mp-logo svg { color: var(--accent-edge, var(--accent)) }
+.mp-wm { font-family: Geologica, var(--font-sans); font-weight: 600; font-size: 17px; line-height: 1; letter-spacing: -.02em }

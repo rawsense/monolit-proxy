@@ -1,0 +1,13 @@
+# журнал решений и черновики — только локально
+DECISIONS.md
+ui/src/layout-notes.md
+ui/src/mock/
+ui/src/mock-*
+# из дизайн-системы в репозитории только то, что нужно для сборки
+ui/ds/01-colors/
+ui/ds/03-components/
+ui/ds/04-screens/
+ui/ds/js/nav.js
+ui/ds/tokens/tiles.css
+node_modules/
+*.log

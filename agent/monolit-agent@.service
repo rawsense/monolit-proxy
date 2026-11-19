@@ -1,0 +1,13 @@
+[Unit]
+Description=monolit proxy helper request
+
+[Service]
+Type=simple
+ExecStart=/usr/local/lib/monolit/agent.sh
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+TimeoutStartSec=0
+RuntimeMaxSec=600
+# systemd по умолчанию глушит SIGPIPE: «… | head» тогда пишет «write error», а с pipefail шаг падает
+IgnoreSIGPIPE=no

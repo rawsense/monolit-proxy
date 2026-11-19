@@ -1,0 +1,16 @@
+/* Заглушка «Вход» в корне домена (режимы ip2 и bare): без бренда monolit, имя — адрес сайта */
+*, *::before, *::after { box-sizing: border-box }
+html { color-scheme: dark; -webkit-tap-highlight-color: transparent }
+[data-theme="light"] { color-scheme: light }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-sans);
+  font-size: var(--fs-md); line-height: var(--lh-md); letter-spacing: var(--ls-md) }
+h1, p { margin: 0 }
+.g-page { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; align-content: center; justify-content: center; grid-template-columns: min(400px, 100%); gap: var(--sp-6); padding: var(--sp-6) var(--sp-4) }
+.g-card { width: 100%; display: grid; gap: var(--sp-5); padding: var(--sp-8); border-radius: var(--r-xl); background: var(--surface); box-shadow: inset 0 0 0 1px var(--border-subtle) }
+.g-head { display: grid; gap: var(--sp-1); margin-bottom: var(--sp-1) }
+.g-host { font-size: var(--fs-sm); line-height: var(--lh-sm); color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.g-title { margin: var(--sp-2) 0 0; font-size: var(--fs-2xl); line-height: var(--lh-2xl); letter-spacing: var(--ls-2xl); font-weight: var(--w-semibold) }
+.g-sub { margin: 0; color: var(--text-muted) }
+.g-card .field .hint { color: var(--danger) }
+.g-foot { margin: 0; text-align: center; font-size: var(--fs-sm); line-height: var(--lh-sm) }
+.g-copy { margin: 0; font-size: var(--fs-sm); line-height: var(--lh-sm); color: var(--text-faint) }

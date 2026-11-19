@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru" data-store="gate" data-theme-default="system" data-accent-default="slate">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Вход</title>
+<!--css--><link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="../ds/tokens/colors.css"><link rel="stylesheet" href="../ds/tokens/accents.css"><link rel="stylesheet" href="../ds/tokens/palettes.css">
+<link rel="stylesheet" href="../ds/tokens/motion.css">
+<link rel="stylesheet" href="../ds/tokens/type.css">
+<link rel="stylesheet" href="../ds/tokens/space.css">
+<link rel="stylesheet" href="../ds/tokens/icons.css">
+<link rel="stylesheet" href="../ds/tokens/components.css">
+<link rel="stylesheet" href="../ds/tokens/inputs.css">
+<link rel="stylesheet" href="../ds/tokens/layers.css">
+<link rel="stylesheet" href="../ds/tokens/soft.css">
+<link rel="stylesheet" href="gate.css"><!--/css-->
+<script src="../ds/js/theme.js"></script>
+<script>document.documentElement.classList.add('js')</script>
+<!--js--><script src="../ds/js/layers.js" defer></script>
+<script src="gate.js" defer></script><!--/js-->
+</head>
+<body>
+<!-- Заглушка в корне домена: обычная форма входа, любой ввод — «неверный пароль». Ничего никуда не отправляет -->
+<main class="g-page">
+  <form class="g-card" id="g-form" novalidate>
+    <div class="g-head">
+      <span class="g-host" id="g-host">Личный кабинет</span>
+      <h1 class="g-title">Вход</h1>
+      <p class="g-sub">Войдите, чтобы продолжить</p>
+    </div>
+    <label class="field"><span class="label">Логин или почта</span>
+      <input class="input" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+    <label class="field"><span class="label">Пароль</span>
+      <input class="input" type="password" name="password" autocomplete="current-password" required></label>
+    <button class="btn btn-primary btn-block" type="submit"><span>Войти</span></button>
+    <p class="g-foot"><a class="link" href="#" id="g-forgot">Забыли пароль?</a></p>
+  </form>
+  <p class="g-copy" id="g-copy"></p>
+</main>
+</body>
+</html>
