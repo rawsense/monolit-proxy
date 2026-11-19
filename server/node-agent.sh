@@ -9,6 +9,7 @@ CFG=/usr/local/etc/xray/config.json
 API=127.0.0.1:10085
 DIR=/var/lib/monolit-node
 LIB=/usr/local/lib/monolit-node
+GEO=/usr/local/share/xray
 mkdir -p "$DIR"
 ERR=""
 CERR=""
@@ -57,6 +58,24 @@ UNIT
   systemctl daemon-reload; systemctl enable --now monolit-node-page >/dev/null 2>&1
 }
 
+# Базы «какие сайты и адреса российские» нужны, когда нода выпускает российское напрямую. Раз в неделю берём свежие,
+# проверяем их самим Xray и кладём на место; в работу они идут при следующем перезапуске Xray. Качаем в фоне: отчёты не ждут
+geo() {
+  local c="$CFG" t="$DIR/geo"
+  [ -s "$DIR/cand.json" ] && c="$DIR/cand.json"
+  grep -qs 'geosite:' "$c" || return 0
+  [ -n "$(find "$GEO/geosite.dat" -mtime -7 2>/dev/null)" ] && return 0
+  [ -n "$(find "$DIR/geo.try" -mmin -360 2>/dev/null)" ] && return 0
+  touch "$DIR/geo.try"; mkdir -p "$t" "$GEO"
+  (
+    curl -fsSL -m 120 https://github.com/v2fly/geoip/releases/latest/download/geoip.dat -o "$t/geoip.dat" &&
+    curl -fsSL -m 120 https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat -o "$t/geosite.dat" &&
+    XRAY_LOCATION_ASSET="$t" "$X" run -test -c "$c" >/dev/null 2>&1 &&
+    install -m 644 "$t/geoip.dat" "$t/geosite.dat" "$GEO/"
+    rm -f "$t/geoip.dat" "$t/geosite.dat"
+  ) >/dev/null 2>&1 &
+}
+
 # Новая версия агента приходит с основного сервера: проверяем синтаксис и перезапускаемся
 selfupdate() {
   local want=$1 have
@@ -102,6 +121,7 @@ while true; do
         ERR=$(printf %s "$OUT" | tail -n 3)
       fi
     fi
+    geo
     selfupdate "${ASIG:-}"
   fi
   sleep 30

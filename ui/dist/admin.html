@@ -129,7 +129,7 @@ const DS_KEY = (k) => (document.documentElement.dataset.store ? document.documen
 })();
 </script>
 <script>document.documentElement.classList.add('js')</script>
-<script src="_/admin.js?v=2b61a06ad7" defer></script>
+<script src="_/admin.js?v=a03a5e8d3f" defer></script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="mp-mark" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2.5" fill="currentColor"/></symbol></svg>
@@ -377,6 +377,7 @@ const DS_KEY = (k) => (document.documentElement.dataset.store ? document.documen
       <label class="field"><span class="label">Название</span><input class="input" name="name" maxlength="24" autocomplete="off"></label>
       <label class="field"><span class="label">Домен <span class="opt">необязательно</span></span><input class="input" name="domain" placeholder="msk.example.ru" autocomplete="off" spellcheck="false" autocapitalize="none"><span class="hint" id="nd-s-dom-h"></span></label>
       <label class="field"><span class="label">Маскировка под сайт</span><input class="input" name="mask" autocomplete="off" spellcheck="false" autocapitalize="none"></label>
+      <label class="choice"><input type="checkbox" role="switch" class="switch" name="ru_direct"><span>Российские сайты напрямую<small>Для моста в России: выходят с адреса ноды, а не через зарубежный сервер</small></span></label>
     </form>
     <div class="mp-section">
       <span class="t-label">Редкие действия</span>

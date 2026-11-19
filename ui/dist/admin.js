@@ -5588,7 +5588,7 @@ var qrcode = function() {
     } else if ((m = /^api\/nodes\/(\d+)(\/token)?$/.exec(path))) {
       const n = s.nodes.find((x) => x.id === Number(m[1]))
       if (m[2]) extra = { command: `bash <(curl -fsSL https://${s.settings.domain}/s/_n/install.sh) --join 9Zp4nWc2kR8sDemo` }
-      else if (method === 'PATCH') { Object.assign(n, { name: b.name || n.name, mask: b.mask || n.mask, domain: b.domain ?? n.domain, tls: false, cert_err: '' }); if (n.domain) setTimeout(() => { n.tls = true; A.setState(s) }, 4000) }
+      else if (method === 'PATCH') { Object.assign(n, { name: b.name || n.name, mask: b.mask || n.mask, domain: b.domain ?? n.domain, ru_direct: !!b.ru_direct, tls: false, cert_err: '' }); if (n.domain) setTimeout(() => { n.tls = true; A.setState(s) }, 4000) }
       else { s.nodes = s.nodes.filter((x) => x !== n); s.kits.forEach((k) => { k.lines = k.lines.filter((l) => l.out !== n.id && l.via !== n.id) }) }
     } else if (path === 'api/kits') { const k = { id: ++demoId, name: b.name, is_default: false, users: 0, lines: [] }; s.kits.push(k); extra = { kit: k.id } }
     else if ((m = /^api\/kits\/(\d+)(\/lines|\/order|\/users)?$/.exec(path))) {
@@ -5660,7 +5660,7 @@ var qrcode = function() {
     $('nd-s-seen').textContent = n.up && n.seen ? 'отчёт ' + since(n.seen) + ' назад' : ''
     $('nd-s-err').hidden = !n.err; $('nd-s-err-t').textContent = n.err
     put($('nd-s-kv'), [['Занята', usage(n.id)], ['Xray', n.xray || 'нет данных'], ['В сети', n.up ? n.online : 'нет данных'], ['За сутки', n.day ? A.bytes(n.day) : '0'], ['Нагрузка', n.load || 'нет данных']].map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join(''))
-    if (form) { const f = $('nd-s-form'); f.name.value = n.name; f.mask.value = n.mask; f.domain.value = n.domain || ''; window.fieldError?.(f.domain, ''); window.fieldError?.(f.mask, '') }
+    if (form) { const f = $('nd-s-form'); f.name.value = n.name; f.mask.value = n.mask; f.domain.value = n.domain || ''; f.ru_direct.checked = !!n.ru_direct; window.fieldError?.(f.domain, ''); window.fieldError?.(f.mask, '') }
     const h = $('nd-s-dom-h'); h.textContent = !n.domain ? '' : n.tls ? 'Сертификат выпущен, на ноде работают Vision и Hysteria2' : n.old_agent ? 'На ноде старый агент, он не умеет выпускать сертификат. Запустите на ней «Команду для переустановки»' : n.cert_err ? 'Сертификат не выпустился: ' + n.cert_err : 'Нода выпускает сертификат, это до минуты'
     h.classList.toggle('mp-warn', !!n.domain && !n.tls && (!!n.cert_err || !!n.old_agent))
     // с доменом и сертификатом Reality маскируется под сам домен ноды: чужой сайт не используется, поле только путает
@@ -5672,7 +5672,7 @@ var qrcode = function() {
   $('nd-s-form').addEventListener('submit', (e) => {
     e.preventDefault(); const f = e.target
     busy(document.querySelector('[form="nd-s-form"]'), async () => {
-      try { await call('PATCH', 'api/nodes/' + sheetId, { name: f.name.value, mask: f.mask.value, domain: f.domain.value }); $('nd-sheet').close(); toast({ type: 'success', title: 'Нода сохранена', text: 'Настройки дойдут до неё за полминуты' }) }
+      try { await call('PATCH', 'api/nodes/' + sheetId, { name: f.name.value, mask: f.mask.value, domain: f.domain.value, ru_direct: f.ru_direct.checked }); $('nd-sheet').close(); toast({ type: 'success', title: 'Нода сохранена', text: 'Настройки дойдут до неё за полминуты' }) }
       catch (err) { /маскировк/i.test(err.message) ? window.fieldError?.(f.mask, err.message) : /домен/i.test(err.message) ? window.fieldError?.(f.domain, err.message) : fail(err) }
     })
   })

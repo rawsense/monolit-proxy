@@ -54,6 +54,7 @@ export function createNodes({ db, xray, log, dayOf, server, users }) {
     CREATE TABLE IF NOT EXISTS node_daily (node_id INTEGER NOT NULL, day TEXT NOT NULL, bytes INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (node_id, day));
   `);
   if (!db.prepare('PRAGMA table_info(nodes)').all().some((c) => c.name === 'domain')) db.exec("ALTER TABLE nodes ADD COLUMN domain TEXT NOT NULL DEFAULT ''");
+  if (!db.prepare('PRAGMA table_info(nodes)').all().some((c) => c.name === 'ru_direct')) db.exec('ALTER TABLE nodes ADD COLUMN ru_direct INTEGER NOT NULL DEFAULT 0');
   if (!db.prepare('PRAGMA table_info(users)').all().some((c) => c.name === 'kit_id')) db.exec('ALTER TABLE users ADD COLUMN kit_id INTEGER NOT NULL DEFAULT 0');
   // Первая версия с наборами: что раньше включалось галочками «Протоколы в подписке», становится набором «Обычный» с теми же названиями
   if (!db.prepare('SELECT 1 FROM kits').get()) {
@@ -157,6 +158,11 @@ export function createNodes({ db, xray, log, dayOf, server, users }) {
     const user = { id: n.link_uuid, flow: 'xtls-rprx-vision', encryption: 'none' };
     const cert = { certificateFile: `/etc/letsencrypt/live/${n.domain}/fullchain.pem`, keyFile: `/etc/letsencrypt/live/${n.domain}/privkey.pem` };
     const outbounds = [{ tag: 'direct', protocol: 'freedom' }, { tag: 'block', protocol: 'blackhole' }], rules = [{ ip: ['geoip:private'], outboundTag: 'block' }];
+    // Мост в России: российские сайты выпускает сам, со своего адреса, за границу уходит только остальное.
+    // Адрес сайта нода узнаёт из самого запроса (sniffing), имена сама не разрешает: чужой DNS не влияет на то, куда пойдёт человек
+    const ru = !!n.ru_direct && route.size > 0;
+    const sniff = ru ? { sniffing: { enabled: true, destOverride: ['http', 'tls', 'quic'], routeOnly: true } } : {};
+    if (ru) rules.push({ domain: ['geosite:category-ru', 'domain:ru', 'domain:su', 'domain:xn--p1ai'], outboundTag: 'direct' }, { ip: ['geoip:ru'], outboundTag: 'direct' });
     for (const [to, emails] of route) {
       const b = to && byId(to), tag = `to-${to}`;
       outbounds.push(b
@@ -169,13 +175,13 @@ export function createNodes({ db, xray, log, dayOf, server, users }) {
       api: { tag: 'api', listen: '127.0.0.1:10085', services: ['HandlerService', 'StatsService'] },
       stats: {},
       policy: { levels: { 0: { statsUserUplink: true, statsUserDownlink: true, statsUserOnline: true } } },
-      inbounds: [{ tag: 'in', listen: '0.0.0.0', port: 443, protocol: 'vless', settings: { clients, decryption: 'none' },
+      inbounds: [{ tag: 'in', listen: '0.0.0.0', port: 443, protocol: 'vless', ...sniff, settings: { clients, decryption: 'none' },
         // с доменом Reality показывает проверяющему собственный сайт ноды: её же вход Vision с настоящим сертификатом
         streamSettings: { network: 'raw', security: 'reality', realitySettings: { dest: tls(n) ? `127.0.0.1:${VISION_PORT}` : `${n.mask}:443`, serverNames: [sni(n)], privateKey: n.priv, shortIds: [n.sid] } } },
       ...(!tls(n) ? [] : [
-        { tag: 'vision', listen: '0.0.0.0', port: VISION_PORT, protocol: 'vless', settings: { clients: vision, decryption: 'none', fallbacks: [{ dest: 8081 }] },   // не VPN — на страницу-заглушку
+        { tag: 'vision', listen: '0.0.0.0', port: VISION_PORT, protocol: 'vless', ...sniff, settings: { clients: vision, decryption: 'none', fallbacks: [{ dest: 8081 }] },   // не VPN — на страницу-заглушку
           streamSettings: { network: 'raw', security: 'tls', tlsSettings: { minVersion: '1.2', alpn: ['http/1.1'], certificates: [cert] } } },
-        { tag: 'hy2', listen: '0.0.0.0', port: 443, protocol: 'hysteria', settings: { version: 2, clients: hy2 },
+        { tag: 'hy2', listen: '0.0.0.0', port: 443, protocol: 'hysteria', ...sniff, settings: { version: 2, clients: hy2 },
           streamSettings: { network: 'hysteria', security: 'tls', tlsSettings: { serverName: n.domain, alpn: ['h3'], certificates: [{ usage: 'encipherment', ...cert }] },
             hysteriaSettings: { version: 2 }, finalmask: { quicParams: { congestion: 'bbr' } } } }])],
       outbounds, routing: { domainStrategy: 'AsIs', rules },
@@ -249,7 +255,7 @@ export function createNodes({ db, xray, log, dayOf, server, users }) {
     return {
       main: { day: Number(db.prepare('SELECT SUM(up + down) AS s FROM traffic_daily WHERE day = ?').get(dayOf(t))?.s || 0), protos: LOCAL.filter((k) => d[k]) },
       nodes: all().map((n) => { const i = J(n.info, {}), on = online.get(n.id);
-        return { id: n.id, name: n.name, addr: n.addr, mask: n.mask, domain: n.domain, tls: tls(n), cert_err: n.domain && !tls(n) ? i.cert_err || '' : '', old_agent: joined(n) && !!n.seen_at && !!i.xray && !(i.v >= 2), joined: joined(n), waiting: !!n.join_hash, seen: n.seen_at, up: joined(n) && t - n.seen_at < SEEN, xray: i.xray || '', load: i.load || '', xray_ok: i.active !== false, err: i.err || '',
+        return { id: n.id, name: n.name, addr: n.addr, mask: n.mask, domain: n.domain, ru_direct: !!n.ru_direct, tls: tls(n), cert_err: n.domain && !tls(n) ? i.cert_err || '' : '', old_agent: joined(n) && !!n.seen_at && !!i.xray && !(i.v >= 2), joined: joined(n), waiting: !!n.join_hash, seen: n.seen_at, up: joined(n) && t - n.seen_at < SEEN, xray: i.xray || '', load: i.load || '', xray_ok: i.active !== false, err: i.err || '',
           online: on && t - on.at < SEEN ? Object.keys(on.ips).length : 0, day: dayBytes(n.id) } }),
       kits: kits().map((k) => ({ id: k.id, name: k.name, is_default: k.id === def.id, users: count.filter((c) => c.kit_id === k.id || (k.id === def.id && !kits().some((x) => x.id === c.kit_id))).reduce((s, c) => s + c.n, 0),
         lines: linesOf(k.id).map((l) => ({ id: l.id, name: l.name, out: l.out, via: l.via, proto: l.proto, on: !!l.enabled, problem: whyNot(l, d) })) })),
@@ -299,7 +305,8 @@ export function createNodes({ db, xray, log, dayOf, server, users }) {
             if (!a.includes(n.addr)) return bad(a.length ? `Домен смотрит на ${a.join(', ')}, а нода на ${n.addr}. Поправьте запись A в DNS` : `У домена нет записи A. Создайте её на адрес ${n.addr}`);
           }
         }
-        db.prepare('UPDATE nodes SET name = ?, mask = ?, domain = ? WHERE id = ?').run(name, mask, domain, n.id); return ok({}, false);
+        const ru = b.ru_direct !== undefined ? (b.ru_direct ? 1 : 0) : n.ru_direct;
+        db.prepare('UPDATE nodes SET name = ?, mask = ?, domain = ?, ru_direct = ? WHERE id = ?').run(name, mask, domain, ru, n.id); return ok({}, false);
       }
       if (!m[2] && M === 'DELETE') {
         db.prepare('DELETE FROM kit_lines WHERE out = ? OR via = ?').run(n.id, n.id); db.prepare('DELETE FROM nodes WHERE id = ?').run(n.id); db.prepare('DELETE FROM node_daily WHERE node_id = ?').run(n.id);
