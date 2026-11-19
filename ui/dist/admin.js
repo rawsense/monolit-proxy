@@ -4595,14 +4595,10 @@ var qrcode = function() {
   async function loadUserLinks(id) {
     const box = $('mp-d-links'), sec = $('mp-d-links-sec')
     try { const r = await api('GET', `api/users/${id}/links`); if (openId !== id) return; userLinks = r.links || [] } catch (e) { if (openId !== id) return; userLinks = [] }
-    box.innerHTML = userLinks.map((l, i) => `<button type="button" class="alist-row" data-i="${i}"><span class="alist-ic"><i data-lucide="copy"></i></span><span class="alist-tx"><b>${esc(l.name)}</b><span>${esc(l.proto)}</span></span></button>`).join('')
-    sec.hidden = !userLinks.length; window.lucide?.createIcons()
+    // то же поле с кнопкой копирования, что у ссылки на подписку
+    box.innerHTML = userLinks.map((l) => `<div class="field"><span class="label">${esc(l.name)} <span class="opt">${esc(l.proto)}</span></span><span class="copy-field"><input class="input" readonly value="${esc(l.url)}" aria-label="Ссылка: ${esc(l.name)}, ${esc(l.proto)}"><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать ссылку" data-copy="${esc(l.url)}"></button></span></div>`).join('')
+    sec.hidden = !userLinks.length; window.initInputs?.(box)
   }
-  $('mp-d-links').addEventListener('click', (e) => {
-    const l = userLinks[e.target.closest('[data-i]')?.dataset.i]; if (!l) return
-    navigator.clipboard?.writeText(l.url).catch(() => {})
-    toast({ type: 'success', title: 'Ссылка скопирована', text: `${l.name}, ${l.proto}` })
-  })
   function openDetail(id) { openId = Number(id); $('mp-d-links-sec').hidden = true; fillDetail(); $('mp-detail').showModal(); loadUserChart(openId); loadUserLinks(openId) }
   $('mp-d-unblock').addEventListener('click', (e) => busy(e.currentTarget, async () => {
     const u = cur(); if (!u) return

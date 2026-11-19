@@ -99,6 +99,7 @@ h1, h2, h3, h4, p { margin: 0 }
 .mp-form { display: grid; gap: var(--sp-4) }
 .mp-section { display: grid; gap: var(--sp-4); align-content: start }
 .mp-section + .mp-section { margin-top: var(--sp-8) }
+.mp-links { display: grid; gap: var(--sp-4) }
 .sheet-side.mp-detail { width: min(560px, 100vw) }   /* 420 системы мало: поле со ссылкой и форма в одной колонке */
 .mp-detail .sheet-head > div:first-child { flex: 1; min-width: 0 }
 .mp-did { color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-sm) }
