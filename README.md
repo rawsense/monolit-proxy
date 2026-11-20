@@ -31,3 +31,5 @@ bash install.sh --domain vpn.example.ru
 GPL-3.0, текст в `LICENSE`.
 
 `server/autoXRAY2.sh` — копия скрипта [autoXRAY](https://github.com/xVRVx/autoXRAY) (автор xVRVx, GPL-3.0). Сам скрипт не запускается: monolit берёт из него шаблон клиентских конфигов и сверяется с новой версией из репозитория autoXRAY.
+
+`ui/src/flags.woff2` — шрифт Twemoji Country Flags из [country-flag-emoji-polyfill](https://github.com/talkjs/country-flag-emoji-polyfill) (MIT); рисунки флагов — [Twemoji](https://github.com/twitter/twemoji), CC-BY 4.0.
