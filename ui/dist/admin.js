@@ -4596,7 +4596,8 @@ var qrcode = function() {
     const box = $('mp-d-links'), sec = $('mp-d-links-sec')
     try { const r = await api('GET', `api/users/${id}/links`); if (openId !== id) return; userLinks = r.links || [] } catch (e) { if (openId !== id) return; userLinks = [] }
     // то же поле с кнопкой копирования, что у ссылки на подписку
-    box.innerHTML = userLinks.map((l) => `<div class="field"><span class="label"><span>${esc(l.name)}</span><span class="opt">${esc(l.proto)}</span></span><span class="copy-field"><input class="input" readonly value="${esc(l.url)}" aria-label="Ссылка: ${esc(l.name)}, ${esc(l.proto)}"><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать ссылку" data-copy="${esc(l.url)}"></button></span></div>`).join('')
+    // у AmneziaWG ссылки нет: копируется файл .conf целиком
+    box.innerHTML = userLinks.map((l) => `<div class="field"><span class="label"><span>${esc(l.name)}</span><span class="opt">${esc(l.proto)}</span></span><span class="copy-field"><input class="input" readonly value="${esc(l.conf ? 'Конфиг .conf' : l.url)}" aria-label="${l.conf ? 'Конфиг' : 'Ссылка'}: ${esc(l.name)}, ${esc(l.proto)}"><button class="icon-btn icon-btn-sm" type="button" aria-label="${l.conf ? 'Скопировать конфиг' : 'Скопировать ссылку'}" data-copy="${esc(l.conf || l.url)}"></button></span></div>`).join('')
     sec.hidden = !userLinks.length; window.initInputs?.(box)
   }
   function openDetail(id) { openId = Number(id); $('mp-d-links-sec').hidden = true; fillDetail(); $('mp-detail').showModal(); loadUserChart(openId); loadUserLinks(openId) }
@@ -5222,12 +5223,33 @@ var qrcode = function() {
     if (document.activeElement?.form !== sForm) $('mp-socks-f').hidden = !s.on
     if (s.on) window.mpAdmin.setCopy($('mp-socks-url'), $('mp-socks-copy'), socksUrl())
     $('mp-mtg').hidden = !M.managed || !M.mtg
+    paintAwg()
     if (M.mtg) { $('mp-mtg-on').checked = ST?.mtg === 'running'; window.mpAdmin.setCopy($('mp-mtg-url'), $('mp-mtg-copy'), M.mtg.link) }
   }
   for (const k of ['hy2', 'xhttp']) $('mp-pr-' + k).addEventListener('change', async (e) => {
     const on = e.target.checked; e.target.disabled = true
     try { take(await run('PATCH', 'api/proto', { [k]: on })); paintAll(); toast({ type: 'success', title: `${k === 'hy2' ? 'Hysteria2' : 'XHTTP'} ${on ? 'включён' : 'выключен'}` }) }
     catch (err) { e.target.checked = !on; fail(err) } finally { e.target.disabled = false }
+  })
+  // AmneziaWG ставится отдельным контейнером: первая сборка идёт несколько минут, состояние приходит с общим состоянием админки
+  const AWG_HINT = 'Отдельный сервер по UDP. Для monolit client и AmneziaVPN'
+  let awgPoll = 0
+  function paintAwg() {
+    const a = window.mpAdmin.state()?.awg || { on: false, state: 'off' }, sw = $('mp-pr-awg')
+    if (document.activeElement !== sw) sw.checked = a.on
+    sw.disabled = !ST?.agent && !window.mpAdmin.demo()
+    $('mp-pr-awg-h').textContent = a.state === 'starting' ? 'Ставится. В первый раз это несколько минут'
+      : a.state === 'error' ? a.error || 'Не запустился' : a.state === 'on' ? `UDP ${a.port}. Добавьте его в набор подключений` : AWG_HINT
+    clearInterval(awgPoll)
+    if (a.state === 'starting' && !window.mpAdmin.demo()) awgPoll = setInterval(async () => { await window.mpAdmin.refresh(); paintAwg() }, 4000)
+  }
+  $('mp-pr-awg').addEventListener('change', async (e) => {
+    const on = e.target.checked; e.target.disabled = true
+    try {
+      if (window.mpAdmin.demo()) { const s = window.mpAdmin.state(); s.awg = { on, port: 46213, state: on ? 'on' : 'off', error: '' }; window.mpAdmin.setState(s) }
+      else window.mpAdmin.setState(await window.mpAdmin.api('PATCH', 'api/awg', { on }))
+      toast({ type: 'success', title: on ? 'AmneziaWG включается' : 'AmneziaWG выключен' })
+    } catch (err) { e.target.checked = !on; fail(err) } finally { e.target.disabled = false; paintAwg() }
   })
   // поля нужны только включённому SOCKS5
   sForm.on.addEventListener('change', () => { $('mp-socks-f').hidden = !sForm.on.checked; if (!sForm.on.checked) $('mp-socks-cf').hidden = true })
@@ -5565,7 +5587,7 @@ var qrcode = function() {
   const icons = () => window.lucide?.createIcons()
   const busy = async (btn, fn) => { btn.disabled = true; btn.classList.add('is-loading'); try { return await fn() } finally { btn.disabled = false; btn.classList.remove('is-loading') } }
   const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c }
-  const PROTO = { vision: 'Vision', xhttp: 'XHTTP', hy2: 'Hysteria2', reality: 'Reality' }
+  const PROTO = { vision: 'Vision', xhttp: 'XHTTP', hy2: 'Hysteria2', reality: 'Reality', awg: 'AmneziaWG' }
   const S = () => A.state()
   // разметку меняем, только когда она правда другая: обновление раз в минуту не сбивает фокус и перетаскивание
   const put = (el, html) => { if (el._html === html) return false; el._html = html; el.innerHTML = html; icons(); return true }

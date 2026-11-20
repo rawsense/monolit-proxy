@@ -132,7 +132,9 @@ if [ "$ACTION" = uninstall ]; then
   echo "убраны BBR-настройки monolit. Изменения nginx, сделанные после установки, пропадут (текущий nginx сохраню в $BK)."
   echo "База пользователей останется в $DATA, Docker — на месте; Xray $([ "${MP_OWN_XRAY:-}" = 1 ] && echo "уберу: его ставил monolit" || echo "останется со старым конфигом")."
   [ "$YES" = 1 ] || { [ "$TTY" = 1 ] && yesno "Удалить monolit?" нет; } || die "Отменено. Без терминала добавьте --yes"
-  docker rm -f monolit monolit-mtg >>"$LOG" 2>&1 || true
+  docker rm -f monolit monolit-mtg monolit-awg >>"$LOG" 2>&1 || true
+  docker network rm monolit-awg >>"$LOG" 2>&1 || true
+  iptables -t nat -S POSTROUTING 2>/dev/null | grep -- "--comment monolit-awg" | sed "s/^-A/-D/" | while read -r r; do eval "iptables -t nat $r" 2>/dev/null || true; done
   systemctl disable --now monolit-agent.socket >>"$LOG" 2>&1 || true
   rm -f /etc/systemd/system/monolit-agent.socket /etc/systemd/system/monolit-agent@.service /usr/local/lib/monolit/agent.sh /usr/local/lib/monolit/update.sh /usr/local/lib/monolit/reconf.sh
   restore_before

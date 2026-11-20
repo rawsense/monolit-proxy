@@ -13,8 +13,8 @@ const sha = (s) => createHash('sha256').update(String(s)).digest('hex');
 const same = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && timingSafeEqual(x, y) };
 const J = (s, d) => { try { return JSON.parse(s) } catch { return d } };
 export const LINK = (id) => `mpn-${id}`;                       // клиент «нода → следующий сервер», в трафик людей не идёт
-export const PROTO = { vision: 'Vision', xhttp: 'XHTTP', hy2: 'Hysteria2', reality: 'Reality' };
-const LOCAL = ['vision', 'xhttp', 'hy2'];
+export const PROTO = { vision: 'Vision', xhttp: 'XHTTP', hy2: 'Hysteria2', reality: 'Reality', awg: 'AmneziaWG' };
+const LOCAL = ['vision', 'xhttp', 'hy2', 'awg'];               // awg — не вход Xray: отдельный сервер AmneziaWG (awg.mjs)
 const NODE_TLS = ['vision', 'hy2'];                           // входы ноды, которым нужен её домен и сертификат
 const VISION_PORT = 8443;                                      // 443 на ноде занят Reality
 const SEEN = 100;                                              // секунд без отчёта — нода «не на связи»
@@ -28,7 +28,9 @@ const PAGE = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta n
 <body><form onsubmit="event.preventDefault();this.querySelector('p').textContent='Неверный логин или пароль'"><h1>Вход</h1><input placeholder="Логин" autocomplete="username"><input type="password" placeholder="Пароль" autocomplete="current-password"><button>Войти</button><p></p></form></body></html>
 `;
 
-export function createNodes({ db, xray, log, dayOf, server, users }) {
+export function createNodes({ db, xray, log, dayOf, server, users, awg }) {
+  // входы этого сервера: что нашлось в конфиге Xray, плюс AmneziaWG, если он включён
+  const detect = () => ({ ...xray.detect(), ...(awg?.ready() ? { awg: { port: awg.conf().port } } : {}) });
   db.exec(`
     CREATE TABLE IF NOT EXISTS nodes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,7 +80,7 @@ export function createNodes({ db, xray, log, dayOf, server, users }) {
   const entry = (l) => l.via || l.out;
 
   // Работает ли подключение сейчас: вход есть и подключён, следующий сервер тоже
-  function usable(l, d = xray.detect()) {
+  function usable(l, d = detect()) {
     const e = entry(l);
     if (!e) return LOCAL.includes(l.proto) && !!d[l.proto];
     const en = byId(e); if (!joined(en)) return false;
@@ -95,17 +97,21 @@ export function createNodes({ db, xray, log, dayOf, server, users }) {
   };
 
   // Какие входы этого сервера нужны людям: только те, что есть в наборах
-  const kindsOn = (d = xray.detect()) => { const want = new Set(linesOn().filter((l) => !entry(l)).map((l) => l.proto)); return LOCAL.filter((k) => want.has(k) && d[k]) };
+  const kindsOn = (d = xray.detect()) => { const want = new Set(linesOn().filter((l) => !entry(l)).map((l) => l.proto)); return LOCAL.filter((k) => k !== 'awg' && want.has(k) && d[k]) };
   // Клиенты нод на входе Vision этого сервера: через них идут люди, пришедшие по мосту
   const linkClients = () => all().filter(joined).map((n) => ({ id: n.link_uuid, flow: 'xtls-rprx-vision', email: LINK(n.id), level: 0 }));
   async function ensureLinks() { for (const c of linkClients()) await xray.addClient('vision', c).catch(() => {}) }
 
   // ---------- подписка ----------
-  function forUser(u) { const d = xray.detect(); return linesOf(kitOf(u).id).filter((l) => l.enabled && usable(l, d)) }
-  function render(parsed, u, srv) {
+  function forUser(u) { const d = detect(); return linesOf(kitOf(u).id).filter((l) => l.enabled && usable(l, d)) }
+  // Кому из людей нужен пользователь на сервере AmneziaWG: у кого в наборе есть такое подключение
+  const wantsAwg = (u) => forUser(u).some((l) => !entry(l) && l.proto === 'awg');
+  // opts.awg — клиент понимает AmneziaWG внутри JSON (monolit client); остальным такой конфиг не отдаём: он бы у них не заработал
+  function render(parsed, u, srv, opts = {}) {
     const out = [];
     for (const l of forUser(u)) {
       const e = entry(l), n = e && byId(e);
+      if (!e && l.proto === 'awg') { const ob = opts.awg && awg.outbound(u); if (ob) out.push(renderOne(parsed, 'awg', { user: u, server: srv }, { remark: l.name, ob })); continue }
       const kind = !e ? l.proto : l.proto === 'hy2' ? 'hy2' : 'vision';
       if (!parsed.outbounds[kind]) continue;
       out.push(renderOne(parsed, kind, { user: u, server: srv }, { remark: l.name, outbound: !e ? null : (ob) => {
@@ -126,6 +132,8 @@ export function createNodes({ db, xray, log, dayOf, server, users }) {
     const fp = srv.fp || 'firefox', d = srv.domain, out = [], push = (l, url) => out.push({ name: l.name, proto: PROTO[l.proto], url });
     for (const l of forUser(u)) {
       const e = entry(l), n = e && byId(e), name = encodeURIComponent(l.name);
+      // у AmneziaWG ссылки нет: вместо неё файл .conf целиком
+      if (!e && l.proto === 'awg') { const conf = awg.confText(u, l.name); if (conf) out.push({ name: l.name, proto: PROTO.awg, url: '', conf }); continue }
       if (e && l.proto === 'hy2') push(l, `hysteria2://${encodeURIComponent(lineUuid(u.hy2, l.id))}@${n.domain}:443?sni=${n.domain}&alpn=h3#${name}`);
       else if (e && l.proto === 'vision') push(l, `vless://${lineUuid(u.uuid, l.id)}@${n.domain}:${VISION_PORT}?encryption=none&security=tls&type=tcp&flow=xtls-rprx-vision&sni=${n.domain}&fp=${fp}#${name}`);
       else if (e) push(l, `vless://${lineUuid(u.uuid, l.id)}@${n.addr}:443?encryption=none&security=reality&type=tcp&flow=xtls-rprx-vision&sni=${sni(n)}&fp=${fp}&pbk=${n.pub}&sid=${n.sid}#${name}`);
@@ -135,7 +143,7 @@ export function createNodes({ db, xray, log, dayOf, server, users }) {
     }
     return out;
   }
-  const links = (u, srv) => linkList(u, srv).map((x) => x.url);
+  const links = (u, srv) => linkList(u, srv).map((x) => x.url).filter(Boolean);
 
   // ---------- конфиг Xray для ноды ----------
   function nodeConfig(n) {
@@ -251,7 +259,7 @@ export function createNodes({ db, xray, log, dayOf, server, users }) {
   // ---------- админка ----------
   const dayBytes = (id) => Number(db.prepare('SELECT bytes FROM node_daily WHERE node_id = ? AND day = ?').get(id, dayOf(now()))?.bytes || 0);
   function state() {
-    const t = now(), d = xray.detect(), o = onlineMap();
+    const t = now(), d = detect(), o = onlineMap();
     const count = db.prepare('SELECT kit_id, COUNT(*) AS n FROM users GROUP BY kit_id').all(), def = defKit();
     return {
       main: { day: Number(db.prepare('SELECT SUM(up + down) AS s FROM traffic_daily WHERE day = ?').get(dayOf(t))?.s || 0), protos: LOCAL.filter((k) => d[k]) },
@@ -357,5 +365,5 @@ export function createNodes({ db, xray, log, dayOf, server, users }) {
     return bad('Нет такого действия', 404);
   }
 
-  return { kindsOn, linkClients, ensureLinks, render, links, linkList, onlineMap, http, api, state, kitOf, defKit, nodeConfig, usable };
+  return { kindsOn, linkClients, ensureLinks, render, links, linkList, onlineMap, http, api, state, kitOf, defKit, nodeConfig, usable, wantsAwg };
 }

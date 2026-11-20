@@ -30,12 +30,13 @@ export function renderOne(parsed, kind, { user, server }, opts = {}) {
     DOMAIN: jstr(server.domain), xray_uuid_vrv: jstr(user.uuid), xray_shortIds_vrv: jstr(user.hy2),
     fpBro: jstr(server.fp || 'firefox'), path_xhttp: jstr(server.xhttpPath || ''),
   };
-  const ob = JSON.parse(subst(parsed.outbounds[kind], vars));
+  // opts.ob — готовый выход (AmneziaWG): в шаблоне autoXRAY такого нет
+  const ob = opts.ob || JSON.parse(subst(parsed.outbounds[kind], vars));
   // порт — тот, на котором вход реально слушает на этом сервере
-  const port = server.ports?.[kind];
+  const port = opts.ob ? 0 : server.ports?.[kind];
   if (port) { if (ob.settings?.vnext?.[0]) ob.settings.vnext[0].port = port; else if (ob.settings && 'port' in ob.settings) ob.settings.port = port; }
   if (opts.outbound) opts.outbound(ob);
-  const remark = opts.remark || `${server.name} ${{ vision: 'Vision', hy2: 'Hysteria2', xhttp: 'XHTTP' }[kind]}`;
+  const remark = opts.remark || `${server.name} ${{ vision: 'Vision', hy2: 'Hysteria2', xhttp: 'XHTTP', awg: 'AmneziaWG' }[kind]}`;
   const text = subst(parsed.tpl, { ...vars, PROXY_OUTBOUND: JSON.stringify(ob), REMARK: jstr(remark) });
   const left = /\$\{[A-Za-z_][A-Za-z0-9_]*\}|"\$[A-Za-z_][A-Za-z0-9_]*"/.exec(text);
   if (left) throw new Error(`в шаблоне осталась неизвестная переменная ${left[0]}`);

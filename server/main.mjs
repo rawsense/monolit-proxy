@@ -9,6 +9,7 @@ import { AUTOXRAY_URL, parseAutoXray, hashOf, renderAll } from './template.mjs';
 import { createManager, PRESETS, agent } from './manage.mjs';
 import { createWatch, tgSend, tgFindChat, resolve4 } from './watch.mjs';
 import { createNodes } from './nodes.mjs';
+import { createAwg } from './awg.mjs';
 
 const env = (k, d) => process.env[k] ?? d;
 const DATA = env('MP_DATA', '/data');
@@ -57,7 +58,9 @@ const serverCtx = () => {
 };
 const users = () => db.prepare('SELECT * FROM users ORDER BY id').all();
 const userById = id => db.prepare('SELECT * FROM users WHERE id = ?').get(id);
-const nodes = createNodes({ db, xray, log, dayOf, server: serverCtx, users });
+// AmneziaWG — отдельный сервер рядом с Xray; после его запуска сразу сверяем пользователей
+const awg = createAwg({ db, log, agent, domain: () => getSetting(db, 'domain'), outIp: () => getSetting(db, 'out_ip', ''), onReady: () => { queueSync({ full: true }) } });
+const nodes = createNodes({ db, xray, log, dayOf, server: serverCtx, users, awg });
 xray.linkClients = nodes.linkClients;
 
 // ---------- шаблон autoXRAY ----------
@@ -127,7 +130,19 @@ function checkDevices(t) {
   }
 }
 
+// AmneziaWG: пользователи, трафик и кто в сети. Отдельно от Xray: сбой одного не мешает другому
+async function awgSync(full) {
+  const t = now(), day = dayOf(t);
+  const r = await awg.sync(users().filter(u => userState(u, t) === 'active' && nodes.wantsAwg(u)), { full });
+  for (const [id, v] of Object.entries(r.traffic)) {
+    db.prepare('UPDATE users SET up = up + ?, down = down + ?, last_active = ? WHERE id = ?').run(v.up, v.down, t, Number(id));
+    db.prepare('INSERT INTO traffic_daily (user_id, day, up, down) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, day) DO UPDATE SET up = up + excluded.up, down = down + excluded.down').run(Number(id), day, v.up, v.down);
+  }
+  return r.online;
+}
+
 async function sync({ full = false } = {}) {
+  const awgOnline = await awgSync(full).catch(e => { log('awg:', e.message); return {} });
   try {
     xrayOk = await xray.apiAlive();
     if (!xrayOk) { syncError = 'API Xray не отвечает'; return; }
@@ -141,6 +156,7 @@ async function sync({ full = false } = {}) {
     }
     online = await xray.online();
     for (const [id, ips] of Object.entries(nodes.onlineMap())) Object.assign(online[id] ||= {}, ips);   // кто подключён через ноды
+    for (const [id, ips] of Object.entries(awgOnline)) Object.assign(online[id] ||= {}, ips);           // и через AmneziaWG
     checkDevices(t);
     const kinds = kindsOn(), all = users(), want = new Set(all.filter(u => userState(u, t) === 'active').map(u => u.id));
     const was = applied || new Set();
@@ -236,6 +252,7 @@ function stateForAdmin() {
     update: updateState(),
     watch: watch.state(),
     ...nodes.state(),
+    awg: awg.stateForAdmin(),
     users: users().map(u => ({ ...publicUser(u), url: subUrl(u) })),
     settings: { server_name: getSetting(db, 'server_name'), domain: getSetting(db, 'domain'), fp: getSetting(db, 'fp'), kinds: getSetting(db, 'kinds'), autoupdate: getSetting(db, 'autoupdate') === '1', support_url: getSetting(db, 'support_url'), update_hours: Number(getSetting(db, 'update_hours', '12')), login: getSetting(db, 'admin_login'),
       tg_token: getSetting(db, 'tg_token', ''), tg_chat: getSetting(db, 'tg_chat', '') },
@@ -307,6 +324,7 @@ async function adminApi(req, res, path) {
     // новая ссылка и новые ключи: старая ссылка и старые конфиги перестают работать
     const id = Number(m[1]); await xray.removeUser(id, ['vision', 'hy2', 'xhttp']);
     db.prepare('UPDATE users SET token = ?, uuid = ?, hy2 = ? WHERE id = ?').run(token(16), newUuid(), token(12), id);
+    awg.dropKeys(id);   // новые ключи AmneziaWG появятся при сверке
     applied?.delete(id); await queueSync(); return json(res, 200, { user: { ...publicUser(userById(id)), url: subUrl(userById(id)) } });
   }
   if (m && !m[2] && req.method === 'DELETE') {
@@ -453,6 +471,7 @@ async function adminApi(req, res, path) {
   if (path === '/api/warp/license' && M === 'POST') return done(await mgr.warp.license((await readBody(req)).key));
   if (path === '/api/warp/check' && M === 'POST') { const r = await mgr.warp.check(); return json(res, r.warp ? 200 : 400, r.warp ? r : { error: r.error }); }
   if (path === '/api/proto' && M === 'PATCH') return done(await mgr.proto.set(await readBody(req)));
+  if (path === '/api/awg' && M === 'PATCH') { const r = await awg.set(await readBody(req)); if (r.error) return json(res, 400, { error: r.error }); await queueSync({ full: true }); return json(res, 200, stateForAdmin()); }
   if (path === '/api/mtg' && M === 'POST') return done(await mgr.proto.mtg(!!(await readBody(req)).on));
   if ((mm = /^\/api\/history\/(\d+)(\/rollback)?$/.exec(path))) {
     if (mm[2] && M === 'POST') return done(await mgr.history.rollback(Number(mm[1])));
@@ -489,7 +508,8 @@ function subscription(req, res, tok, mode) {
   };
   const asLinks = mode === 'links' || (mode === 'auto' && /v2rayn\b|nekobox|throne|shadowrocket/i.test(ua) && !/v2rayng/i.test(ua));
   if (asLinks) return send(res, 200, b64(info.configs.join('\n')), { ...headers, 'content-type': 'text/plain; charset=utf-8' });
-  const body = st === 'active' && tpl ? nodes.render(tpl.parsed, u, ctx.server) : [];
+  // AmneziaWG внутри JSON понимает только monolit client: остальным клиентам такой конфиг не отдаём
+  const body = st === 'active' && tpl ? nodes.render(tpl.parsed, u, ctx.server, { awg: /monolit-client\//i.test(ua) }) : [];
   return send(res, 200, JSON.stringify(body, null, 2), { ...headers, 'content-type': 'application/json; charset=utf-8' });
 }
 

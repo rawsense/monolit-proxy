@@ -332,7 +332,8 @@
     const box = $('mp-d-links'), sec = $('mp-d-links-sec')
     try { const r = await api('GET', `api/users/${id}/links`); if (openId !== id) return; userLinks = r.links || [] } catch (e) { if (openId !== id) return; userLinks = [] }
     // то же поле с кнопкой копирования, что у ссылки на подписку
-    box.innerHTML = userLinks.map((l) => `<div class="field"><span class="label"><span>${esc(l.name)}</span><span class="opt">${esc(l.proto)}</span></span><span class="copy-field"><input class="input" readonly value="${esc(l.url)}" aria-label="Ссылка: ${esc(l.name)}, ${esc(l.proto)}"><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать ссылку" data-copy="${esc(l.url)}"></button></span></div>`).join('')
+    // у AmneziaWG ссылки нет: копируется файл .conf целиком
+    box.innerHTML = userLinks.map((l) => `<div class="field"><span class="label"><span>${esc(l.name)}</span><span class="opt">${esc(l.proto)}</span></span><span class="copy-field"><input class="input" readonly value="${esc(l.conf ? 'Конфиг .conf' : l.url)}" aria-label="${l.conf ? 'Конфиг' : 'Ссылка'}: ${esc(l.name)}, ${esc(l.proto)}"><button class="icon-btn icon-btn-sm" type="button" aria-label="${l.conf ? 'Скопировать конфиг' : 'Скопировать ссылку'}" data-copy="${esc(l.conf || l.url)}"></button></span></div>`).join('')
     sec.hidden = !userLinks.length; window.initInputs?.(box)
   }
   function openDetail(id) { openId = Number(id); $('mp-d-links-sec').hidden = true; fillDetail(); $('mp-detail').showModal(); loadUserChart(openId); loadUserLinks(openId) }

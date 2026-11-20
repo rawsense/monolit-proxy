@@ -366,12 +366,33 @@
     if (document.activeElement?.form !== sForm) $('mp-socks-f').hidden = !s.on
     if (s.on) window.mpAdmin.setCopy($('mp-socks-url'), $('mp-socks-copy'), socksUrl())
     $('mp-mtg').hidden = !M.managed || !M.mtg
+    paintAwg()
     if (M.mtg) { $('mp-mtg-on').checked = ST?.mtg === 'running'; window.mpAdmin.setCopy($('mp-mtg-url'), $('mp-mtg-copy'), M.mtg.link) }
   }
   for (const k of ['hy2', 'xhttp']) $('mp-pr-' + k).addEventListener('change', async (e) => {
     const on = e.target.checked; e.target.disabled = true
     try { take(await run('PATCH', 'api/proto', { [k]: on })); paintAll(); toast({ type: 'success', title: `${k === 'hy2' ? 'Hysteria2' : 'XHTTP'} ${on ? 'включён' : 'выключен'}` }) }
     catch (err) { e.target.checked = !on; fail(err) } finally { e.target.disabled = false }
+  })
+  // AmneziaWG ставится отдельным контейнером: первая сборка идёт несколько минут, состояние приходит с общим состоянием админки
+  const AWG_HINT = 'Отдельный сервер по UDP. Для monolit client и AmneziaVPN'
+  let awgPoll = 0
+  function paintAwg() {
+    const a = window.mpAdmin.state()?.awg || { on: false, state: 'off' }, sw = $('mp-pr-awg')
+    if (document.activeElement !== sw) sw.checked = a.on
+    sw.disabled = !ST?.agent && !window.mpAdmin.demo()
+    $('mp-pr-awg-h').textContent = a.state === 'starting' ? 'Ставится. В первый раз это несколько минут'
+      : a.state === 'error' ? a.error || 'Не запустился' : a.state === 'on' ? `UDP ${a.port}. Добавьте его в набор подключений` : AWG_HINT
+    clearInterval(awgPoll)
+    if (a.state === 'starting' && !window.mpAdmin.demo()) awgPoll = setInterval(async () => { await window.mpAdmin.refresh(); paintAwg() }, 4000)
+  }
+  $('mp-pr-awg').addEventListener('change', async (e) => {
+    const on = e.target.checked; e.target.disabled = true
+    try {
+      if (window.mpAdmin.demo()) { const s = window.mpAdmin.state(); s.awg = { on, port: 46213, state: on ? 'on' : 'off', error: '' }; window.mpAdmin.setState(s) }
+      else window.mpAdmin.setState(await window.mpAdmin.api('PATCH', 'api/awg', { on }))
+      toast({ type: 'success', title: on ? 'AmneziaWG включается' : 'AmneziaWG выключен' })
+    } catch (err) { e.target.checked = !on; fail(err) } finally { e.target.disabled = false; paintAwg() }
   })
   // поля нужны только включённому SOCKS5
   sForm.on.addEventListener('change', () => { $('mp-socks-f').hidden = !sForm.on.checked; if (!sForm.on.checked) $('mp-socks-cf').hidden = true })

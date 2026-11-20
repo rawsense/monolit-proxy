@@ -129,7 +129,7 @@ const DS_KEY = (k) => (document.documentElement.dataset.store ? document.documen
 })();
 </script>
 <script>document.documentElement.classList.add('js')</script>
-<script src="_/admin.js?v=5c972691ec" defer></script>
+<script src="_/admin.js?v=08ce02f487" defer></script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="mp-mark" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2.5" fill="currentColor"/></symbol></svg>
@@ -653,6 +653,7 @@ const DS_KEY = (k) => (document.documentElement.dataset.store ? document.documen
       <label class="choice"><input type="checkbox" role="switch" class="switch" checked disabled><span>Vision<small>Основной вход на 443, через него открываются и сайты. Не выключается</small></span></label>
       <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-pr-hy2" data-k="hy2"><span>Hysteria2<small id="mp-pr-hy2-h">UDP 443, быстрее на плохой связи</small></span></label>
       <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-pr-xhttp" data-k="xhttp"><span>XHTTP<small id="mp-pr-xhttp-h">Через nginx, если TCP режут</small></span></label>
+      <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-pr-awg"><span>AmneziaWG<small id="mp-pr-awg-h">Отдельный сервер по UDP. Для monolit client и AmneziaVPN</small></span></label>
       <p class="mp-note">Выключенный вход пропадёт из подписок, когда приложения их обновят</p>
     </div>
     <form class="mp-section mp-managed mp-form" id="mp-socks" novalidate>

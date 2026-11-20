@@ -135,5 +135,48 @@ case "$cmd" in
     systemctl list-units --type=service --state=active --no-legend 'monolit-update-*' 'monolit-reconf-*' 2>/dev/null | grep -q . && { echo "Уже идёт обновление или смена адреса"; fin 1; }
     systemd-run --unit "monolit-reconf-$(date +%s)" --collect -p IgnoreSIGPIPE=no /usr/local/lib/monolit/reconf.sh "$mode" "$domain" "$ip2" "$keep" "$skip" "$drop" 2>&1 | tail -1
     fin "${PIPESTATUS[0]}" ;;
+  awg)   # awg on ПОРТ [IP выхода] | awg off | awg state — сервер AmneziaWG в отдельном контейнере monolit-awg
+    NETN=monolit-awg; SUB=172.31.213.0/24; SRC=${MP_SRC:-/opt/monolit-src}/awg
+    snat_drop() { iptables -t nat -S POSTROUTING 2>/dev/null | grep -- '--comment monolit-awg' | sed 's/^-A/-D/' | while read -r r; do eval "iptables -t nat $r" 2>/dev/null; done; }
+    case "$a1" in
+      on)
+        num "$a2" || fin 2
+        [ -z "$rest" ] || [[ "$rest" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || { echo "плохой адрес выхода"; fin 2; }
+        [ -f "$SRC/Dockerfile" ] || { echo "нет файлов сборки AmneziaWG: $SRC"; fin 1; }
+        tag=$(sed -n 's/^ARG AWG_TAG=//p' "$SRC/Dockerfile" | head -1); [[ "$tag" =~ ^v[0-9.]+$ ]] || { echo "не найдена версия AmneziaWG"; fin 1; }
+        img="monolit-awg:$tag-$(cat "$SRC/Dockerfile" "$SRC/start.sh" | sha256sum | cut -c1-8)"
+        if ! docker image inspect "$img" >/dev/null 2>&1; then
+          docker build -t "$img" "$SRC" > /tmp/monolit-awg-build.log 2>&1 || { tail -n 12 /tmp/monolit-awg-build.log; fin 1; }
+        fi
+        docker network inspect "$NETN" >/dev/null 2>&1 || docker network create --subnet "$SUB" "$NETN" >/dev/null 2>&1 || { echo "не создалась сеть $NETN ($SUB)"; fin 1; }
+        cur=$(docker inspect monolit-awg --format '{{.Config.Image}} {{range $p, $_ := .HostConfig.PortBindings}}{{$p}}{{end}}' 2>/dev/null)
+        if [ "$cur" != "$img $a2/udp" ]; then
+          docker rm -f monolit-awg >/dev/null 2>&1
+          docker run -d --name monolit-awg --restart unless-stopped --network "$NETN" --cap-add NET_ADMIN --device /dev/net/tun \
+            --sysctl net.ipv4.ip_forward=1 --sysctl net.ipv4.conf.all.src_valid_mark=1 \
+            -p "$a2:$a2/udp" -v /run/monolit/awg:/var/run/amneziawg "$img" >/dev/null 2>/tmp/monolit-awg-run.log || { tail -n 4 /tmp/monolit-awg-run.log; fin 1; }
+        else
+          docker update --restart unless-stopped monolit-awg >/dev/null 2>&1; docker start monolit-awg >/dev/null 2>&1
+        fi
+        # выход с выбранного адреса сервера: правило не переживает перезагрузку, админка повторяет «awg on» при сверке
+        want=""; [ -n "$rest" ] && ip -4 -o addr show 2>/dev/null | grep -q " inet $rest/" && want="-s $SUB ! -d $SUB -m comment --comment monolit-awg -j SNAT --to-source $rest"
+        have=$(iptables -t nat -S POSTROUTING 2>/dev/null | grep -- '--comment monolit-awg' | sed 's/^-A POSTROUTING //')
+        if [ "$have" != "$want" ]; then snat_drop; [ -n "$want" ] && iptables -t nat -I POSTROUTING $want; fi
+        if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q '^Status: active'; then ufw allow "$a2/udp" >/dev/null 2>&1
+        elif command -v firewall-cmd >/dev/null && firewall-cmd --state >/dev/null 2>&1; then firewall-cmd -q --permanent --add-port="$a2/udp" && firewall-cmd -q --reload; fi
+        for i in $(seq 1 25); do [ -S /run/monolit/awg/awg0.sock ] && break; sleep 0.2; done
+        [ -S /run/monolit/awg/awg0.sock ] || { echo "AmneziaWG не запустился"; docker logs --tail 6 monolit-awg 2>&1; fin 1; }
+        echo "$tag"; fin 0 ;;
+      off)
+        port=$(docker inspect monolit-awg --format '{{range $p, $_ := .HostConfig.PortBindings}}{{$p}}{{end}}' 2>/dev/null | cut -d/ -f1)
+        docker rm -f monolit-awg >/dev/null 2>&1; snat_drop
+        if num "${port:-x}"; then
+          if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q '^Status: active'; then ufw delete allow "$port/udp" >/dev/null 2>&1
+          elif command -v firewall-cmd >/dev/null && firewall-cmd --state >/dev/null 2>&1; then firewall-cmd -q --permanent --remove-port="$port/udp" && firewall-cmd -q --reload; fi
+        fi
+        fin 0 ;;
+      state) docker ps -a --filter name=^monolit-awg$ --format '{{.State}}' 2>/dev/null | head -1; fin 0 ;;
+      *) fin 2 ;;
+    esac ;;
   *) echo "нет такой команды"; fin 2 ;;
 esac
