@@ -5237,7 +5237,7 @@ var qrcode = function() {
   function paintAwg() {
     const a = window.mpAdmin.state()?.awg || { on: false, state: 'off' }, sw = $('mp-pr-awg')
     if (document.activeElement !== sw) sw.checked = a.on
-    sw.disabled = !ST?.agent && !window.mpAdmin.demo()
+    sw.disabled = a.state === 'starting'   // пока ставится — не трогать; причина написана строкой ниже
     $('mp-pr-awg-h').textContent = a.state === 'starting' ? 'Ставится. В первый раз это несколько минут'
       : a.state === 'error' ? a.error || 'Не запустился' : a.state === 'on' ? `UDP ${a.port}. Добавьте его в набор подключений` : AWG_HINT
     clearInterval(awgPoll)
