@@ -36,6 +36,12 @@ export function renderOne(parsed, kind, { user, server }, opts = {}) {
   const port = opts.ob ? 0 : server.ports?.[kind];
   if (port) { if (ob.settings?.vnext?.[0]) ob.settings.vnext[0].port = port; else if (ob.settings && 'port' in ob.settings) ob.settings.port = port; }
   if (opts.outbound) opts.outbound(ob);
+  // Hysteria2 по умолчанию не шлёт поддерживающих пакетов и ждёт 30 секунд без ответа: при обрыве пути всё висит полминуты.
+  // Поддержка каждые 3 с и срок молчания 8 с — если шаблон не задал своих
+  if (kind === 'hy2' && ob.streamSettings) {
+    const qp = ((ob.streamSettings.finalmask ||= {}).quicParams ||= {});
+    qp.keepAlivePeriod ??= 3; qp.maxIdleTimeout ??= 8;
+  }
   const remark = opts.remark || `${server.name} ${{ vision: 'Vision', hy2: 'Hysteria2', xhttp: 'XHTTP', awg: 'AmneziaWG' }[kind]}`;
   const text = subst(parsed.tpl, { ...vars, PROXY_OUTBOUND: JSON.stringify(ob), REMARK: jstr(remark) });
   const left = /\$\{[A-Za-z_][A-Za-z0-9_]*\}|"\$[A-Za-z_][A-Za-z0-9_]*"/.exec(text);
