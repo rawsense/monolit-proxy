@@ -132,8 +132,8 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg }) {
     const fp = srv.fp || 'firefox', d = srv.domain, out = [], push = (l, url) => out.push({ name: l.name, proto: PROTO[l.proto], url });
     for (const l of forUser(u)) {
       const e = entry(l), n = e && byId(e), name = encodeURIComponent(l.name);
-      // у AmneziaWG ссылки нет: вместо неё файл .conf целиком
-      if (!e && l.proto === 'awg') { const conf = awg.confText(u, l.name); if (conf) out.push({ name: l.name, proto: PROTO.awg, url: '', conf }); continue }
+      // AmneziaWG: ссылка vpn:// для приложения AmneziaVPN. В общий список ссылок подписки она не идёт: другие приложения её не понимают
+      if (!e && l.proto === 'awg') { const url = awg.vpnLink(u, l.name); if (url) out.push({ name: l.name, proto: PROTO.awg, url, own: true }); continue }
       if (e && l.proto === 'hy2') push(l, `hysteria2://${encodeURIComponent(lineUuid(u.hy2, l.id))}@${n.domain}:443?sni=${n.domain}&alpn=h3#${name}`);
       else if (e && l.proto === 'vision') push(l, `vless://${lineUuid(u.uuid, l.id)}@${n.domain}:${VISION_PORT}?encryption=none&security=tls&type=tcp&flow=xtls-rprx-vision&sni=${n.domain}&fp=${fp}#${name}`);
       else if (e) push(l, `vless://${lineUuid(u.uuid, l.id)}@${n.addr}:443?encryption=none&security=reality&type=tcp&flow=xtls-rprx-vision&sni=${sni(n)}&fp=${fp}&pbk=${n.pub}&sid=${n.sid}#${name}`);
@@ -143,7 +143,7 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg }) {
     }
     return out;
   }
-  const links = (u, srv) => linkList(u, srv).map((x) => x.url).filter(Boolean);
+  const links = (u, srv) => linkList(u, srv).filter((x) => !x.own).map((x) => x.url);
 
   // ---------- конфиг Xray для ноды ----------
   function nodeConfig(n) {

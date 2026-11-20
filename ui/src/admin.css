@@ -1,6 +1,9 @@
 /* Админка monolit proxy: только то, чего нет в системе. Каркас (.app-shell, .app-main, .app-head) — layers.css */
 *, *::before, *::after { box-sizing: border-box }
 html { color-scheme: dark; -webkit-tap-highlight-color: transparent }
+:root { --font-sans: "Twemoji Country Flags", "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif }
+/* флаг страны в названии: отступ до текста как между иконкой и подписью */
+.mp-flag { display: inline-block; margin-right: var(--sp-2) }
 [data-theme="light"] { color-scheme: light }
 body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-sans);
   font-size: var(--fs-md); line-height: var(--lh-md); letter-spacing: var(--ls-md) }

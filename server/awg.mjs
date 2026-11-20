@@ -3,6 +3,7 @@
 // сокет настройки устройства. Пользователь — пара ключей и адрес внутри сети 10.13.0.0/16, по номеру в базе.
 import { createConnection } from 'node:net';
 import { generateKeyPairSync, randomBytes, randomInt } from 'node:crypto';
+import { deflateSync } from 'node:zlib';
 import { now, getSetting, setSetting } from './db.mjs';
 
 const SOCK = process.env.MP_AWG_SOCK || '/run/monolit/awg/awg0.sock';
@@ -171,6 +172,21 @@ export function createAwg({ db, log, agent, domain, outIp, onReady }) {
       `Endpoint = ${k.endpoint}`, 'AllowedIPs = 0.0.0.0/0', 'PersistentKeepalive = 25', ''].join('\n');
   }
 
+  // Ссылка vpn:// для приложения AmneziaVPN: его собственный JSON (как оно само собирает из файла .conf,
+  // см. extractWireGuardConfig в amnezia-client), сжатый как qCompress — длина в 4 байтах и поток zlib — и записанный в base64url
+  function vpnLink(u, name) {
+    const k = client(u); if (!k) return '';
+    const c = conf(), text = confText(u, name);
+    const last = { config: text, hostName: domain(), port: c.port, client_priv_key: k.priv, client_ip: `${k.ip}/32`, psk_key: k.psk, server_pub_key: k.server,
+      mtu: String(MTU), persistent_keep_alive: '25', allowed_ips: ['0.0.0.0/0'], ...k.params };
+    const json = Buffer.from(JSON.stringify({
+      containers: [{ container: 'amnezia-awg', awg: { last_config: JSON.stringify(last, null, 4), isThirdPartyConfig: true, port: String(c.port), transport_proto: 'udp' } }],
+      defaultContainer: 'amnezia-awg', description: String(name || '').replace(/[\r\n]/g, ' '), dns1: '1.1.1.1', dns2: '8.8.8.8', hostName: domain(),
+    }));
+    const len = Buffer.alloc(4); len.writeUInt32BE(json.length);
+    return 'vpn://' + Buffer.concat([len, deflateSync(json, { level: 8 })]).toString('base64url');
+  }
+
   async function set({ on, port }) {
     let c = conf();
     if (on) {
@@ -193,5 +209,5 @@ export function createAwg({ db, log, agent, domain, outIp, onReady }) {
 
   const stateForAdmin = () => { const c = conf(); return { on: !!c.on, port: c.port || 0, state: c.on ? state : 'off', error } };
   if (conf().on) state = 'starting';
-  return { ready, sync, set, outbound, confText, dropKeys, stateForAdmin, conf };
+  return { ready, sync, set, outbound, confText, vpnLink, dropKeys, stateForAdmin, conf };
 }

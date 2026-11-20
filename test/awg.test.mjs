@@ -154,6 +154,29 @@ test('конфиг для клиента monolit и файл .conf', () => {
   for (const line of [`PrivateKey = ${u.awg_priv}`, 'Address = 10.13.0.3/32', `HeaderProtectionKey = ${c.hpk}`, 'RandomTrailers = on', 'S4 = 12', `PublicKey = ${c.pub}`, 'Endpoint = vpn.example.com:46200']) assert.ok(text.includes(line + '\n'), line);
 });
 
+test('ссылка vpn:// для AmneziaVPN: сжатый JSON приложения с теми же ключами и параметрами', async () => {
+  const { inflateSync } = await import('node:zlib');
+  const u = users()[1], c = awg.conf(), link = awg.vpnLink(u, 'Stockholm');
+  assert.ok(link.startsWith('vpn://'));
+  const raw = Buffer.from(link.slice(6), 'base64url'), json = inflateSync(raw.subarray(4));
+  assert.equal(raw.readUInt32BE(0), json.length);   // как qCompress: длина несжатого в первых 4 байтах
+  const cfg = JSON.parse(json);
+  assert.equal(cfg.defaultContainer, 'amnezia-awg');
+  assert.equal(cfg.description, 'Stockholm');
+  assert.equal(cfg.hostName, 'vpn.example.com');
+  assert.deepEqual([cfg.dns1, cfg.dns2], ['1.1.1.1', '8.8.8.8']);
+  const box = cfg.containers[0];
+  assert.equal(box.container, 'amnezia-awg');
+  assert.deepEqual({ ...box.awg, last_config: undefined }, { last_config: undefined, isThirdPartyConfig: true, port: '46200', transport_proto: 'udp' });
+  const last = JSON.parse(box.awg.last_config);
+  assert.equal(last.config, awg.confText(u, 'Stockholm'));
+  assert.equal(last.hostName, 'vpn.example.com'); assert.equal(last.port, 46200);
+  assert.equal(last.client_priv_key, u.awg_priv); assert.equal(last.psk_key, u.awg_psk); assert.equal(last.server_pub_key, c.pub);
+  assert.equal(last.client_ip, '10.13.0.3/32'); assert.equal(last.mtu, '1280');
+  assert.deepEqual(last.allowed_ips, ['0.0.0.0/0']);
+  assert.equal(last.HeaderProtectionKey, c.hpk); assert.equal(last.S3, '12'); assert.equal(last.RandomTrailers, 'on'); assert.equal(last.Jc, String(c.jc));
+});
+
 test('сменили выходной адрес — при полной сверке помощник вызывается с ним', async () => {
   outIp = '198.51.100.9'; calls.length = 0;
   await awg.sync(users());

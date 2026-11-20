@@ -4267,6 +4267,8 @@ var qrcode = function() {
 (() => {
   const $ = (id) => document.getElementById(id)
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+  // Название с флагом страны: флаг — отдельным элементом со своим отступом, пробел из названия после него убирается
+  const named = (s) => esc(s).replace(/((?:\p{Regional_Indicator}{2})|\u{1F3F4}[\u{E0061}-\u{E007A}]+\u{E007F})\s*/gu, '<span class="mp-flag">$1</span>')
   const NF1 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }), NF = new Intl.NumberFormat('ru-RU')
   const DF = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' }), DFY = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
   const TF = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' })
@@ -4596,8 +4598,7 @@ var qrcode = function() {
     const box = $('mp-d-links'), sec = $('mp-d-links-sec')
     try { const r = await api('GET', `api/users/${id}/links`); if (openId !== id) return; userLinks = r.links || [] } catch (e) { if (openId !== id) return; userLinks = [] }
     // то же поле с кнопкой копирования, что у ссылки на подписку
-    // у AmneziaWG ссылки нет: копируется файл .conf целиком
-    box.innerHTML = userLinks.map((l) => `<div class="field"><span class="label"><span>${esc(l.name)}</span><span class="opt">${esc(l.proto)}</span></span><span class="copy-field"><input class="input" readonly value="${esc(l.conf ? 'Конфиг .conf' : l.url)}" aria-label="${l.conf ? 'Конфиг' : 'Ссылка'}: ${esc(l.name)}, ${esc(l.proto)}"><button class="icon-btn icon-btn-sm" type="button" aria-label="${l.conf ? 'Скопировать конфиг' : 'Скопировать ссылку'}" data-copy="${esc(l.conf || l.url)}"></button></span></div>`).join('')
+    box.innerHTML = userLinks.map((l) => `<div class="field"><span class="label"><span>${named(l.name)}</span><span class="opt">${esc(l.proto)}</span></span><span class="copy-field"><input class="input" readonly value="${esc(l.url)}" aria-label="Ссылка: ${esc(l.name)}, ${esc(l.proto)}"><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать ссылку" data-copy="${esc(l.url)}"></button></span></div>`).join('')
     sec.hidden = !userLinks.length; window.initInputs?.(box)
   }
   function openDetail(id) { openId = Number(id); $('mp-d-links-sec').hidden = true; fillDetail(); $('mp-detail').showModal(); loadUserChart(openId); loadUserLinks(openId) }
@@ -5588,6 +5589,7 @@ var qrcode = function() {
   const busy = async (btn, fn) => { btn.disabled = true; btn.classList.add('is-loading'); try { return await fn() } finally { btn.disabled = false; btn.classList.remove('is-loading') } }
   const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c }
   const PROTO = { vision: 'Vision', xhttp: 'XHTTP', hy2: 'Hysteria2', reality: 'Reality', awg: 'AmneziaWG' }
+  const named = (s) => esc(s).replace(/((?:\p{Regional_Indicator}{2})|\u{1F3F4}[\u{E0061}-\u{E007A}]+\u{E007F})\s*/gu, '<span class="mp-flag">$1</span>')
   const S = () => A.state()
   // разметку меняем, только когда она правда другая: обновление раз в минуту не сбивает фокус и перетаскивание
   const put = (el, html) => { if (el._html === html) return false; el._html = html; el.innerHTML = html; icons(); return true }
@@ -5761,7 +5763,7 @@ var qrcode = function() {
     if (cur && cur.getAttribute('aria-selected') !== 'true') $('kit-tabs').select?.(cur, false)
     if (!dragging) put($('ln-list'), k.lines.map((l) => `<div class="alist-row mp-line${l.on ? '' : ' is-off'}" data-id="${l.id}">
       <button type="button" class="icon-btn icon-btn-sm mp-grip" aria-label="Переместить «${esc(l.name)}»">${icon('grip-vertical')}</button>
-      <button type="button" class="mp-line-open"><b>${esc(l.name)}</b>${chain(l)}</button>
+      <button type="button" class="mp-line-open"><b>${named(l.name)}</b>${chain(l)}</button>
       <input type="checkbox" role="switch" class="switch" aria-label="Показывать «${esc(l.name)}»"${l.on ? ' checked' : ''}></div>`).join('')) && window.initLayers?.($('ln-list'))
     $('ln-list').hidden = !k.lines.length; $('ln-empty').hidden = !!k.lines.length
     if (document.activeElement !== $('kit-name')) $('kit-name').value = k.name

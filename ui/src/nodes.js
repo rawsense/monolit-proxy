@@ -11,6 +11,7 @@
   const busy = async (btn, fn) => { btn.disabled = true; btn.classList.add('is-loading'); try { return await fn() } finally { btn.disabled = false; btn.classList.remove('is-loading') } }
   const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c }
   const PROTO = { vision: 'Vision', xhttp: 'XHTTP', hy2: 'Hysteria2', reality: 'Reality', awg: 'AmneziaWG' }
+  const named = (s) => esc(s).replace(/((?:\p{Regional_Indicator}{2})|\u{1F3F4}[\u{E0061}-\u{E007A}]+\u{E007F})\s*/gu, '<span class="mp-flag">$1</span>')
   const S = () => A.state()
   // разметку меняем, только когда она правда другая: обновление раз в минуту не сбивает фокус и перетаскивание
   const put = (el, html) => { if (el._html === html) return false; el._html = html; el.innerHTML = html; icons(); return true }
@@ -184,7 +185,7 @@
     if (cur && cur.getAttribute('aria-selected') !== 'true') $('kit-tabs').select?.(cur, false)
     if (!dragging) put($('ln-list'), k.lines.map((l) => `<div class="alist-row mp-line${l.on ? '' : ' is-off'}" data-id="${l.id}">
       <button type="button" class="icon-btn icon-btn-sm mp-grip" aria-label="Переместить «${esc(l.name)}»">${icon('grip-vertical')}</button>
-      <button type="button" class="mp-line-open"><b>${esc(l.name)}</b>${chain(l)}</button>
+      <button type="button" class="mp-line-open"><b>${named(l.name)}</b>${chain(l)}</button>
       <input type="checkbox" role="switch" class="switch" aria-label="Показывать «${esc(l.name)}»"${l.on ? ' checked' : ''}></div>`).join('')) && window.initLayers?.($('ln-list'))
     $('ln-list').hidden = !k.lines.length; $('ln-empty').hidden = !!k.lines.length
     if (document.activeElement !== $('kit-name')) $('kit-name').value = k.name
