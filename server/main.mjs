@@ -241,6 +241,15 @@ function updateState() {
 // ---------- адрес сервера ----------
 const cleanDomain = v => { const d = String(v || '').trim().toLowerCase().replace(/^[a-z]+:\/\//, '').replace(/[/:?#].*$/, '').replace(/\.$/, ''); return /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(d) && d.length <= 253 ? d : '' };
 const resolve = resolve4;
+// Адреса, которыми пользуется monolit: входящий (способ «Второй IP») и исходящий. Помощник проверяет, записаны ли они
+// в настройках сети и нет ли там старых адресов, которых на сервере уже нет (agent/netsave.sh)
+async function netsave(op) {
+  const ips = [...new Set([env('MP_MODE', '') === 'ip2' ? env('MP_IP2', '') : '', getSetting(db, 'out_ip', '')].filter(Boolean))];
+  const r = await agent(['netsave', op, ...ips].join(' '), 30000);
+  const lines = r.out.split('\n').filter(Boolean);
+  let state = null; try { state = JSON.parse(lines.at(-1)) } catch {}
+  return { code: r.code, state: r.code === 2 ? null : state, text: lines.filter((l) => !l.startsWith('{')).at(-1) || '' };
+}
 function addrState() {
   let job = null; try { job = JSON.parse(readFileSync(join(DATA, 'reconf.json'), 'utf8')) } catch {}
   return { mode: env('MP_MODE', ''), domain: getSetting(db, 'domain'), ip2: env('MP_IP2', ''), out_ip: mgr.stateForAdmin().out_ip, alt: env('MP_ALT', '').replace(/^"|"$/g, '').split(/[,;]/).map(x => x.split(/[:|]/)[0]).filter(x => cleanDomain(x)), admin: ADMIN, job, watch: watch.state() };
@@ -410,7 +419,12 @@ async function adminApi(req, res, path) {
   if (path === '/api/addr' && M === 'GET') {
     const net = await agent('netinfo', 30000);
     let info = null; try { info = net.code === 0 ? JSON.parse(net.out.split('\n').pop() || '{}') : null } catch {}
-    return json(res, 200, { ...addrState(), net: info, net_error: info ? '' : net.out || 'Помощник не ответил', dns: await resolve(getSetting(db, 'domain')) });
+    return json(res, 200, { ...addrState(), net: info, net_error: info ? '' : net.out || 'Помощник не ответил', dns: await resolve(getSetting(db, 'domain')), netsave: (await netsave('check')).state });
+  }
+  if (path === '/api/addr/netsave' && M === 'POST') {
+    const r = await netsave('fix');
+    if (r.code === 0) { log('настройки сети:', r.text); return json(res, 200, { ok: true, text: r.text, netsave: r.state }) }
+    return json(res, r.code < 0 ? 503 : 400, { error: r.state?.manual || r.text || 'Не получилось', netsave: r.state });
   }
   if (path === '/api/addr/dns' && M === 'POST') {
     const d = cleanDomain((await readBody(req)).domain); if (!d) return json(res, 400, { error: 'Домен выглядит так: vpn.example.ru' });
@@ -552,7 +566,11 @@ http.listen(Number(PORT), HOST, async () => {
     setSetting(db, 'reconf_seen', String(job.at));
     if (now() - job.at < 3600) {
       watch.notify(job.state === 'done' ? `адрес сервера сменён, домен ${getSetting(db, 'domain')}` : `сменить адрес не получилось: ${job.text}`);
-      if (job.state === 'done') setTimeout(() => watch.check(true), 60_000);
+      if (job.state === 'done') {
+        setTimeout(() => watch.check(true), 60_000);
+        // новый адрес — в настройки сети, старый оттуда убрать: иначе после перезагрузки сервер останется без VPN
+        netsave('fix').then((r) => log('настройки сети после смены адреса:', r.state?.manual || r.text)).catch((e) => log('настройки сети:', e.message));
+      }
     }
   }
   setInterval(() => checkUpdate(), 24 * 3600_000);

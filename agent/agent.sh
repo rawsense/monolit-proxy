@@ -135,6 +135,15 @@ case "$cmd" in
     systemctl list-units --type=service --state=active --no-legend 'monolit-update-*' 'monolit-reconf-*' 2>/dev/null | grep -q . && { echo "Уже идёт обновление или смена адреса"; fin 1; }
     systemd-run --unit "monolit-reconf-$(date +%s)" --collect -p IgnoreSIGPIPE=no /usr/local/lib/monolit/reconf.sh "$mode" "$domain" "$ip2" "$keep" "$skip" "$drop" 2>&1 | tail -1
     fin "${PIPESTATUS[0]}" ;;
+  netsave)   # netsave check|fix IP… — сохранены ли адреса в настройках сети (переживут ли перезагрузку)
+    read -r _ op ips <<<"$line"
+    [[ "$op" =~ ^(check|fix)$ ]] || fin 2
+    for a in $ips; do [[ "$a" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || { echo "плохой адрес"; fin 2; }; done
+    [ -x /usr/local/lib/monolit/netsave.sh ] || { echo "нет такой команды"; fin 2; }
+    # шлём без кавычек нарочно: адреса уже проверены, каждый — отдельный аргумент
+    # shellcheck disable=SC2086
+    /usr/local/lib/monolit/netsave.sh "$op" $ips 2>&1
+    fin $? ;;
   awg)   # awg on ПОРТ [IP выхода] | awg off | awg state — сервер AmneziaWG в отдельном контейнере monolit-awg
     NETN=monolit-awg; SUB=172.31.213.0/24; SRC=${MP_SRC:-/opt/monolit-src}/awg
     snat_drop() { iptables -t nat -S POSTROUTING 2>/dev/null | grep -- '--comment monolit-awg' | sed 's/^-A/-D/' | while read -r r; do eval "iptables -t nat $r" 2>/dev/null; done; }

@@ -136,7 +136,7 @@ if [ "$ACTION" = uninstall ]; then
   docker network rm monolit-awg >>"$LOG" 2>&1 || true
   iptables -t nat -S POSTROUTING 2>/dev/null | grep -- "--comment monolit-awg" | sed "s/^-A/-D/" | while read -r r; do eval "iptables -t nat $r" 2>/dev/null || true; done
   systemctl disable --now monolit-agent.socket >>"$LOG" 2>&1 || true
-  rm -f /etc/systemd/system/monolit-agent.socket /etc/systemd/system/monolit-agent@.service /usr/local/lib/monolit/agent.sh /usr/local/lib/monolit/update.sh /usr/local/lib/monolit/reconf.sh
+  rm -f /etc/systemd/system/monolit-agent.socket /etc/systemd/system/monolit-agent@.service /usr/local/lib/monolit/agent.sh /usr/local/lib/monolit/update.sh /usr/local/lib/monolit/reconf.sh /usr/local/lib/monolit/netsave.sh
   restore_before
   [ -f /etc/sysctl.d/99-monolit.conf ] && rm -f /etc/sysctl.d/99-monolit.conf && info "BBR-настройки убраны, старые значения ядра вернутся после перезагрузки"
   mv "$ENVF" "$BK/monolit.env-$STAMP"
@@ -552,7 +552,7 @@ fi
 
 # Помощник админки на хосте: перезапуск и проверка Xray, обновления, журнал. Только команды из списка, сокет только для root
 install -d -m 755 /usr/local/lib/monolit
-install -m 755 "$SRC/agent/agent.sh" "$SRC/agent/update.sh" "$SRC/agent/reconf.sh" /usr/local/lib/monolit/
+install -m 755 "$SRC/agent/agent.sh" "$SRC/agent/update.sh" "$SRC/agent/reconf.sh" "$SRC/agent/netsave.sh" /usr/local/lib/monolit/
 install -m 644 "$SRC/agent/monolit-agent.socket" "$SRC/agent/monolit-agent@.service" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable monolit-agent.socket >>"$LOG" 2>&1; systemctl restart monolit-agent.socket >>"$LOG" 2>&1 \

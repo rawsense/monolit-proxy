@@ -18,11 +18,12 @@
   const MODES = { bare: ['Весь сервер под VPN', 'Xray на 443, за ним страница входа, админка и подписки'], front: ['Рядом с сайтами', 'Xray на 443, сайты nginx открываются через него'], ip2: ['Второй IP', 'Xray на отдельном адресе, сайты остаются на основном'] }
   const W = { ok: ['Открывается', 'badge-success'], blocked: ['Не открывается', 'badge-danger'], down: ['Сервер не отвечает', 'badge-danger'], unknown: ['Не удалось проверить', 'badge-warning'], none: ['Ещё не проверяли', ''] }
 
-  let D = null   // { mode, domain, ip2, out_ip, alt, admin, job, watch, net, dns }
+  let D = null   // { mode, domain, ip2, out_ip, alt, admin, job, watch, net, dns, netsave }
 
   // ---------- демо ----------
   const demo = {
-    mode: 'front', domain: 'vpn.example.ru', ip2: '', out_ip: '', alt: ['old.example.ru'], admin: '/adm', job: null, dns: ['203.0.113.7'],
+    mode: 'ip2', domain: 'vpn.example.ru', ip2: '203.0.113.8', out_ip: '', alt: ['old.example.ru'], admin: '/adm', job: null, dns: ['203.0.113.8'],
+    netsave: { tool: 'ifupdown', dev: 'ens3', file: '/etc/network/interfaces', missing: ['203.0.113.8'], stale: ['198.51.100.4'], manual: '' },
     net: { ips: ['203.0.113.7', '203.0.113.8'], ip1: '203.0.113.7', sites: [{ names: ['example.ru', 'www.example.ru'] }] },
     watch: { state: 'blocked', at: now() - 600, since: now() - 4000, ip: '203.0.113.7', on: true, every: 60, error: '',
       ru: [{ node: 'ru1', city: 'Moscow', ok: false, healthy: false, answered: true }, { node: 'ru2', city: 'Moscow', ok: false, healthy: true, answered: true }],
@@ -42,6 +43,7 @@
       }
       return structuredClone(demo)
     }
+    if (path === 'api/addr/netsave') { await sleep(800); demo.netsave = { ...demo.netsave, missing: [], stale: [] }; return { ok: true, text: 'заменил 198.51.100.4 на 203.0.113.8', netsave: demo.netsave } }
     if (path === 'api/egress') { await sleep(1000); demo.out_ip = body.ip; return { ok: true, seen: body.ip || demo.net.ip1 } }
     if (path === 'api/watch') { if ('on' in body) demo.watch.on = body.on; if ('every' in body) demo.watch.every = Number(body.every); return { watch: demo.watch } }
     if (path === 'api/watch/check') { await sleep(1500); Object.assign(demo.watch, { state: 'ok', at: now(), since: now(), ru: demo.watch.ru.map((x) => ({ ...x, ok: x.healthy, ms: 41 })) }); return { watch: demo.watch } }
@@ -89,7 +91,9 @@
       D.mode === 'ip2' ? ['Входящий IP', D.ip2] : null,
       on.length ? [on.length > 1 ? 'Адреса сервера' : 'Адрес сервера', on.join(', ')] : null,
       D.mode === 'front' && sites().length ? ['Сайты рядом', sites().join(', ')] : null,
+      bootOk() ? ['После перезагрузки', 'адреса сохранятся'] : null,
     ])
+    paintBoot(running)
     const alt = D.alt || []
     $('mp-a-alt').hidden = !alt.length
     $('mp-a-alt').innerHTML = alt.map((d) => `<div class="alist-row mp-alt"><span class="alist-ic"><i data-lucide="link"></i></span><span class="alist-tx"><b>${esc(d)}</b><span>Запасной: старые ссылки подписок работают</span></span>
@@ -102,6 +106,33 @@
     $('mp-o-kv').innerHTML = kv([['Сейчас', D.out_ip || 'как решает сервер' + (D.net?.ip1 ? `, ${D.net.ip1}` : '')]])
     $('mp-o-edit').disabled = foreign || running || !D.net
   }
+  // ---------- переживут ли адреса перезагрузку ----------
+  // Хостер меняет IP на лету и не всегда записывает его в настройки сети; старый там тоже остаётся
+  const ns = () => D.netsave
+  const bootOk = () => !!ns() && (D.mode === 'ip2' || D.out_ip) && !ns().missing.length && !ns().stale.length
+  function paintBoot(running) {
+    const n = ns(), miss = n?.missing || [], stale = n?.stale || []
+    $('mp-a-boot').hidden = !miss.length && !stale.length
+    if ($('mp-a-boot').hidden) return
+    $('mp-a-boot-t').textContent = miss.length ? 'После перезагрузки адрес пропадёт' : 'В настройках сети старый адрес'
+    $('mp-a-boot-p').textContent = n.manual || (miss.length && stale.length ? `В настройках сети записан ${stale.join(', ')}, а работает ${miss.join(', ')}`
+      : miss.length ? `${miss.join(', ')} не записан в настройках сети` : `После перезагрузки сервер возьмёт себе ${stale.join(', ')}, которого у него уже нет`)
+    $('mp-a-boot-act').hidden = n.tool === 'none'
+    $('mp-a-boot-fix').disabled = running
+  }
+  $('mp-a-boot-fix').addEventListener('click', async (e) => {
+    const btn = e.currentTarget, n = ns(), what = [n.stale.length && n.missing.length ? `заменим ${n.stale.join(', ')} на ${n.missing.join(', ')}` : '',
+      !n.stale.length && n.missing.length ? `допишем ${n.missing.join(', ')}` : '', n.stale.length && !n.missing.length ? `уберём ${n.stale.join(', ')}` : ''].filter(Boolean).join('')
+    if (!await A().confirm('Исправить настройки сети?', `В ${n.file || 'настройках сети'} ${what}. Сейчас ничего не прервётся, копия файла останется в /root/backups`, 'Исправить')) return
+    await busy(btn, async () => {
+      try {
+        const r = await api('POST', 'api/addr/netsave')
+        D.netsave = r.netsave; paintAddr()
+        toast({ type: 'success', title: 'Настройки сети исправлены', text: 'После перезагрузки адреса будут на месте' })
+      } catch (err) { fail(err); load().catch(() => {}) }
+    })
+  })
+
   const paint = () => { paintWatch(); paintAddr() }
 
   async function load() { D = await api('GET', 'api/addr'); paint(); if (D.job?.state === 'running' && now() - D.job.at < 900) follow() }
