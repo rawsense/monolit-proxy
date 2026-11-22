@@ -1752,7 +1752,8 @@
     // мышь: подсветка следует за курсором, клик выбирает; фокус остаётся на кнопке
     list.addEventListener('pointermove', (e) => { const o = e.target.closest('.option'); if (o && opts.indexOf(o) !== active) setActive(o, false) });
     list.addEventListener('pointerdown', (e) => e.preventDefault());
-    list.addEventListener('click', (e) => pick(e.target.closest('.option')));
+    // preventDefault: список лежит внутри <label>, и клик по пункту подпись передала бы родному select — Chrome открыл бы системный список
+    list.addEventListener('click', (e) => { e.preventDefault(); pick(e.target.closest('.option')) });
     document.addEventListener('pointerdown', (e) => { if (!wrap.contains(e.target)) close() });
     btn.addEventListener('blur', () => setTimeout(() => { if (!wrap.contains(document.activeElement)) close() }, 0));
     // изменения снаружи: значение, disabled, состав опций
