@@ -232,13 +232,17 @@
     const out = Number(lForm.out.value), list = S().nodes.filter((n) => n.id !== out)
     setSelect(lForm.via, '<option value="0">Без моста</option>' + list.map((n) => `<option value="${n.id}">${esc(n.name)}</option>`).join(''), list.some((n) => n.id === Number(keep)) ? keep : 0)
   }
-  let filling = false
+  let filling = false, lineExit = [0, 'direct']
+  // AmneziaWG идёт мимо Xray: выход ему не задать
+  const fillExit = () => window.mpExits?.fill(lForm.exit, lForm.exit_fail, lineExit[0], lineExit[1], 'Как у человека', lForm.proto.value === 'awg' ? 'Нельзя для AmneziaWG' : '')
+  lForm.proto.addEventListener('change', () => { if (lForm.exit.options.length && !lForm.exit.disabled) lineExit = [Number(lForm.exit.value) || 0, lForm.exit_fail.value]; fillExit() })
   function openLine(l) {
     lineId = l ? l.id : 0; filling = true
     $('ln-dlg-t').textContent = l ? 'Подключение' : 'Новое подключение'; $('ln-del').hidden = !l
     lForm.name.value = l ? l.name : ''; lForm.name.placeholder = l ? '' : 'Подставится само'
     setSelect(lForm.out, [{ id: 0, name: S().settings.server_name }, ...S().nodes].map((n) => `<option value="${n.id}">${esc(n.name)}</option>`).join(''), l ? l.out : 0)
     fillVia(l ? l.via : 0); fillProto(l ? l.proto : 'vision'); filling = false
+    lineExit = l ? [l.exit, l.exit_fail] : [0, 'direct']; fillExit()
     $('ln-dlg').showModal()
   }
   lForm.out.addEventListener('change', () => { if (filling) return; filling = true; fillVia(lForm.via.value); fillProto(lForm.proto.value); filling = false })
@@ -246,7 +250,7 @@
   $('ln-list').addEventListener('click', (e) => { const b = e.target.closest('.mp-line-open'); if (b) openLine(lineOf(b.closest('.mp-line').dataset.id)) })
   $('ln-add').addEventListener('click', () => openLine(null))
   lForm.addEventListener('submit', (e) => {
-    e.preventDefault(); const body = { name: lForm.name.value, out: Number(lForm.out.value), via: Number(lForm.via.value), proto: lForm.proto.value }
+    e.preventDefault(); const body = { name: lForm.name.value, out: Number(lForm.out.value), via: Number(lForm.via.value), proto: lForm.proto.value, ...(lForm.exit.options.length ? { exit: Number(lForm.exit.value) || 0, exit_fail: lForm.exit_fail.value } : {}) }
     busy(lForm.querySelector('[type=submit]'), async () => {
       try { await call(lineId ? 'PATCH' : 'POST', lineId ? 'api/lines/' + lineId : `api/kits/${kitId}/lines`, body); $('ln-dlg').close() } catch (err) { fail(err) }
     })
@@ -297,7 +301,7 @@
     setSelect(sel, ks.map((k) => `<option value="${k.id}">${esc(k.name)}</option>`).join(''), value ?? ks.find((k) => k.is_default)?.id ?? '')
   }
   window.mpKits = { fill: fillKit }
-  document.querySelectorAll('[data-open="mp-add"]').forEach((b) => b.addEventListener('click', () => fillKit($('mp-add-form').kit)))
+  document.querySelectorAll('[data-open="mp-add"]').forEach((b) => b.addEventListener('click', () => { const f = $('mp-add-form'); fillKit(f.kit); window.mpExits?.fill(f.exit, f.exit_fail, 0, 'direct', 'С адреса сервера') }))
 
   function paint() {
     const s = S(); if (!s) return

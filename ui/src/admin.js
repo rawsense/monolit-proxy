@@ -315,6 +315,7 @@
     dForm.name.value = u.name
     dForm.note.value = u.note || ''
     window.mpKits?.fill(dForm.kit, u.kit)
+    window.mpExits?.fill(dForm.exit, dForm.exit_fail, u.exit, u.exit_fail, 'С адреса сервера')
     dForm.limit.value = gbOf(u.limit)
     dForm.period.value = u.period || ''; dForm.period.dispatchEvent(new Event('change'))
     // значения не из списка (задано раньше числом) — добавляем пунктом, чтобы не потерялось
@@ -363,7 +364,7 @@
     if (!limitOk(dForm.limit)) return
     busy(document.querySelector('[form="mp-d-form"]'), async () => {
       try {
-        const r = await api('PATCH', 'api/users/' + u.id, { name: dForm.name.value, note: dForm.note.value, limit: parseGb(dForm.limit.value), expire: fromDateInput(dForm.expire.value), enabled: dForm.enabled.checked, period: dForm.period.value, devices: Number(dForm.devices.value) || 0, kit: Number(dForm.kit.value) || undefined })
+        const r = await api('PATCH', 'api/users/' + u.id, { name: dForm.name.value, note: dForm.note.value, limit: parseGb(dForm.limit.value), expire: fromDateInput(dForm.expire.value), enabled: dForm.enabled.checked, period: dForm.period.value, devices: Number(dForm.devices.value) || 0, kit: Number(dForm.kit.value) || undefined, exit: Number(dForm.exit.value) || 0, exit_fail: dForm.exit_fail.value })
         putUser(r.user); fillDetail(); loadUserLinks(u.id); toast({ type: 'success', title: 'Сохранено', text: ST[r.user.state][0] + ', ' + left(r.user) })
       } catch (err) { fail(err) }
     })
@@ -422,7 +423,7 @@
     if (!limitOk(aForm.limit)) return
     busy(aForm.querySelector('button[type=submit]'), async () => {
       try {
-        const r = await api('POST', 'api/users', { name, note: aForm.note.value.trim(), limit: parseGb(aForm.limit.value), period: aForm.period.value, devices: Number(aForm.devices.value) || 0, kit: Number(aForm.kit.value) || undefined, expire: Number(aForm.days.value) ? now() + Number(aForm.days.value) * 86400 : 0 })
+        const r = await api('POST', 'api/users', { name, note: aForm.note.value.trim(), limit: parseGb(aForm.limit.value), period: aForm.period.value, devices: Number(aForm.devices.value) || 0, kit: Number(aForm.kit.value) || undefined, exit: Number(aForm.exit.value) || 0, exit_fail: aForm.exit_fail.value, expire: Number(aForm.days.value) ? now() + Number(aForm.days.value) * 86400 : 0 })
         putUser(r.user)
         $('mp-add').close(); aForm.reset(); aForm.days.dispatchEvent(new Event('change')); aForm.period.dispatchEvent(new Event('change')); aForm.devices.dispatchEvent(new Event('change'))
         setCopy($('mp-made-url'), $('mp-made-copy'), r.user.url)

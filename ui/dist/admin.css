@@ -1186,7 +1186,7 @@ input.input { text-overflow: ellipsis }   /* длинное значение в 
    На десктопе (hover + точный указатель) js/select.js ставит рядом кнопку-триггер и список, родной select прячется,
    но остаётся источником значения: форма, change-события, disabled — работают как обычно. */
 .select-ui { position: relative; display: block }
-.select-ui > select { position: absolute; inset: 0; opacity: 0; pointer-events: none }      /* для форм и автозаполнения */
+.select-ui > select, .select-ui > select:disabled { position: absolute; inset: 0; opacity: 0; pointer-events: none }      /* для форм и автозаполнения */
 .select-trigger { display: flex; align-items: center; gap: var(--sp-2); text-align: left; cursor: pointer; padding-right: var(--sp-3);
   outline: var(--focus-outline) solid transparent; outline-offset: 0 }
 .select-trigger > .value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
@@ -3753,3 +3753,8 @@ button.alist-row { width: 100%; border: 0; background: none; font: inherit; colo
   .app-head .btn-row { width: 100% }
   .app-head .btn-row > .btn, .app-head .btn-row > .seg { flex: 1 }
 }
+
+/* Выходы: флаг в названии — в строку с ним, а не отдельной строкой подписи; состояние в правом конце */
+.alist-tx b .mp-flag { display: inline-block; color: inherit; font-size: inherit; line-height: inherit }
+.alist-row.mp-ex { grid-template-columns: var(--al-ic) minmax(0, 1fr) auto; text-align: left }
+.mp-ex .badge { white-space: nowrap }

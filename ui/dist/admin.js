@@ -1,7 +1,7 @@
 // icons.js
 // Иконки Lucide 0.460.0 (ISC), только нужные: замена <i data-lucide> на svg, как lucide.createIcons()
 (() => {
-  const P = {"arrow-right":"<path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/>","grip-vertical":"<circle cx=\"9\" cy=\"12\" r=\"1\"/><circle cx=\"9\" cy=\"5\" r=\"1\"/><circle cx=\"9\" cy=\"19\" r=\"1\"/><circle cx=\"15\" cy=\"12\" r=\"1\"/><circle cx=\"15\" cy=\"5\" r=\"1\"/><circle cx=\"15\" cy=\"19\" r=\"1\"/>","waypoints":"<circle cx=\"12\" cy=\"4.5\" r=\"2.5\"/><path d=\"m10.2 6.3-3.9 3.9\"/><circle cx=\"4.5\" cy=\"12\" r=\"2.5\"/><path d=\"M7 12h10\"/><circle cx=\"19.5\" cy=\"12\" r=\"2.5\"/><path d=\"m13.8 17.7 3.9-3.9\"/><circle cx=\"12\" cy=\"19.5\" r=\"2.5\"/>","terminal":"<polyline points=\"4 17 10 11 4 5\"/><line x1=\"12\" x2=\"20\" y1=\"19\" y2=\"19\"/>","list-checks":"<path d=\"m3 17 2 2 4-4\"/><path d=\"m3 7 2 2 4-4\"/><path d=\"M13 6h8\"/><path d=\"M13 12h8\"/><path d=\"M13 18h8\"/>","map-pin":"<path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/>","wrench":"<path d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z\"/>","upload":"<path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"17 8 12 3 7 8\"/><line x1=\"12\" x2=\"12\" y1=\"3\" y2=\"15\"/>","lock-open":"<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\"/><path d=\"M7 11V7a5 5 0 0 1 9.9-1\"/>","apple":"<path d=\"M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z\"/><path d=\"M10 2c1 .5 2 2 2 5\"/>","check":"<path d=\"M20 6 9 17l-5-5\"/>","chevron-right":"<path d=\"m9 18 6-6-6-6\"/>","circle-alert":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><line x1=\"12\" x2=\"12\" y1=\"8\" y2=\"12\"/><line x1=\"12\" x2=\"12.01\" y1=\"16\" y2=\"16\"/>","circle-check":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m9 12 2 2 4-4\"/>","clock":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><polyline points=\"12 6 12 12 16 14\"/>","copy":"<rect width=\"14\" height=\"14\" x=\"8\" y=\"8\" rx=\"2\" ry=\"2\"/><path d=\"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2\"/>","download":"<path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" x2=\"12\" y1=\"15\" y2=\"3\"/>","external-link":"<path d=\"M15 3h6v6\"/><path d=\"M10 14 21 3\"/><path d=\"M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6\"/>","file-code":"<path d=\"M10 12.5 8 15l2 2.5\"/><path d=\"m14 12.5 2 2.5-2 2.5\"/><path d=\"M14 2v4a2 2 0 0 0 2 2h4\"/><path d=\"M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z\"/>","infinity":"<path d=\"M12 12c-2-2.67-4-4-6-4a4 4 0 1 0 0 8c2 0 4-1.33 6-4Zm0 0c2 2.67 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.33-6 4Z\"/>","key-round":"<path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\"/><circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\"/>","link":"<path d=\"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71\"/><path d=\"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71\"/>","log-out":"<path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\"/><polyline points=\"16 17 21 12 16 7\"/><line x1=\"21\" x2=\"9\" y1=\"12\" y2=\"12\"/>","monitor":"<rect width=\"20\" height=\"14\" x=\"2\" y=\"3\" rx=\"2\"/><line x1=\"8\" x2=\"16\" y1=\"21\" y2=\"21\"/><line x1=\"12\" x2=\"12\" y1=\"17\" y2=\"21\"/>","moon":"<path d=\"M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z\"/>","panel-left":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"M9 3v18\"/>","plus":"<path d=\"M5 12h14\"/><path d=\"M12 5v14\"/>","qr-code":"<rect width=\"5\" height=\"5\" x=\"3\" y=\"3\" rx=\"1\"/><rect width=\"5\" height=\"5\" x=\"16\" y=\"3\" rx=\"1\"/><rect width=\"5\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\"/><path d=\"M21 16h-3a2 2 0 0 0-2 2v3\"/><path d=\"M21 21v.01\"/><path d=\"M12 7v3a2 2 0 0 1-2 2H7\"/><path d=\"M3 12h.01\"/><path d=\"M12 3h.01\"/><path d=\"M12 16v.01\"/><path d=\"M16 12h1\"/><path d=\"M21 12v.01\"/><path d=\"M12 21v-1\"/>","refresh-cw":"<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\"/><path d=\"M21 3v5h-5\"/><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\"/><path d=\"M8 16H3v5\"/>","rotate-ccw":"<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path d=\"M3 3v5h5\"/>","search":"<circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/>","settings":"<path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","smartphone":"<rect width=\"14\" height=\"20\" x=\"5\" y=\"2\" rx=\"2\" ry=\"2\"/><path d=\"M12 18h.01\"/>","sun":"<circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2\"/><path d=\"M12 20v2\"/><path d=\"m4.93 4.93 1.41 1.41\"/><path d=\"m17.66 17.66 1.41 1.41\"/><path d=\"M2 12h2\"/><path d=\"M20 12h2\"/><path d=\"m6.34 17.66-1.41 1.41\"/><path d=\"m19.07 4.93-1.41 1.41\"/>","trash-2":"<path d=\"M3 6h18\"/><path d=\"M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6\"/><path d=\"M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2\"/><line x1=\"10\" x2=\"10\" y1=\"11\" y2=\"17\"/><line x1=\"14\" x2=\"14\" y1=\"11\" y2=\"17\"/>","triangle-alert":"<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\"/><path d=\"M12 9v4\"/><path d=\"M12 17h.01\"/>","undo-2":"<path d=\"M9 14 4 9l5-5\"/><path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11\"/>","users":"<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\"/><path d=\"M16 3.13a4 4 0 0 1 0 7.75\"/>","x":"<path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/>","arrow-down":"<path d=\"M12 5v14\"/><path d=\"m19 12-7 7-7-7\"/>","arrow-up":"<path d=\"m5 12 7-7 7 7\"/><path d=\"M12 19V5\"/>","cloud":"<path d=\"M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z\"/>","eye":"<path d=\"M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","globe":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20\"/><path d=\"M2 12h20\"/>","history":"<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path d=\"M3 3v5h5\"/><path d=\"M12 7v5l4 2\"/>","network":"<rect x=\"16\" y=\"16\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"2\" y=\"16\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"9\" y=\"2\" width=\"6\" height=\"6\" rx=\"1\"/><path d=\"M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3\"/><path d=\"M12 12V8\"/>","pencil":"<path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\"/><path d=\"m15 5 4 4\"/>","route":"<circle cx=\"6\" cy=\"19\" r=\"3\"/><path d=\"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15\"/><circle cx=\"18\" cy=\"5\" r=\"3\"/>","scroll-text":"<path d=\"M15 12h-5\"/><path d=\"M15 8h-5\"/><path d=\"M19 17V5a2 2 0 0 0-2-2H4\"/><path d=\"M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3\"/>","send":"<path d=\"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z\"/><path d=\"m21.854 2.147-10.94 10.939\"/>","server":"<rect width=\"20\" height=\"8\" x=\"2\" y=\"2\" rx=\"2\" ry=\"2\"/><rect width=\"20\" height=\"8\" x=\"2\" y=\"14\" rx=\"2\" ry=\"2\"/><line x1=\"6\" x2=\"6.01\" y1=\"6\" y2=\"6\"/><line x1=\"6\" x2=\"6.01\" y1=\"18\" y2=\"18\"/>","shield-check":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/><path d=\"m9 12 2 2 4-4\"/>","shield":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/>"};
+  const P = {"door-open":"<path d=\"M13 4h3a2 2 0 0 1 2 2v14\"/><path d=\"M2 20h3\"/><path d=\"M13 20h9\"/><path d=\"M10 12v.01\"/><path d=\"M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.561Z\"/>","arrow-right":"<path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/>","grip-vertical":"<circle cx=\"9\" cy=\"12\" r=\"1\"/><circle cx=\"9\" cy=\"5\" r=\"1\"/><circle cx=\"9\" cy=\"19\" r=\"1\"/><circle cx=\"15\" cy=\"12\" r=\"1\"/><circle cx=\"15\" cy=\"5\" r=\"1\"/><circle cx=\"15\" cy=\"19\" r=\"1\"/>","waypoints":"<circle cx=\"12\" cy=\"4.5\" r=\"2.5\"/><path d=\"m10.2 6.3-3.9 3.9\"/><circle cx=\"4.5\" cy=\"12\" r=\"2.5\"/><path d=\"M7 12h10\"/><circle cx=\"19.5\" cy=\"12\" r=\"2.5\"/><path d=\"m13.8 17.7 3.9-3.9\"/><circle cx=\"12\" cy=\"19.5\" r=\"2.5\"/>","terminal":"<polyline points=\"4 17 10 11 4 5\"/><line x1=\"12\" x2=\"20\" y1=\"19\" y2=\"19\"/>","list-checks":"<path d=\"m3 17 2 2 4-4\"/><path d=\"m3 7 2 2 4-4\"/><path d=\"M13 6h8\"/><path d=\"M13 12h8\"/><path d=\"M13 18h8\"/>","map-pin":"<path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/>","wrench":"<path d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z\"/>","upload":"<path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"17 8 12 3 7 8\"/><line x1=\"12\" x2=\"12\" y1=\"3\" y2=\"15\"/>","lock-open":"<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\"/><path d=\"M7 11V7a5 5 0 0 1 9.9-1\"/>","apple":"<path d=\"M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z\"/><path d=\"M10 2c1 .5 2 2 2 5\"/>","check":"<path d=\"M20 6 9 17l-5-5\"/>","chevron-right":"<path d=\"m9 18 6-6-6-6\"/>","circle-alert":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><line x1=\"12\" x2=\"12\" y1=\"8\" y2=\"12\"/><line x1=\"12\" x2=\"12.01\" y1=\"16\" y2=\"16\"/>","circle-check":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m9 12 2 2 4-4\"/>","clock":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><polyline points=\"12 6 12 12 16 14\"/>","copy":"<rect width=\"14\" height=\"14\" x=\"8\" y=\"8\" rx=\"2\" ry=\"2\"/><path d=\"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2\"/>","download":"<path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" x2=\"12\" y1=\"15\" y2=\"3\"/>","external-link":"<path d=\"M15 3h6v6\"/><path d=\"M10 14 21 3\"/><path d=\"M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6\"/>","file-code":"<path d=\"M10 12.5 8 15l2 2.5\"/><path d=\"m14 12.5 2 2.5-2 2.5\"/><path d=\"M14 2v4a2 2 0 0 0 2 2h4\"/><path d=\"M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z\"/>","infinity":"<path d=\"M12 12c-2-2.67-4-4-6-4a4 4 0 1 0 0 8c2 0 4-1.33 6-4Zm0 0c2 2.67 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.33-6 4Z\"/>","key-round":"<path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\"/><circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\"/>","link":"<path d=\"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71\"/><path d=\"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71\"/>","log-out":"<path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\"/><polyline points=\"16 17 21 12 16 7\"/><line x1=\"21\" x2=\"9\" y1=\"12\" y2=\"12\"/>","monitor":"<rect width=\"20\" height=\"14\" x=\"2\" y=\"3\" rx=\"2\"/><line x1=\"8\" x2=\"16\" y1=\"21\" y2=\"21\"/><line x1=\"12\" x2=\"12\" y1=\"17\" y2=\"21\"/>","moon":"<path d=\"M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z\"/>","panel-left":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"M9 3v18\"/>","plus":"<path d=\"M5 12h14\"/><path d=\"M12 5v14\"/>","qr-code":"<rect width=\"5\" height=\"5\" x=\"3\" y=\"3\" rx=\"1\"/><rect width=\"5\" height=\"5\" x=\"16\" y=\"3\" rx=\"1\"/><rect width=\"5\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\"/><path d=\"M21 16h-3a2 2 0 0 0-2 2v3\"/><path d=\"M21 21v.01\"/><path d=\"M12 7v3a2 2 0 0 1-2 2H7\"/><path d=\"M3 12h.01\"/><path d=\"M12 3h.01\"/><path d=\"M12 16v.01\"/><path d=\"M16 12h1\"/><path d=\"M21 12v.01\"/><path d=\"M12 21v-1\"/>","refresh-cw":"<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\"/><path d=\"M21 3v5h-5\"/><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\"/><path d=\"M8 16H3v5\"/>","rotate-ccw":"<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path d=\"M3 3v5h5\"/>","search":"<circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/>","settings":"<path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","smartphone":"<rect width=\"14\" height=\"20\" x=\"5\" y=\"2\" rx=\"2\" ry=\"2\"/><path d=\"M12 18h.01\"/>","sun":"<circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2\"/><path d=\"M12 20v2\"/><path d=\"m4.93 4.93 1.41 1.41\"/><path d=\"m17.66 17.66 1.41 1.41\"/><path d=\"M2 12h2\"/><path d=\"M20 12h2\"/><path d=\"m6.34 17.66-1.41 1.41\"/><path d=\"m19.07 4.93-1.41 1.41\"/>","trash-2":"<path d=\"M3 6h18\"/><path d=\"M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6\"/><path d=\"M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2\"/><line x1=\"10\" x2=\"10\" y1=\"11\" y2=\"17\"/><line x1=\"14\" x2=\"14\" y1=\"11\" y2=\"17\"/>","triangle-alert":"<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\"/><path d=\"M12 9v4\"/><path d=\"M12 17h.01\"/>","undo-2":"<path d=\"M9 14 4 9l5-5\"/><path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11\"/>","users":"<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\"/><path d=\"M16 3.13a4 4 0 0 1 0 7.75\"/>","x":"<path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/>","arrow-down":"<path d=\"M12 5v14\"/><path d=\"m19 12-7 7-7-7\"/>","arrow-up":"<path d=\"m5 12 7-7 7 7\"/><path d=\"M12 19V5\"/>","cloud":"<path d=\"M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z\"/>","eye":"<path d=\"M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","globe":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20\"/><path d=\"M2 12h20\"/>","history":"<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path d=\"M3 3v5h5\"/><path d=\"M12 7v5l4 2\"/>","network":"<rect x=\"16\" y=\"16\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"2\" y=\"16\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"9\" y=\"2\" width=\"6\" height=\"6\" rx=\"1\"/><path d=\"M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3\"/><path d=\"M12 12V8\"/>","pencil":"<path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\"/><path d=\"m15 5 4 4\"/>","route":"<circle cx=\"6\" cy=\"19\" r=\"3\"/><path d=\"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15\"/><circle cx=\"18\" cy=\"5\" r=\"3\"/>","scroll-text":"<path d=\"M15 12h-5\"/><path d=\"M15 8h-5\"/><path d=\"M19 17V5a2 2 0 0 0-2-2H4\"/><path d=\"M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3\"/>","send":"<path d=\"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z\"/><path d=\"m21.854 2.147-10.94 10.939\"/>","server":"<rect width=\"20\" height=\"8\" x=\"2\" y=\"2\" rx=\"2\" ry=\"2\"/><rect width=\"20\" height=\"8\" x=\"2\" y=\"14\" rx=\"2\" ry=\"2\"/><line x1=\"6\" x2=\"6.01\" y1=\"6\" y2=\"6\"/><line x1=\"6\" x2=\"6.01\" y1=\"18\" y2=\"18\"/>","shield-check":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/><path d=\"m9 12 2 2 4-4\"/>","shield":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/>"};
   const make = (i) => { const n = i.getAttribute('data-lucide'), p = P[n]; if (!p) return;
     const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     for (const [k, v] of Object.entries({ xmlns: 'http://www.w3.org/2000/svg', width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) s.setAttribute(k, v);
@@ -4579,6 +4579,7 @@ var qrcode = function() {
     dForm.name.value = u.name
     dForm.note.value = u.note || ''
     window.mpKits?.fill(dForm.kit, u.kit)
+    window.mpExits?.fill(dForm.exit, dForm.exit_fail, u.exit, u.exit_fail, 'С адреса сервера')
     dForm.limit.value = gbOf(u.limit)
     dForm.period.value = u.period || ''; dForm.period.dispatchEvent(new Event('change'))
     // значения не из списка (задано раньше числом) — добавляем пунктом, чтобы не потерялось
@@ -4627,7 +4628,7 @@ var qrcode = function() {
     if (!limitOk(dForm.limit)) return
     busy(document.querySelector('[form="mp-d-form"]'), async () => {
       try {
-        const r = await api('PATCH', 'api/users/' + u.id, { name: dForm.name.value, note: dForm.note.value, limit: parseGb(dForm.limit.value), expire: fromDateInput(dForm.expire.value), enabled: dForm.enabled.checked, period: dForm.period.value, devices: Number(dForm.devices.value) || 0, kit: Number(dForm.kit.value) || undefined })
+        const r = await api('PATCH', 'api/users/' + u.id, { name: dForm.name.value, note: dForm.note.value, limit: parseGb(dForm.limit.value), expire: fromDateInput(dForm.expire.value), enabled: dForm.enabled.checked, period: dForm.period.value, devices: Number(dForm.devices.value) || 0, kit: Number(dForm.kit.value) || undefined, exit: Number(dForm.exit.value) || 0, exit_fail: dForm.exit_fail.value })
         putUser(r.user); fillDetail(); loadUserLinks(u.id); toast({ type: 'success', title: 'Сохранено', text: ST[r.user.state][0] + ', ' + left(r.user) })
       } catch (err) { fail(err) }
     })
@@ -4686,7 +4687,7 @@ var qrcode = function() {
     if (!limitOk(aForm.limit)) return
     busy(aForm.querySelector('button[type=submit]'), async () => {
       try {
-        const r = await api('POST', 'api/users', { name, note: aForm.note.value.trim(), limit: parseGb(aForm.limit.value), period: aForm.period.value, devices: Number(aForm.devices.value) || 0, kit: Number(aForm.kit.value) || undefined, expire: Number(aForm.days.value) ? now() + Number(aForm.days.value) * 86400 : 0 })
+        const r = await api('POST', 'api/users', { name, note: aForm.note.value.trim(), limit: parseGb(aForm.limit.value), period: aForm.period.value, devices: Number(aForm.devices.value) || 0, kit: Number(aForm.kit.value) || undefined, exit: Number(aForm.exit.value) || 0, exit_fail: aForm.exit_fail.value, expire: Number(aForm.days.value) ? now() + Number(aForm.days.value) * 86400 : 0 })
         putUser(r.user)
         $('mp-add').close(); aForm.reset(); aForm.days.dispatchEvent(new Event('change')); aForm.period.dispatchEvent(new Event('change')); aForm.devices.dispatchEvent(new Event('change'))
         setCopy($('mp-made-url'), $('mp-made-copy'), r.user.url)
@@ -5841,13 +5842,17 @@ var qrcode = function() {
     const out = Number(lForm.out.value), list = S().nodes.filter((n) => n.id !== out)
     setSelect(lForm.via, '<option value="0">Без моста</option>' + list.map((n) => `<option value="${n.id}">${esc(n.name)}</option>`).join(''), list.some((n) => n.id === Number(keep)) ? keep : 0)
   }
-  let filling = false
+  let filling = false, lineExit = [0, 'direct']
+  // AmneziaWG идёт мимо Xray: выход ему не задать
+  const fillExit = () => window.mpExits?.fill(lForm.exit, lForm.exit_fail, lineExit[0], lineExit[1], 'Как у человека', lForm.proto.value === 'awg' ? 'Нельзя для AmneziaWG' : '')
+  lForm.proto.addEventListener('change', () => { if (lForm.exit.options.length && !lForm.exit.disabled) lineExit = [Number(lForm.exit.value) || 0, lForm.exit_fail.value]; fillExit() })
   function openLine(l) {
     lineId = l ? l.id : 0; filling = true
     $('ln-dlg-t').textContent = l ? 'Подключение' : 'Новое подключение'; $('ln-del').hidden = !l
     lForm.name.value = l ? l.name : ''; lForm.name.placeholder = l ? '' : 'Подставится само'
     setSelect(lForm.out, [{ id: 0, name: S().settings.server_name }, ...S().nodes].map((n) => `<option value="${n.id}">${esc(n.name)}</option>`).join(''), l ? l.out : 0)
     fillVia(l ? l.via : 0); fillProto(l ? l.proto : 'vision'); filling = false
+    lineExit = l ? [l.exit, l.exit_fail] : [0, 'direct']; fillExit()
     $('ln-dlg').showModal()
   }
   lForm.out.addEventListener('change', () => { if (filling) return; filling = true; fillVia(lForm.via.value); fillProto(lForm.proto.value); filling = false })
@@ -5855,7 +5860,7 @@ var qrcode = function() {
   $('ln-list').addEventListener('click', (e) => { const b = e.target.closest('.mp-line-open'); if (b) openLine(lineOf(b.closest('.mp-line').dataset.id)) })
   $('ln-add').addEventListener('click', () => openLine(null))
   lForm.addEventListener('submit', (e) => {
-    e.preventDefault(); const body = { name: lForm.name.value, out: Number(lForm.out.value), via: Number(lForm.via.value), proto: lForm.proto.value }
+    e.preventDefault(); const body = { name: lForm.name.value, out: Number(lForm.out.value), via: Number(lForm.via.value), proto: lForm.proto.value, ...(lForm.exit.options.length ? { exit: Number(lForm.exit.value) || 0, exit_fail: lForm.exit_fail.value } : {}) }
     busy(lForm.querySelector('[type=submit]'), async () => {
       try { await call(lineId ? 'PATCH' : 'POST', lineId ? 'api/lines/' + lineId : `api/kits/${kitId}/lines`, body); $('ln-dlg').close() } catch (err) { fail(err) }
     })
@@ -5906,7 +5911,7 @@ var qrcode = function() {
     setSelect(sel, ks.map((k) => `<option value="${k.id}">${esc(k.name)}</option>`).join(''), value ?? ks.find((k) => k.is_default)?.id ?? '')
   }
   window.mpKits = { fill: fillKit }
-  document.querySelectorAll('[data-open="mp-add"]').forEach((b) => b.addEventListener('click', () => fillKit($('mp-add-form').kit)))
+  document.querySelectorAll('[data-open="mp-add"]').forEach((b) => b.addEventListener('click', () => { const f = $('mp-add-form'); fillKit(f.kit); window.mpExits?.fill(f.exit, f.exit_fail, 0, 'direct', 'С адреса сервера') }))
 
   function paint() {
     const s = S(); if (!s) return
@@ -5916,4 +5921,146 @@ var qrcode = function() {
   }
   document.addEventListener('mp-state', paint)
   paint()
+})()
+
+;
+// exits.js
+// Админка monolit proxy: «Выходы» — купленные SOCKS5-прокси, через которые люди выходят в интернет.
+// Выход выбирают у человека (для всех его подключений) и у подключения в наборе. Новый или изменённый прокси
+// сервер сначала проверяет, потом применяет с перезапуском Xray (ответ — по api/job, как у маршрутов)
+(() => {
+  const A = window.mpAdmin, $ = (id) => document.getElementById(id)
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+  const toast = (o) => window.toast?.(o)
+  const fail = (e) => toast({ type: 'error', title: 'Не получилось', text: e.message })
+  const icons = () => window.lucide?.createIcons()
+  const busy = async (btn, fn) => { btn.disabled = true; btn.classList.add('is-loading'); try { return await fn() } finally { btn.disabled = false; btn.classList.remove('is-loading') } }
+  const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c }
+  const named = (s) => esc(s).replace(/((?:\p{Regional_Indicator}{2}))\s*/gu, '<span class="mp-flag">$1</span>')
+  const flag = (cc) => /^[A-Z]{2}$/.test(cc || '') ? String.fromCodePoint(...[...cc].map((c) => 0x1F1A5 + c.charCodeAt(0))) : ''
+  const S = () => A.state()
+  const list = () => S()?.exits || []
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+  // ---------- демо ----------
+  let demoId = 10
+  const demoSeed = (s) => { if (s.exits) return; s.exits = [
+    { id: 1, name: flag('NL') + ' Амстердам', proxy: 'user7:Kx92mQ@185.199.110.4:1080', host: '185.199.110.4', port: 1080, ok: 1, udp: 1, ip: '185.199.110.4', country: 'NL', ms: 84, error: '', checked: Date.now() / 1000 - 120, users: 2, lines: 0 },
+    { id: 2, name: flag('US') + ' Резидентный', proxy: 'res-us:pX4q@gate.example.net:7000', host: 'gate.example.net', port: 7000, ok: 1, udp: 0, ip: '73.162.18.201', country: 'US', ms: 212, error: '', checked: Date.now() / 1000 - 300, users: 0, lines: 1 }] }
+  async function demoCall(method, path, b = {}) {
+    await sleep(600)
+    const s = S(), m = /^api\/exits\/(\d+)(\/check)?$/.exec(path), x = m && s.exits.find((e) => e.id === Number(m[1]))
+    if (m?.[2]) { x.checked = Date.now() / 1000; return { ok: true, exits: s.exits } }
+    if (method === 'DELETE') { s.exits = s.exits.filter((e) => e !== x); s.users.forEach((u) => { if (u.exit === x.id) u.exit = 0 }); return { ok: true, exits: s.exits } }
+    const p = /^(?:socks5:\/\/)?(?:([^:@]+):([^@]*)@)?([a-z0-9.-]+):(\d{1,5})$/i.exec(String(b.proxy ?? x?.proxy).trim())
+    if (!p) throw new Error('Прокси выглядит так: 1.2.3.4:1080 или логин:пароль@1.2.3.4:1080')
+    if (p[3].startsWith('10.')) throw new Error('Прокси не отвечает: порт закрыт')
+    const row = { proxy: p[0].replace(/^socks5:\/\//, ''), host: p[3], port: Number(p[4]), ok: 1, udp: 1, ip: /^\d/.test(p[3]) ? p[3] : '91.198.4.27', country: 'DE', ms: 97, error: '', checked: Date.now() / 1000 }
+    if (x) Object.assign(x, row, { name: b.name || x.name })
+    else s.exits.push({ id: ++demoId, name: b.name || `${flag('DE')} ${row.ip}`, ...row, users: 0, lines: 0 })
+    return { ok: true, exits: s.exits }
+  }
+  async function api(method, path, body) { if (A.demo()) { demoSeed(S()); return demoCall(method, path, body) } return A.api(method, path, body) }
+  // с перезапуском Xray: сервер отвечает сразу, итог — по api/job
+  async function run(method, path, body) {
+    const r = await api(method, path, body)
+    if (!r?.pending) return r
+    const until = Date.now() + 150000
+    await sleep(1500)
+    while (Date.now() < until) {
+      let j = null
+      try { j = await A.api('GET', 'api/job') } catch (e) {}
+      if (j && j.job.id === r.job && !j.job.running) { if (!j.job.ok) throw new Error(j.job.error || 'Не получилось'); return r }
+      await sleep(1500)
+    }
+    throw new Error('Xray долго не отвечает, загляните в раздел «Сервер»')
+  }
+  const take = (r) => { if (r?.exits) { const s = S(); s.exits = r.exits; A.setState(s) } return r }
+
+  // ---------- список ----------
+  const ago = (t) => t ? A.ago(t) : 'ещё не проверяли'
+  const status = (x) => x.ok === 1 ? `<span class="badge badge-success"><span class="dot"></span>${x.ms ? x.ms + ' мс' : 'Отвечает'}</span>`
+    : x.ok === 0 ? `<span class="badge badge-danger" data-tip="${esc(x.error)}"><span class="dot"></span>Не отвечает</span>` : '<span class="badge"><span class="dot"></span>Проверяю</span>'
+  const who = (x) => { const n = x.users + x.lines; return n ? `у ${x.users ? `${x.users} ${plural(x.users, 'человека', 'человек', 'человек')}` : ''}${x.users && x.lines ? ' и ' : ''}${x.lines ? `${x.lines} ${plural(x.lines, 'подключения', 'подключений', 'подключений')}` : ''}` : 'пока ни у кого' }
+  function paint() {
+    if (!S()) return
+    if (A.demo()) demoSeed(S())
+    const xs = list(), box = $('mp-ex-list')
+    const html = xs.map((x) => `<button type="button" class="alist-row mp-ex" data-id="${x.id}">
+      <span class="alist-ic"><i data-lucide="door-open"></i></span>
+      <span class="alist-tx"><b>${named(x.name)}</b><span>${esc(x.host)}:${x.port}${x.udp === 0 ? ', без UDP' : ''}, ${who(x)}</span></span>
+      ${status(x)}</button>`).join('')
+    if (box._html !== html) { box._html = html; box.innerHTML = html; icons() }
+    box.hidden = !xs.length; $('mp-ex-empty').hidden = !!xs.length
+    // поля выбора в окнах видны, только когда есть из чего выбирать
+    document.querySelectorAll('.mp-exit-f').forEach((f) => { f.hidden = !xs.length })
+  }
+  $('mp-ex-list').addEventListener('click', (e) => { const r = e.target.closest('.mp-ex'); if (r) open(Number(r.dataset.id)) })
+  $('mp-ex-add').addEventListener('click', () => open(0))
+
+  // ---------- окно выхода ----------
+  const f = $('mp-ex-form')
+  let editId = 0
+  function kv(x) {
+    $('mp-ex-kv').hidden = !x || !x.checked
+    if (!x) return
+    $('mp-ex-kv').innerHTML = [
+      ['Адрес выхода', x.ip ? `${flag(x.country) ? `<span class="mp-flag">${flag(x.country)}</span>` : ''}${esc(x.ip)}` : 'не узнали'],
+      ['UDP', x.udp === 1 ? 'есть' : x.udp === 0 ? '<span class="mp-warn">нет, звонки и игры пойдут по правилу падения</span>' : 'не узнали'],
+      ['Задержка', x.ok === 1 && x.ms ? x.ms + ' мс' : x.ok === 0 ? `<span class="mp-warn">${esc(x.error || 'не отвечает')}</span>` : '—'],
+      ['Проверен', esc(ago(x.checked))],
+    ].map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')
+  }
+  function open(id) {
+    editId = id; const x = list().find((e) => e.id === id)
+    $('mp-ex-t').textContent = x ? 'Выход' : 'Новый выход'
+    f.proxy.value = x ? x.proxy : ''; f.name.value = x ? x.name : ''
+    window.fieldError?.(f.proxy, '')
+    $('mp-ex-del').hidden = !x; $('mp-ex-check').hidden = !x
+    kv(x)
+    $('mp-ex-dlg').showModal()
+  }
+  f.addEventListener('submit', (e) => {
+    e.preventDefault()
+    const proxy = f.proxy.value.trim()
+    if (!proxy) { window.fieldError?.(f.proxy, 'Вставьте прокси от продавца'); f.proxy.focus(); return }
+    window.fieldError?.(f.proxy, '')
+    const x = list().find((e) => e.id === editId)
+    busy(f.querySelector('button[type=submit]'), async () => {
+      try {
+        take(await run(editId ? 'PATCH' : 'POST', editId ? 'api/exits/' + editId : 'api/exits', { proxy, name: f.name.value.trim() }))
+        if (!A.demo()) take(await A.api('GET', 'api/state').then((s) => ({ exits: s.exits })))
+        $('mp-ex-dlg').close(); paint()
+        toast({ type: 'success', title: x ? 'Выход сохранён' : 'Выход добавлен', text: x ? '' : 'Выберите его у человека или подключения' })
+      } catch (err) { window.fieldError?.(f.proxy, err.message) }
+    })
+  })
+  $('mp-ex-check').addEventListener('click', (e) => busy(e.currentTarget, async () => {
+    try { take(await api('POST', `api/exits/${editId}/check`)); kv(list().find((x) => x.id === editId)); paint() } catch (err) { fail(err) }
+  }))
+  $('mp-ex-del').addEventListener('click', async () => {
+    const x = list().find((e) => e.id === editId); if (!x) return
+    $('mp-ex-dlg').close()
+    if (!await A.confirm(`Удалить выход «${x.name}»?`, x.users + x.lines ? 'Люди с этим выходом пойдут в интернет с адреса сервера' : 'Им никто не пользуется', 'Удалить')) return
+    try { take(await run('DELETE', 'api/exits/' + x.id)); if (!A.demo()) await A.refresh(); paint(); toast({ title: 'Выход удалён', text: x.name }) } catch (err) { fail(err) }
+  })
+
+  // ---------- выбор выхода у человека и у подключения ----------
+  // inherit — текст пункта «без своего выхода»: у человека это адрес сервера, у подключения — выход человека
+  function fill(sel, failSel, value, failValue, inherit, off) {
+    const xs = list()
+    sel.innerHTML = off ? `<option value="0">${esc(off)}</option>` : `<option value="0">${esc(inherit)}</option>` + xs.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join('')
+    sel.value = String(!off && xs.some((x) => x.id === value) ? value : 0); sel.disabled = !!off
+    failSel.value = failValue === 'block' ? 'block' : 'direct'
+    const sync = () => { failSel.disabled = !!off || sel.value === '0'; failSel.dispatchEvent(new Event('change', { bubbles: true })) }
+    sel.onchange = sync; sel.dispatchEvent(new Event('change', { bubbles: true }))
+  }
+  window.mpExits = { fill, paint }
+
+  document.querySelectorAll('[data-open="mp-exits"]').forEach((b) => b.addEventListener('click', paint))
+  const prev = A.setState
+  A.setState = (s) => { prev(s); paint() }
+  // общий список обновляется раз в минуту в admin.js: подхватываем тем же опросом
+  setInterval(() => { if ($('mp-exits').open) paint() }, 5000)
+  setTimeout(paint, 0)
 })()

@@ -28,7 +28,7 @@ const PAGE = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta n
 <body><form onsubmit="event.preventDefault();this.querySelector('p').textContent='Неверный логин или пароль'"><h1>Вход</h1><input placeholder="Логин" autocomplete="username"><input type="password" placeholder="Пароль" autocomplete="current-password"><button>Войти</button><p></p></form></body></html>
 `;
 
-export function createNodes({ db, xray, log, dayOf, server, users, awg }) {
+export function createNodes({ db, xray, log, dayOf, server, users, awg, exits }) {
   // входы этого сервера: что нашлось в конфиге Xray, плюс AmneziaWG, если он включён
   const detect = () => ({ ...xray.detect(), ...(awg?.ready() ? { awg: { port: awg.conf().port } } : {}) });
   db.exec(`
@@ -99,7 +99,32 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg }) {
   // Какие входы этого сервера нужны людям: только те, что есть в наборах
   const kindsOn = (d = xray.detect()) => { const want = new Set(linesOn().filter((l) => !entry(l)).map((l) => l.proto)); return LOCAL.filter((k) => k !== 'awg' && want.has(k) && d[k]) };
   // Клиенты нод на входе Vision этого сервера: через них идут люди, пришедшие по мосту
-  const linkClients = () => all().filter(joined).map((n) => ({ id: n.link_uuid, flow: 'xtls-rprx-vision', email: LINK(n.id), level: 0 }));
+  // Нода ходит дальше своим ключом, а для людей с выходом — ключом на этот выход: так сервер знает, в какой прокси их вести
+  const linkUser = (n, k) => k ? { id: lineUuid(n.link_uuid, k), email: `${LINK(n.id)}-${k}` } : { id: n.link_uuid, email: LINK(n.id) };
+  // Какие ключи выхода нужны ноде via на пути к серверу out (0 — этот сервер)
+  function linkKeys(via, out) {
+    const t = now(), ks = new Set(), kitsOn = new Map();
+    for (const l of linesOn()) if (l.via === via && l.out === out) kitsOn.set(l.kit_id, (kitsOn.get(l.kit_id) || []).concat(l));
+    if (!kitsOn.size) return [];
+    for (const u of users()) if (userState(u, t) === 'active') for (const l of kitsOn.get(kitOf(u).id) || []) { const k = exits.key(exits.eff(u, l)); if (k) ks.add(k) }
+    return [...ks];
+  }
+  const linkClients = () => all().filter(joined).flatMap((n) => ['', ...linkKeys(n.id, 0)].map((k) => ({ ...linkUser(n, k), flow: 'xtls-rprx-vision', level: 0 })));
+  // Выходы на этом сервере: люди на его входах и люди, пришедшие по мосту
+  function exitGroups(d = xray.detect()) {
+    const t = now(), g = new Map(), add = (users, inboundTag, e) => { const k = exits.key(e) + '|' + (inboundTag || ''); (g.get(k) || g.set(k, { users: [], inboundTag, exit: e }).get(k)).users.push(...users) };
+    const lines = linesOn().filter((l) => usable(l)), byKit = new Map();
+    for (const l of lines) byKit.set(l.kit_id, (byKit.get(l.kit_id) || []).concat(l));
+    for (const u of users()) {
+      if (userState(u, t) !== 'active') continue;
+      for (const l of byKit.get(kitOf(u).id) || []) {
+        const e = exits.eff(u, l); if (!e) continue;
+        if (!entry(l) && d[l.proto]) add([`mp-${u.id}`], d[l.proto].tag, e);
+      }
+    }
+    for (const n of all().filter(joined)) for (const k of linkKeys(n.id, 0)) { const x = exits.byId(k.slice(1, -1)); if (x) add([linkUser(n, k).email], '', { id: x.id, fail: k.endsWith('b') ? 'block' : 'direct', udp: x.udp !== 0 }) }
+    return [...g.values()];
+  }
   async function ensureLinks() { for (const c of linkClients()) await xray.addClient('vision', c).catch(() => {}) }
 
   // ---------- подписка ----------
@@ -151,20 +176,26 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg }) {
     const lines = linesOn().filter((l) => usable(l, d));
     const mine = lines.filter((l) => entry(l) === n.id), byKit = new Map();
     for (const l of mine) byKit.set(l.kit_id, (byKit.get(l.kit_id) || []).concat(l));
-    const clients = [], vision = [], hy2 = [], route = new Map();   // сервер назначения → почты людей, которых туда вести
+    const clients = [], vision = [], hy2 = [], route = new Map();   // «сервер назначения|ключ выхода» → почты людей, которых туда вести
+    const groups = new Map(), here = (email, e) => { const k = exits.key(e); (groups.get(k) || groups.set(k, { users: [], exit: e }).get(k)).users.push(email) };
     for (const u of users()) {
       if (userState(u, t) !== 'active') continue;
       for (const l of byKit.get(kitOf(u).id) || []) {
         const email = `mp-${u.id}-${l.id}`;
         if (l.proto === 'hy2') hy2.push({ auth: lineUuid(u.hy2, l.id), email, level: 0 });
         else (l.proto === 'vision' ? vision : clients).push({ id: lineUuid(u.uuid, l.id), flow: 'xtls-rprx-vision', email, level: 0 });
-        if (l.via === n.id) route.set(l.out, (route.get(l.out) || []).concat(email));
+        const e = exits.eff(u, l);
+        if (l.via === n.id) { const k = `${l.out}|${exits.key(e)}`; route.set(k, (route.get(k) || []).concat(email)) }
+        else if (e) here(email, e);   // подключение кончается на этой ноде: выход здесь
       }
     }
     // другие ноды, которые ведут людей через эту как через сервер
     const from = new Set(lines.filter((l) => l.via && l.out === n.id).map((l) => l.via));
-    for (const id of from) { const a = byId(id); if (joined(a)) clients.push({ id: a.link_uuid, flow: 'xtls-rprx-vision', email: LINK(a.id), level: 0 }) }
-    const user = { id: n.link_uuid, flow: 'xtls-rprx-vision', encryption: 'none' };
+    for (const id of from) { const a = byId(id); if (!joined(a)) continue;
+      for (const k of ['', ...linkKeys(a.id, n.id)]) {
+        clients.push({ ...linkUser(a, k), flow: 'xtls-rprx-vision', level: 0 });
+        const x = k && exits.byId(k.slice(1, -1)); if (x) here(linkUser(a, k).email, { id: x.id, fail: k.endsWith('b') ? 'block' : 'direct', udp: x.udp !== 0 });
+      } }
     const cert = { certificateFile: `/etc/letsencrypt/live/${n.domain}/fullchain.pem`, keyFile: `/etc/letsencrypt/live/${n.domain}/privkey.pem` };
     const outbounds = [{ tag: 'direct', protocol: 'freedom' }, { tag: 'block', protocol: 'blackhole' }], rules = [{ ip: ['geoip:private'], outboundTag: 'block' }];
     // Мост в России: российские сайты выпускает сам, со своего адреса, за границу уходит только остальное.
@@ -172,14 +203,15 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg }) {
     const ru = !!n.ru_direct && route.size > 0;
     const sniff = ru ? { sniffing: { enabled: true, destOverride: ['http', 'tls', 'quic'], routeOnly: true } } : {};
     if (ru) rules.push({ domain: ['geosite:category-ru', 'domain:ru', 'domain:su', 'domain:xn--p1ai'], outboundTag: 'direct' }, { ip: ['geoip:ru'], outboundTag: 'direct' });
-    for (const [to, emails] of route) {
-      const b = to && byId(to), tag = `to-${to}`;
+    for (const [key, emails] of route) {
+      const [to, k] = [Number(key.split('|')[0]), key.split('|')[1]], b = to && byId(to), tag = `to-${to}${k ? '-' + k : ''}`;
+      const user = { id: linkUser(n, k).id, flow: 'xtls-rprx-vision', encryption: 'none' };
       outbounds.push(b
         ? { tag, protocol: 'vless', settings: { vnext: [{ address: b.addr, port: 443, users: [user] }] }, streamSettings: { network: 'raw', security: 'reality', realitySettings: { serverName: sni(b), fingerprint: fp, publicKey: b.pub, shortId: b.sid } } }
         : { tag, protocol: 'vless', settings: { vnext: [{ address: srv.domain, port: srv.ports.vision || 443, users: [user] }] }, streamSettings: { network: 'raw', security: 'tls', tlsSettings: { serverName: srv.domain, fingerprint: fp } } });
       rules.push({ user: emails, outboundTag: tag });
     }
-    return {
+    return exits.parts({
       log: { loglevel: 'warning' },
       api: { tag: 'api', listen: '127.0.0.1:10085', services: ['HandlerService', 'StatsService'] },
       stats: {},
@@ -194,7 +226,7 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg }) {
           streamSettings: { network: 'hysteria', security: 'tls', tlsSettings: { serverName: n.domain, alpn: ['h3'], certificates: [{ usage: 'encipherment', ...cert }] },
             hysteriaSettings: { version: 2 }, finalmask: { quicParams: { congestion: 'bbr' } } } }])],
       outbounds, routing: { domainStrategy: 'AsIs', rules },
-    };
+    }, [...groups.values()]);
   }
 
   // ---------- отчёт ноды ----------
@@ -267,7 +299,7 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg }) {
         return { id: n.id, name: n.name, addr: n.addr, mask: n.mask, domain: n.domain, ru_direct: !!n.ru_direct, tls: tls(n), cert_err: n.domain && !tls(n) ? i.cert_err || '' : '', old_agent: joined(n) && !!n.seen_at && !!i.xray && !(i.v >= 2), joined: joined(n), waiting: !!n.join_hash, seen: n.seen_at, up: joined(n) && t - n.seen_at < SEEN, xray: i.xray || '', load: i.load || '', xray_ok: i.active !== false, err: i.err || '',
           online: on && t - on.at < SEEN ? Object.keys(on.ips).length : 0, day: dayBytes(n.id) } }),
       kits: kits().map((k) => ({ id: k.id, name: k.name, is_default: k.id === def.id, users: count.filter((c) => c.kit_id === k.id || (k.id === def.id && !kits().some((x) => x.id === c.kit_id))).reduce((s, c) => s + c.n, 0),
-        lines: linesOf(k.id).map((l) => ({ id: l.id, name: l.name, out: l.out, via: l.via, proto: l.proto, on: !!l.enabled, problem: whyNot(l, d) })) })),
+        lines: linesOf(k.id).map((l) => ({ id: l.id, name: l.name, out: l.out, via: l.via, proto: l.proto, on: !!l.enabled, exit: l.exit_id, exit_fail: l.exit_fail, problem: whyNot(l, d) })) })),
       online: o,
     };
   }
@@ -281,7 +313,8 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg }) {
     const proto = e ? (NODE_TLS.includes(want) && byId(e).domain ? want : 'reality') : LOCAL.includes(want) ? want : 'vision';
     const nm = (id) => id ? byId(id).name : server().name;
     const name = cleanName(b.name ?? old?.name, 40) || (via ? `${nm(out)} через «${nm(via)}»` : e ? nm(out) : `${nm(0)} ${PROTO[proto]}`);
-    return { out, via, proto, name };
+    const x = exits.pick(b, old); if (x.error) return x;
+    return { out, via, proto, name, ...x, exit_id: proto === 'awg' ? 0 : x.exit_id };
   }
   function newKeys() {
     const { publicKey, privateKey } = generateKeyPairSync('x25519');
@@ -341,7 +374,7 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg }) {
       if (m[2] === '/lines' && M === 'POST') {
         const l = cleanLine(await h.readBody(req)); if (l.error) return bad(l.error);
         const pos = Number(db.prepare('SELECT MAX(pos) AS p FROM kit_lines WHERE kit_id = ?').get(k.id)?.p ?? -1) + 1;
-        db.prepare('INSERT INTO kit_lines (kit_id, pos, name, out, via, proto) VALUES (?, ?, ?, ?, ?, ?)').run(k.id, pos, l.name, l.out, l.via, l.proto); return ok();
+        db.prepare('INSERT INTO kit_lines (kit_id, pos, name, out, via, proto, exit_id, exit_fail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(k.id, pos, l.name, l.out, l.via, l.proto, l.exit_id, l.exit_fail); return ok();
       }
       if (m[2] === '/order' && M === 'POST') {
         [].concat((await h.readBody(req)).ids || []).forEach((id, i) => db.prepare('UPDATE kit_lines SET pos = ? WHERE id = ? AND kit_id = ?').run(i, Number(id) || 0, k.id)); return ok({}, false);
@@ -359,11 +392,11 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg }) {
       if (M === 'DELETE') { db.prepare('DELETE FROM kit_lines WHERE id = ?').run(old.id); return ok() }
       if (M === 'PATCH') {
         const b = await h.readBody(req), l = cleanLine(b, old); if (l.error) return bad(l.error);
-        db.prepare('UPDATE kit_lines SET name = ?, out = ?, via = ?, proto = ?, enabled = ? WHERE id = ?').run(l.name, l.out, l.via, l.proto, b.on !== undefined ? (b.on ? 1 : 0) : old.enabled, old.id); return ok();
+        db.prepare('UPDATE kit_lines SET name = ?, out = ?, via = ?, proto = ?, enabled = ?, exit_id = ?, exit_fail = ? WHERE id = ?').run(l.name, l.out, l.via, l.proto, b.on !== undefined ? (b.on ? 1 : 0) : old.enabled, l.exit_id, l.exit_fail, old.id); return ok();
       }
     }
     return bad('Нет такого действия', 404);
   }
 
-  return { kindsOn, linkClients, ensureLinks, render, links, linkList, onlineMap, http, api, state, kitOf, defKit, nodeConfig, usable, wantsAwg };
+  return { kindsOn, linkClients, exitGroups, ensureLinks, render, links, linkList, onlineMap, http, api, state, kitOf, defKit, nodeConfig, usable, wantsAwg };
 }

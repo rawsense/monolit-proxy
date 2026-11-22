@@ -7,7 +7,8 @@ import { join } from 'node:path';
 
 export const EMAIL = id => `mp-${id}`;
 // mp-N — люди, mpn-N — ноды (ходят сюда за людей, пришедших по мосту)
-const isOurs = c => typeof c?.email === 'string' && /^mpn?-\d+$/.test(c.email);
+// mpn-N-x<выход><d|b> — та же нода с людьми, которым нужен выход через прокси (exits.mjs)
+const isOurs = c => typeof c?.email === 'string' && /^mpn?-\d+(-x\d+[db])?$/.test(c.email);
 
 export class Xray {
   constructor({ bin, config, api }) { Object.assign(this, { bin, config, api }); }
@@ -46,16 +47,31 @@ export class Xray {
       ib.settings ||= {}; ib.settings.clients ||= [];
       ib.settings.clients = ib.settings.clients.filter(c => !isOurs(c)).concat(users.map(u => Xray.clientsFor(u, k)), k === 'vision' && this.linkClients ? this.linkClients() : []);
     }
-    return cfg;
+    return this.extra ? this.extra(cfg) : cfg;   // выходы через прокси (exits.mjs)
   }
 
+  // Возвращает правила выходов до и после: если поменялись, их нужно передать живому Xray (liveRules)
   writeUsers(users, kinds) {
-    const cfg = this.fillUsers(this.read(), users, kinds);
+    const old = this.read(), was = Xray.exitRules(old);
+    const cfg = this.fillUsers(old, users, kinds);
     const bak = this.config + '.monolit-original';
     if (!existsSync(bak)) copyFileSync(this.config, bak);
     const tmp = this.config + '.monolit-tmp';
     writeFileSync(tmp, JSON.stringify(cfg, null, 2));
     renameSync(tmp, this.config);
+    return { was, now: Xray.exitRules(cfg) };
+  }
+  static exitRules(cfg) { return (cfg.routing?.rules || []).filter(r => String(r.ruleTag || '').startsWith('mp-x')) }
+
+  // Заменить правила выходов в работающем Xray без перезапуска: старые снять по ruleTag, новые дописать в конец
+  async liveRules(was, next) {
+    if (JSON.stringify(was) === JSON.stringify(next)) return false;
+    if (was.length) await this.run(['api', 'rmrules', `--server=${this.api}`, ...was.map(r => r.ruleTag)]);
+    if (!next.length) return true;
+    const dir = mkdtempSync(join(tmpdir(), 'mp-'));
+    try { const f = join(dir, 'r.json'); writeFileSync(f, JSON.stringify({ routing: { rules: next } })); await this.run(['api', 'adrules', `--server=${this.api}`, '-append', f]) }
+    finally { rmSync(dir, { recursive: true, force: true }) }
+    return true;
   }
 
   // Включить API и статистику по пользователям. Возвращает true, если конфиг поменялся (нужен перезапуск Xray)

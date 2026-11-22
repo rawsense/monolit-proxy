@@ -34,7 +34,8 @@
 <script src="admin.js" defer></script>
 <script src="server.js" defer></script>
 <script src="addr.js" defer></script>
-<script src="nodes.js" defer></script><!--/js-->
+<script src="nodes.js" defer></script>
+<script src="exits.js" defer></script><!--/js-->
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="mp-mark" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2.5" fill="currentColor"/></symbol></svg>
@@ -64,6 +65,7 @@
     <a class="side-item" href="#" data-open="mp-srv"><i data-lucide="server"></i><span class="side-tx">Сервер</span></a>
     <a class="side-item" href="#" data-open="mp-addr"><i data-lucide="map-pin"></i><span class="side-tx">Адрес</span><span class="side-dot" id="mp-addr-dot" hidden></span></a>
     <a class="side-item" href="#" data-open="mp-routes"><i data-lucide="route"></i><span class="side-tx">Маршруты</span></a>
+    <a class="side-item" href="#" data-open="mp-exits"><i data-lucide="door-open"></i><span class="side-tx">Выходы</span></a>
     <a class="side-item" href="#" data-open="mp-warp"><i data-lucide="cloud"></i><span class="side-tx">WARP</span></a>
     <a class="side-item" href="#" data-open="mp-proto"><i data-lucide="network"></i><span class="side-tx">Протоколы</span></a>
     <a class="side-item" href="#" data-open="mp-hist"><i data-lucide="history"></i><span class="side-tx">История</span></a>
@@ -181,6 +183,10 @@
     <label class="field"><span class="label">Устройств одновременно</span><select class="select" name="devices"><option value="" selected>Без ограничения</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="10">10</option></select>
       <span class="hint">Считаются разные IP. Если их больше, доступ закроется на 10 минут</span></label>
     <label class="field mp-kit-f"><span class="label">Набор подключений</span><select class="select" name="kit"></select></label>
+    <div class="mp-pair mp-exit-f" hidden>
+      <label class="field"><span class="label">Выход в интернет</span><select class="select" name="exit"></select></label>
+      <label class="field"><span class="label">Если выход не отвечает</span><select class="select" name="exit_fail"><option value="direct">Напрямую с сервера</option><option value="block">Без интернета</option></select></label>
+    </div>
     <label class="field"><span class="label">Заметка <span class="opt">необязательно</span></span><input class="input" name="note" maxlength="200" autocomplete="off"></label>
   </div>
   <div class="dialog-foot"><button type="button" class="btn btn-ghost" data-close>Отмена</button><button class="btn btn-primary" type="submit"><span>Создать</span></button></div>
@@ -230,6 +236,10 @@
       </div>
       <label class="field"><span class="label">Устройств одновременно</span><select class="select" name="devices"><option value="" selected>Без ограничения</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="10">10</option></select><span class="hint">Считаются разные IP. Если их больше, доступ закроется на 10 минут</span></label>
       <label class="field mp-kit-f"><span class="label">Набор подключений</span><select class="select" name="kit"></select></label>
+      <div class="mp-pair mp-exit-f" hidden>
+        <label class="field"><span class="label">Выход в интернет</span><select class="select" name="exit"></select></label>
+        <label class="field"><span class="label">Если выход не отвечает</span><select class="select" name="exit_fail"><option value="direct">Напрямую с сервера</option><option value="block">Без интернета</option></select></label>
+      </div>
       <label class="field"><span class="label">Заметка</span><input class="input" name="note" maxlength="200" autocomplete="off"></label>
     </form>
     <div class="mp-section">
@@ -309,6 +319,10 @@
       <label class="field"><span class="label">Мост</span><select class="select" name="via"></select></label>
     </div>
     <label class="field"><span class="label">Протокол</span><select class="select" name="proto"></select></label>
+    <div class="mp-pair mp-exit-f" hidden>
+      <label class="field"><span class="label">Выход в интернет</span><select class="select" name="exit"></select></label>
+      <label class="field"><span class="label">Если выход не отвечает</span><select class="select" name="exit_fail"><option value="direct">Напрямую с сервера</option><option value="block">Без интернета</option></select></label>
+    </div>
   </div>
   <div class="dialog-foot"><button type="button" class="btn btn-ghost mp-danger mp-ln-del" id="ln-del"><i data-lucide="trash-2"></i><span>Удалить</span></button><button type="button" class="btn btn-ghost" data-close>Отмена</button><button class="btn btn-primary" type="submit"><span>Сохранить</span></button></div>
 </form></dialog>
@@ -528,6 +542,30 @@
     <div class="btn-row mp-rt-more" id="mp-rt-more"><button class="btn btn-secondary btn-sm" type="button" data-move="-1"><i data-lucide="arrow-up"></i>Выше</button><button class="btn btn-secondary btn-sm" type="button" data-move="1"><i data-lucide="arrow-down"></i>Ниже</button><button class="btn btn-ghost btn-sm mp-danger" type="button" id="mp-rt-del"><i data-lucide="trash-2"></i>Удалить</button></div>
   </div>
   <div class="dialog-foot"><button type="button" class="btn btn-ghost" data-close>Отмена</button><button class="btn btn-primary" type="submit"><span>Сохранить</span></button></div>
+</form></dialog>
+
+<!-- Выходы -->
+<dialog class="sheet sheet-side" id="mp-exits" aria-labelledby="mp-exits-t">
+  <div class="sheet-head"><h2 id="mp-exits-t">Выходы</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="sheet-body">
+    <div class="mp-section">
+      <p class="mp-note">Купленные SOCKS5-прокси: через них люди выходят в интернет с адреса прокси, а не сервера</p>
+      <div class="alist mp-exs" id="mp-ex-list"></div>
+      <div class="state state-dashed" id="mp-ex-empty" hidden><span class="state-ic"><i data-lucide="door-open"></i></span><h4>Выходов нет</h4><p>Все выходят в интернет с адреса сервера</p></div>
+      <div class="btn-row"><button class="btn btn-primary" type="button" id="mp-ex-add"><i data-lucide="plus"></i>Добавить выход</button></div>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="dialog dialog-md dialog-scroll" id="mp-ex-dlg" aria-labelledby="mp-ex-t"><form novalidate id="mp-ex-form">
+  <div class="dialog-head"><div><h2 id="mp-ex-t">Новый выход</h2><p>Сервер проверит прокси, прежде чем пускать через него людей</p></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="dialog-main mp-form">
+    <label class="field"><span class="label">Прокси</span><input class="input" name="proxy" placeholder="логин:пароль@1.2.3.4:1080" autocomplete="off" spellcheck="false" autocapitalize="none">
+      <span class="hint">Подойдёт и 1.2.3.4:1080:логин:пароль</span></label>
+    <label class="field"><span class="label">Название <span class="opt">необязательно</span></span><input class="input" name="name" maxlength="40" autocomplete="off" placeholder="Подставится по стране"></label>
+    <dl class="mp-kv" id="mp-ex-kv" hidden></dl>
+  </div>
+  <div class="dialog-foot"><button type="button" class="btn btn-ghost mp-danger mp-ln-del" id="mp-ex-del"><i data-lucide="trash-2"></i><span>Удалить</span></button><button type="button" class="btn btn-secondary" id="mp-ex-check"><span>Проверить</span></button><button class="btn btn-primary" type="submit"><span>Сохранить</span></button></div>
 </form></dialog>
 
 <!-- WARP -->

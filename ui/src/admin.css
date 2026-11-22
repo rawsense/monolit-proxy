@@ -315,3 +315,8 @@ button.alist-row { width: 100%; border: 0; background: none; font: inherit; colo
   .app-head .btn-row { width: 100% }
   .app-head .btn-row > .btn, .app-head .btn-row > .seg { flex: 1 }
 }
+
+/* Выходы: флаг в названии — в строку с ним, а не отдельной строкой подписи; состояние в правом конце */
+.alist-tx b .mp-flag { display: inline-block; color: inherit; font-size: inherit; line-height: inherit }
+.alist-row.mp-ex { grid-template-columns: var(--al-ic) minmax(0, 1fr) auto; text-align: left }
+.mp-ex .badge { white-space: nowrap }

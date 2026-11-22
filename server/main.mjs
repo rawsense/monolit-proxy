@@ -10,6 +10,7 @@ import { createManager, PRESETS, agent } from './manage.mjs';
 import { createWatch, tgSend, tgFindChat, resolve4 } from './watch.mjs';
 import { createNodes } from './nodes.mjs';
 import { createAwg } from './awg.mjs';
+import { createExits, parseProxy, checkProxy, flagOf } from './exits.mjs';
 
 const env = (k, d) => process.env[k] ?? d;
 const DATA = env('MP_DATA', '/data');
@@ -60,8 +61,14 @@ const users = () => db.prepare('SELECT * FROM users ORDER BY id').all();
 const userById = id => db.prepare('SELECT * FROM users WHERE id = ?').get(id);
 // AmneziaWG — отдельный сервер рядом с Xray; после его запуска сразу сверяем пользователей
 const awg = createAwg({ db, log, agent, domain: () => getSetting(db, 'domain'), outIp: () => getSetting(db, 'out_ip', ''), onReady: () => { queueSync({ full: true }) } });
-const nodes = createNodes({ db, xray, log, dayOf, server: serverCtx, users, awg });
+const exits = createExits({ db, log });
+const nodes = createNodes({ db, xray, log, dayOf, server: serverCtx, users, awg, exits });
+exits.migrate();
 xray.linkClients = nodes.linkClients;
+// Выходы через прокси: в каждый конфиг, который пишет админка, — свои выходы, балансировщики и правила
+xray.extra = cfg => exits.parts(cfg, nodes.exitGroups(xray.detect(cfg)), {
+  direct: (cfg.outbounds || []).find(o => o.protocol === 'freedom')?.tag || 'direct',
+  block: (cfg.outbounds || []).find(o => o.protocol === 'blackhole')?.tag || 'block' });
 
 // ---------- шаблон autoXRAY ----------
 const activeTpl = () => { const r = db.prepare("SELECT * FROM templates WHERE status = 'active' ORDER BY id DESC LIMIT 1").get(); return r ? { ...r, parsed: JSON.parse(r.body) } : null; };
@@ -169,7 +176,12 @@ async function sync({ full = false } = {}) {
       for (const id of was) if (!want.has(id)) await xray.removeUser(id, ['vision', 'hy2', 'xhttp']);
     }
     const changed = full || !applied || want.size !== was.size || [...want].some(id => !was.has(id));
-    if (changed) xray.writeUsers(all.filter(u => want.has(u.id)), ['vision', 'hy2', 'xhttp'].filter(k => xray.detect()[k]));
+    if (changed) {
+      const r = xray.writeUsers(all.filter(u => want.has(u.id)), ['vision', 'hy2', 'xhttp'].filter(k => xray.detect()[k]));
+      // правила выходов поменялись (выход назначили, сняли, человек выключился): живому Xray без перезапуска.
+      // Не вышло (старый Xray без RoutingService) — перезапуск, конфиг уже записан
+      await xray.liveRules(r.was, r.now).catch(e => { log('правила выходов без перезапуска не легли:', e.message.slice(0, 200)); return mgr.server.restart() });
+    }
     applied = want; lastSync = t; syncError = '';
   } catch (e) { syncError = e.message; log('sync:', e.message); }
 }
@@ -209,7 +221,7 @@ function publicUser(u) {
   const st = userState(u);
   const ips = online[u.id] || {};
   return { id: u.id, name: u.name, note: u.note, token: u.token, limit: u.limit_bytes, expire: u.expire_at, enabled: !!u.enabled, up: u.up, down: u.down, used: u.up + u.down, state: st, last_active: u.last_active, last_sub: u.last_sub, created: u.created_at,
-    period: u.period || '', reset_at: u.reset_at, devices: u.devices, block_until: u.block_until, kit: nodes.kitOf(u).id,
+    period: u.period || '', reset_at: u.reset_at, devices: u.devices, block_until: u.block_until, kit: nodes.kitOf(u).id, exit: u.exit_id, exit_fail: u.exit_fail,
     online: Object.entries(ips).map(([ip, at]) => ({ ip, at: Number(at) })).sort((a, b) => b.at - a.at) };
 }
 const cleanDevices = v => Math.min(50, Math.max(0, Math.round(Number(v) || 0)));
@@ -261,6 +273,7 @@ function stateForAdmin() {
     update: updateState(),
     watch: watch.state(),
     ...nodes.state(),
+    exits: exits.state(),
     awg: awg.stateForAdmin(),
     users: users().map(u => ({ ...publicUser(u), url: subUrl(u) })),
     settings: { server_name: getSetting(db, 'server_name'), domain: getSetting(db, 'domain'), fp: getSetting(db, 'fp'), kinds: getSetting(db, 'kinds'), autoupdate: getSetting(db, 'autoupdate') === '1', support_url: getSetting(db, 'support_url'), update_hours: Number(getSetting(db, 'update_hours', '12')), login: getSetting(db, 'admin_login'),
@@ -304,6 +317,7 @@ async function adminApi(req, res, path) {
       .run(name, String(b.note || '').slice(0, 200), token(16), newUuid(), token(12), Math.max(0, Math.round(Number(b.limit) || 0)), Math.max(0, Math.round(Number(b.expire) || 0)), t,
         period, period ? nextReset(t, t) : 0, cleanDevices(b.devices));
     if (b.kit) db.prepare('UPDATE users SET kit_id = ? WHERE id = ?').run(Number(b.kit) === nodes.defKit().id ? 0 : Number(b.kit) || 0, r.lastInsertRowid);
+    const x = exits.pick(b); if (!x.error) db.prepare('UPDATE users SET exit_id = ?, exit_fail = ? WHERE id = ?').run(x.exit_id, x.exit_fail, r.lastInsertRowid);
     await queueSync(); return json(res, 200, { user: { ...publicUser(userById(r.lastInsertRowid)), url: subUrl(userById(r.lastInsertRowid)) } });
   }
   if (m && m[2] === '/links' && req.method === 'GET') {
@@ -326,7 +340,10 @@ async function adminApi(req, res, path) {
     db.prepare('UPDATE users SET name = ?, note = ?, limit_bytes = ?, expire_at = ?, enabled = ?, period = ?, reset_at = ?, devices = ?, block_until = ? WHERE id = ?')
       .run(f.name, f.note, f.limit_bytes, f.expire_at, f.enabled, f.period, reset_at, f.devices, block_until, u.id);
     if (b.kit !== undefined) db.prepare('UPDATE users SET kit_id = ? WHERE id = ?').run(Number(b.kit) === nodes.defKit().id ? 0 : Number(b.kit) || 0, u.id);
-    await queueSync(); return json(res, 200, { user: { ...publicUser(userById(u.id)), url: subUrl(userById(u.id)) } });
+    const x = exits.pick(b, u); if (x.error) return json(res, 400, { error: x.error });
+    db.prepare('UPDATE users SET exit_id = ?, exit_fail = ? WHERE id = ?').run(x.exit_id, x.exit_fail, u.id);
+    // набор или выход поменялся — правила выходов пересобрать
+    await queueSync({ full: b.kit !== undefined && Number(b.kit) !== u.kit_id || x.exit_id !== u.exit_id || x.exit_fail !== u.exit_fail }); return json(res, 200, { user: { ...publicUser(userById(u.id)), url: subUrl(userById(u.id)) } });
   }
   if (m && m[2] === '/reset' && req.method === 'POST') { db.prepare('UPDATE users SET up = 0, down = 0 WHERE id = ?').run(Number(m[1])); await queueSync(); return json(res, 200, {}); }
   if (m && m[2] === '/regen' && req.method === 'POST') {
@@ -365,6 +382,42 @@ async function adminApi(req, res, path) {
   const agentDone = (r, okText) => r.code === 0 ? json(res, 200, { ok: true, out: r.out, text: okText }) : json(res, r.code < 0 ? 503 : 400, { error: r.out.split(/\n/).filter(Boolean).slice(-3).join(' ') || 'Не получилось' });
   const managed = () => mgr.stateForAdmin().managed || (json(res, 409, { error: 'Xray настроен не через monolit (autoXRAY). Чтобы управлять им здесь, переустановите: install.sh --reconfigure --replace-autoxray' }), false);
   let mm;
+  // ---------- выходы через прокси ----------
+  // Новый, изменённый или удалённый выход меняет состав выходов Xray: применяется с перезапуском (как маршруты),
+  // Xray не принял — база возвращается как была
+  if (path === '/api/exits' && M === 'POST' || (mm = /^\/api\/exits\/(\d+)(\/check)?$/.exec(path))) {
+    const b = M === 'GET' || M === 'DELETE' ? {} : await readBody(req);
+    const old = mm && exits.byId(mm[1]); if (mm && !old) return json(res, 404, { error: 'Нет такого выхода' });
+    const out = (r) => r.ok ? json(res, 200, { ...r, exits: exits.state() }) : json(res, 400, { error: r.error });
+    if (mm?.[2] && M === 'POST') { await exits.check(old.id); return out({ ok: true }) }
+    if (M === 'DELETE') {
+      const us = db.prepare('SELECT id FROM users WHERE exit_id = ?').all(old.id).map(x => x.id), ls = db.prepare('SELECT id FROM kit_lines WHERE exit_id = ?').all(old.id).map(x => x.id);
+      db.prepare("UPDATE users SET exit_id = 0 WHERE exit_id = ?").run(old.id); db.prepare("UPDATE kit_lines SET exit_id = 0 WHERE exit_id = ?").run(old.id); db.prepare('DELETE FROM exits WHERE id = ?').run(old.id);
+      const r = await mgr.apply(`Выход «${old.name}» удалён`, null);
+      if (!r.ok) {
+        db.prepare('INSERT INTO exits (id, name, host, port, user, pass, ok, udp, ip, country, ms, error, checked_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(old.id, old.name, old.host, old.port, old.user, old.pass, old.ok, old.udp, old.ip, old.country, old.ms, old.error, old.checked_at, old.created_at);
+        for (const id of us) db.prepare('UPDATE users SET exit_id = ? WHERE id = ?').run(old.id, id);
+        for (const id of ls) db.prepare('UPDATE kit_lines SET exit_id = ? WHERE id = ?').run(old.id, id);
+      }
+      return out(r);
+    }
+    const name = b.name !== undefined ? String(b.name).trim().slice(0, 40) : old?.name || '';
+    const px = b.proxy !== undefined ? parseProxy(b.proxy) : old;
+    if (!px) return json(res, 400, { error: 'Прокси выглядит так: 1.2.3.4:1080 или логин:пароль@1.2.3.4:1080' });
+    const same = old && px.host === old.host && px.port === old.port && px.user === old.user && px.pass === old.pass;
+    if (same) { db.prepare('UPDATE exits SET name = ? WHERE id = ?').run(name || old.name, old.id); return out({ ok: true }) }
+    // новый адрес проверяем до того, как пустить через него людей
+    const c = await checkProxy(px);
+    if (!c.ok) return json(res, 400, { error: 'Прокси не отвечает: ' + c.error });
+    const nm = name || [flagOf(c.country), c.ip || px.host].filter(Boolean).join(' ');
+    let id;
+    if (old) db.prepare('UPDATE exits SET name = ?, host = ?, port = ?, user = ?, pass = ?, udp = -1 WHERE id = ?').run(nm, px.host, px.port, px.user, px.pass, id = old.id);
+    else id = Number(db.prepare('INSERT INTO exits (name, host, port, user, pass, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(nm, px.host, px.port, px.user, px.pass, now()).lastInsertRowid);
+    db.prepare("UPDATE exits SET ok = 1, udp = ?, ip = ?, country = ?, ms = ?, error = '', checked_at = ? WHERE id = ?").run(c.udp == null ? -1 : c.udp ? 1 : 0, c.ip, c.country, c.ms, now(), id);
+    const r = await mgr.apply(old ? `Выход «${nm}» изменён` : `Выход «${nm}» добавлен`, null);
+    if (!r.ok) { if (old) db.prepare('UPDATE exits SET name = ?, host = ?, port = ?, user = ?, pass = ?, udp = ? WHERE id = ?').run(old.name, old.host, old.port, old.user, old.pass, old.udp, old.id); else db.prepare('DELETE FROM exits WHERE id = ?').run(id) }
+    return out({ ...r, exit: id });
+  }
   // ---------- трафик по дням ----------
   if (path === '/api/traffic' && M === 'GET') {
     const days = Math.min(90, Math.max(7, Number(qs.get('days')) || 30)), uid = Number(qs.get('user')) || 0, t = now(), list = [];
@@ -555,6 +608,7 @@ http.listen(Number(PORT), HOST, async () => {
   await mgr.start().catch(e => log('manage:', e.message));
   setInterval(() => queueSync(), 60_000);
   setInterval(() => queueSync({ full: true }), 10 * 60_000);    // если Xray перезапускали — вернуть пользователей
+  setInterval(() => exits.checkAll().catch(e => log('выходы:', e.message)), 5 * 60_000);   // прокси отвечает? IP, страна, UDP
   setInterval(() => checkTemplate().catch(e => log('tpl', e.message)), 24 * 3600_000);
   setInterval(() => db.prepare('DELETE FROM sessions WHERE expires < ?').run(now()), 3600_000);
   setInterval(() => db.prepare('DELETE FROM traffic_daily WHERE day < ?').run(dayOf(now() - 400 * 86400)), 24 * 3600_000);
