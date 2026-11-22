@@ -65,6 +65,9 @@ const exits = createExits({ db, log });
 const nodes = createNodes({ db, xray, log, dayOf, server: serverCtx, users, awg, exits });
 exits.migrate();
 xray.linkClients = nodes.linkClients;
+// у подключения с выходом свой ключ человека: mp-N-x<выход><d|b>
+xray.userKeys = nodes.userKeys;
+xray.allKeys = () => exits.all().flatMap(x => [`x${x.id}d`, `x${x.id}b`]);
 // Выходы через прокси: в каждый конфиг, который пишет админка, — свои выходы, балансировщики и правила
 xray.extra = cfg => exits.parts(cfg, nodes.exitGroups(xray.detect(cfg)), {
   direct: (cfg.outbounds || []).find(o => o.protocol === 'freedom')?.tag || 'direct',
@@ -169,6 +172,7 @@ async function sync({ full = false } = {}) {
     const was = applied || new Set();
     if (full || !applied) {
       for (const u of all) if (want.has(u.id)) await xray.addUser(u, kinds).catch(() => {});   // уже есть — Xray ответит ошибкой, это нормально
+      for (const u of all) if (want.has(u.id)) await xray.removeUser(u.id, ['vision', 'hy2', 'xhttp'], nodes.userKeys(u));   // ключи на выходы, которые сняли
       for (const u of all) if (!want.has(u.id)) await xray.removeUser(u.id, ['vision', 'hy2', 'xhttp']);
       await nodes.ensureLinks();
     } else {

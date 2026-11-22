@@ -7,7 +7,7 @@ import { join } from 'node:path';
 
 export const EMAIL = id => `mp-${id}`;
 // mp-N — люди, mpn-N — ноды (ходят сюда за людей, пришедших по мосту)
-// mpn-N-x<выход><d|b> — та же нода с людьми, которым нужен выход через прокси (exits.mjs)
+// mp-N-x<выход><d|b> — тот же человек на подключении с выходом через прокси (exits.mjs), mpn-N-x… — нода с такими людьми
 const isOurs = c => typeof c?.email === 'string' && /^mpn?-\d+(-x\d+[db])?$/.test(c.email);
 
 export class Xray {
@@ -32,10 +32,18 @@ export class Xray {
 
   // Клиенты одного пользователя для каждого входа
   static clientsFor(u, kind) {
-    const email = EMAIL(u.id);
+    const email = u.email || EMAIL(u.id);
     if (kind === 'vision') return { id: u.uuid, flow: 'xtls-rprx-vision', email, level: 0 };
     if (kind === 'xhttp') return { id: u.uuid, email, level: 0 };
     if (kind === 'hy2') return { auth: u.hy2, email, level: 0 };
+  }
+
+  // Человек и его ключи на выходы (userKeys задаёт nodes.mjs)
+  withKeys(users) { return users.flatMap(u => [u, ...(this.userKeys ? this.userKeys(u) : [])]) }
+  // Почты ключей на выходы, которые у человека могли остаться от прежних настроек
+  staleKeys(u, keep = this.userKeys ? this.userKeys(u) : []) {
+    const want = new Set(keep.map(x => x.email));
+    return (this.allKeys ? this.allKeys() : []).map(k => `${EMAIL(u.id)}-${k}`).filter(e => !want.has(e));
   }
 
   // Записать в config.json список активных пользователей (чужих клиентов не трогаем)
@@ -45,7 +53,7 @@ export class Xray {
       const tag = d[k]?.tag; if (!tag) continue;
       const ib = cfg.inbounds.find(i => i.tag === tag);
       ib.settings ||= {}; ib.settings.clients ||= [];
-      ib.settings.clients = ib.settings.clients.filter(c => !isOurs(c)).concat(users.map(u => Xray.clientsFor(u, k)), k === 'vision' && this.linkClients ? this.linkClients() : []);
+      ib.settings.clients = ib.settings.clients.filter(c => !isOurs(c)).concat(this.withKeys(users).map(u => Xray.clientsFor(u, k)), k === 'vision' && this.linkClients ? this.linkClients() : []);
     }
     return this.extra ? this.extra(cfg) : cfg;   // выходы через прокси (exits.mjs)
   }
@@ -98,7 +106,7 @@ export class Xray {
     const d = this.detect(), dir = mkdtempSync(join(tmpdir(), 'mp-'));
     try {
       // Xray требует у входа порт, даже когда добавляем только пользователя
-      const inbounds = kinds.filter(k => d[k]).map(k => ({ tag: d[k].tag, port: d[k].port, listen: d[k].listen, protocol: k === 'hy2' ? 'hysteria' : 'vless', settings: { clients: [Xray.clientsFor(u, k)], ...(k === 'hy2' ? { version: 2 } : { decryption: 'none' }) } }));
+      const inbounds = kinds.filter(k => d[k]).map(k => ({ tag: d[k].tag, port: d[k].port, listen: d[k].listen, protocol: k === 'hy2' ? 'hysteria' : 'vless', settings: { clients: this.withKeys([u]).map(x => Xray.clientsFor(x, k)), ...(k === 'hy2' ? { version: 2 } : { decryption: 'none' }) } }));
       if (!inbounds.length) return '';   // в наборах нет входов этого сервера
       const f = join(dir, 'u.json'); writeFileSync(f, JSON.stringify({ inbounds }));
       const so = await this.run(['api', 'adu', `--server=${this.api}`, f]);
@@ -121,9 +129,11 @@ export class Xray {
   }
   async removeClient(kind, email) { const d = this.detect()[kind]; return d ? this.run(['api', 'rmu', `--server=${this.api}`, `-tag=${d.tag}`, email]) : ''; }
 
-  async removeUser(id, kinds) {
-    const d = this.detect(), out = [];
-    for (const k of kinds) if (d[k]) out.push(await this.run(['api', 'rmu', `--server=${this.api}`, `-tag=${d[k].tag}`, EMAIL(id)]).catch(e => e.message));
+  // keep — ключи на выходы, которые человеку ещё нужны: тогда снимаются только лишние, сам человек остаётся
+  async removeUser(id, kinds, keep) {
+    const d = this.detect(), out = [], emails = [...(keep ? [] : [EMAIL(id)]), ...this.staleKeys({ id }, keep || [])];
+    if (!emails.length) return '';
+    for (const k of kinds) if (d[k]) out.push(await this.run(['api', 'rmu', `--server=${this.api}`, `-tag=${d[k].tag}`, ...emails]).catch(e => e.message));
     return out.join('\n');
   }
 
@@ -132,7 +142,7 @@ export class Xray {
     const so = await this.run(['api', 'statsquery', `--server=${this.api}`, '-pattern', 'user>>>mp-', '-reset']);
     const res = {};
     for (const s of JSON.parse(so || '{}').stat || []) {
-      const m = /^user>>>mp-(\d+)>>>traffic>>>(uplink|downlink)$/.exec(s.name); if (!m) continue;
+      const m = /^user>>>mp-(\d+)(?:-x\d+[db])?>>>traffic>>>(uplink|downlink)$/.exec(s.name); if (!m) continue;
       const r = res[m[1]] ||= { up: 0, down: 0 };
       r[m[2] === 'uplink' ? 'up' : 'down'] += Number(s.value || 0);
     }
@@ -144,9 +154,10 @@ export class Xray {
     const res = {};
     let all; try { all = JSON.parse(await this.run(['api', 'statsgetallonlineusers', `--server=${this.api}`]) || '{}').users || []; } catch { return res; }
     for (const name of all) {
-      const m = /^user>>>mp-(\d+)>>>online$/.exec(name); if (!m) continue;
-      try { res[m[1]] = JSON.parse(await this.run(['api', 'statsonlineiplist', `--server=${this.api}`, '-email', `mp-${m[1]}`]) || '{}').ips || {}; }
-      catch { res[m[1]] = {}; }
+      const m = /^user>>>(mp-(\d+)(?:-x\d+[db])?)>>>online$/.exec(name); if (!m) continue;
+      const ips = res[m[2]] ||= {};
+      try { for (const [ip, t] of Object.entries(JSON.parse(await this.run(['api', 'statsonlineiplist', `--server=${this.api}`, '-email', m[1]]) || '{}').ips || {})) ips[ip] = Math.max(ips[ip] || 0, t); }
+      catch {}
     }
     return res;
   }

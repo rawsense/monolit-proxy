@@ -110,6 +110,12 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
     return [...ks];
   }
   const linkClients = () => all().filter(joined).flatMap((n) => ['', ...linkKeys(n.id, 0)].map((k) => ({ ...linkUser(n, k), flow: 'xtls-rprx-vision', level: 0 })));
+  // У подключения этого сервера с выходом — свой ключ человека на выход: иначе два подключения одного входа
+  // (Vision без выхода и Vision с выходом) неотличимы, и правило выхода забрало бы оба
+  const keyed = (u, k) => ({ id: u.id, uuid: lineUuid(u.uuid, k), hy2: lineUuid(u.hy2, k), email: `mp-${u.id}-${k}` });
+  const lineUser = (u, l) => { const k = !entry(l) && exits.key(exits.eff(u, l)); return k ? { ...u, ...keyed(u, k) } : u };
+  // Ключи выходов, которые нужны человеку на входах этого сервера
+  const userKeys = (u) => [...new Set(forUser(u).filter((l) => !entry(l) && l.proto !== 'awg').map((l) => exits.key(exits.eff(u, l))).filter(Boolean))].map((k) => keyed(u, k));
   // Выходы на этом сервере: люди на его входах и люди, пришедшие по мосту
   function exitGroups(d = xray.detect()) {
     const t = now(), g = new Map(), add = (users, inboundTag, e) => { const k = exits.key(e) + '|' + (inboundTag || ''); (g.get(k) || g.set(k, { users: [], inboundTag, exit: e }).get(k)).users.push(...users) };
@@ -117,9 +123,10 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
     for (const l of lines) byKit.set(l.kit_id, (byKit.get(l.kit_id) || []).concat(l));
     for (const u of users()) {
       if (userState(u, t) !== 'active') continue;
+      const seen = new Set();
       for (const l of byKit.get(kitOf(u).id) || []) {
-        const e = exits.eff(u, l); if (!e) continue;
-        if (!entry(l) && d[l.proto]) add([`mp-${u.id}`], d[l.proto].tag, e);
+        const e = exits.eff(u, l), k = exits.key(e); if (!e || entry(l) || !d[l.proto] || seen.has(k)) continue;
+        seen.add(k); add([`mp-${u.id}-${k}`], '', e);
       }
     }
     for (const n of all().filter(joined)) for (const k of linkKeys(n.id, 0)) { const x = exits.byId(k.slice(1, -1)); if (x) add([linkUser(n, k).email], '', { id: x.id, fail: k.endsWith('b') ? 'block' : 'direct', udp: x.udp !== 0 }) }
@@ -139,7 +146,7 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
       if (!e && l.proto === 'awg') { const ob = opts.awg && awg.outbound(u); if (ob) out.push(renderOne(parsed, 'awg', { user: u, server: srv }, { remark: l.name, ob })); continue }
       const kind = !e ? l.proto : l.proto === 'hy2' ? 'hy2' : 'vision';
       if (!parsed.outbounds[kind]) continue;
-      out.push(renderOne(parsed, kind, { user: u, server: srv }, { remark: l.name, outbound: !e ? null : (ob) => {
+      out.push(renderOne(parsed, kind, { user: lineUser(u, l), server: srv }, { remark: l.name, outbound: !e ? null : (ob) => {
         if (l.proto === 'hy2') {
           Object.assign(ob.settings, { address: n.domain, port: 443 });
           ob.streamSettings.tlsSettings.serverName = n.domain; ob.streamSettings.hysteriaSettings.auth = lineUuid(u.hy2, l.id);
@@ -156,15 +163,15 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
   function linkList(u, srv) {
     const fp = srv.fp || 'firefox', d = srv.domain, out = [], push = (l, url) => out.push({ name: l.name, proto: PROTO[l.proto], url });
     for (const l of forUser(u)) {
-      const e = entry(l), n = e && byId(e), name = encodeURIComponent(l.name);
+      const e = entry(l), n = e && byId(e), name = encodeURIComponent(l.name), lu = lineUser(u, l);
       // AmneziaWG: ссылка vpn:// для приложения AmneziaVPN. В общий список ссылок подписки она не идёт: другие приложения её не понимают
       if (!e && l.proto === 'awg') { const url = awg.vpnLink(u, l.name); if (url) out.push({ name: l.name, proto: PROTO.awg, url, own: true }); continue }
       if (e && l.proto === 'hy2') push(l, `hysteria2://${encodeURIComponent(lineUuid(u.hy2, l.id))}@${n.domain}:443?sni=${n.domain}&alpn=h3#${name}`);
       else if (e && l.proto === 'vision') push(l, `vless://${lineUuid(u.uuid, l.id)}@${n.domain}:${VISION_PORT}?encryption=none&security=tls&type=tcp&flow=xtls-rprx-vision&sni=${n.domain}&fp=${fp}#${name}`);
       else if (e) push(l, `vless://${lineUuid(u.uuid, l.id)}@${n.addr}:443?encryption=none&security=reality&type=tcp&flow=xtls-rprx-vision&sni=${sni(n)}&fp=${fp}&pbk=${n.pub}&sid=${n.sid}#${name}`);
-      else if (l.proto === 'vision') push(l, `vless://${u.uuid}@${d}:${srv.ports.vision}?encryption=none&security=tls&type=tcp&flow=xtls-rprx-vision&sni=${d}&fp=${fp}#${name}`);
-      else if (l.proto === 'xhttp' && srv.xhttpPath) push(l, `vless://${u.uuid}@${d}:443?encryption=none&security=tls&type=xhttp&mode=stream-up&path=%2F${encodeURIComponent(srv.xhttpPath)}&sni=${d}&fp=${fp}&alpn=h2#${name}`);
-      else if (l.proto === 'hy2') push(l, `hysteria2://${encodeURIComponent(u.hy2)}@${d}:${srv.ports.hy2}?sni=${d}&alpn=h3#${name}`);
+      else if (l.proto === 'vision') push(l, `vless://${lu.uuid}@${d}:${srv.ports.vision}?encryption=none&security=tls&type=tcp&flow=xtls-rprx-vision&sni=${d}&fp=${fp}#${name}`);
+      else if (l.proto === 'xhttp' && srv.xhttpPath) push(l, `vless://${lu.uuid}@${d}:443?encryption=none&security=tls&type=xhttp&mode=stream-up&path=%2F${encodeURIComponent(srv.xhttpPath)}&sni=${d}&fp=${fp}&alpn=h2#${name}`);
+      else if (l.proto === 'hy2') push(l, `hysteria2://${encodeURIComponent(lu.hy2)}@${d}:${srv.ports.hy2}?sni=${d}&alpn=h3#${name}`);
     }
     return out;
   }
@@ -398,5 +405,5 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
     return bad('Нет такого действия', 404);
   }
 
-  return { kindsOn, linkClients, exitGroups, ensureLinks, render, links, linkList, onlineMap, http, api, state, kitOf, defKit, nodeConfig, usable, wantsAwg };
+  return { kindsOn, linkClients, exitGroups, userKeys, ensureLinks, render, links, linkList, onlineMap, http, api, state, kitOf, defKit, nodeConfig, usable, wantsAwg };
 }

@@ -100,15 +100,32 @@ test('основной сервер: выход у человека, у подк
   db.prepare("INSERT INTO kit_lines (kit_id, name, proto) VALUES (?, 'V', 'vision')").run(kit);
   db.prepare("INSERT INTO kit_lines (kit_id, name, proto, exit_id, exit_fail) VALUES (?, 'H', 'hy2', 2, 'block')").run(kit);
   db.prepare("INSERT INTO kit_lines (kit_id, name, proto, via) VALUES (?, 'M', 'reality', 5)").run(kit);
+  db.prepare("INSERT INTO kit_lines (kit_id, name, proto, exit_id) VALUES (?, 'V2', 'vision', 1)").run(kit);   // второй Vision, с выходом
   void line;
   db.exec("INSERT INTO users (id, name, token, uuid, hy2, created_at, exit_id, exit_fail) VALUES (1, 'a', 't1', '11111111-1111-4111-8111-111111111111', 'h', 0, 1, 'direct'), (2, 'b', 't2', '22222222-2222-4222-8222-222222222222', 'h2', 0, 0, 'direct')");
   const g = nodes.exitGroups();
-  const pick = (u, tag) => g.find((x) => x.users.includes(u) && (x.inboundTag || '') === tag);
-  assert.deepEqual(pick('mp-1', 'vision-in').exit, { id: 1, fail: 'direct', udp: true });       // свой выход человека
-  assert.deepEqual(pick('mp-1', 'hy2-in').exit, { id: 2, fail: 'block', udp: false });          // у подключения главнее
-  assert.deepEqual(pick('mp-2', 'hy2-in').exit, { id: 2, fail: 'block', udp: false });          // у человека выхода нет, у подключения есть
-  assert.equal(pick('mp-2', 'vision-in'), undefined);                                            // нигде нет — напрямую
-  assert.deepEqual(pick('mpn-5-x1d', '').exit, { id: 1, fail: 'direct', udp: true });             // через мост: ключ ноды на выход
+  const pick = (u) => g.find((x) => x.users.includes(u));
+  assert.ok(g.every((x) => !x.inboundTag));                                                      // правило по ключу на выход, не по входу
+  assert.deepEqual(pick('mp-1-x1d').exit, { id: 1, fail: 'direct', udp: true });                  // свой выход человека
+  assert.deepEqual(pick('mp-1-x2b').exit, { id: 2, fail: 'block', udp: false });                  // у подключения главнее
+  assert.deepEqual(pick('mp-2-x2b').exit, { id: 2, fail: 'block', udp: false });                  // у человека выхода нет, у подключения есть
+  assert.deepEqual(pick('mp-2-x1d').exit, { id: 1, fail: 'direct', udp: true });                  // Vision с выходом
+  assert.equal(g.find((x) => x.users.some((e) => /^mp-\d+$/.test(e))), undefined);               // сам человек (Vision без выхода) — напрямую
+  assert.deepEqual(pick('mpn-5-x1d').exit, { id: 1, fail: 'direct', udp: true });                 // через мост: ключ ноды на выход
+  // в подписке у двух Vision одного человека разные ключи: без выхода — свой, с выходом — ключ на выход
+  const u2 = db.prepare('SELECT * FROM users WHERE id = 2').get(), keys = nodes.userKeys(u2);
+  assert.deepEqual(keys.map((k) => k.email).sort(), ['mp-2-x1d', 'mp-2-x2b']);
+  const ls = nodes.links(u2, { name: 'main', domain: 'vpn.example.com', fp: 'firefox', ports: { vision: 443, hy2: 8443 } });
+  const idOf = (name) => decodeURIComponent(/^\w+:\/\/([^@]+)@/.exec(ls.find((s) => s.endsWith('#' + name)))[1]);
+  assert.equal(idOf('V'), u2.uuid);
+  assert.equal(idOf('V2'), keys.find((k) => k.email === 'mp-2-x1d').uuid);
+  assert.equal(idOf('H'), keys.find((k) => k.email === 'mp-2-x2b').hy2);
+  // в Xray: человек и его ключи на выходы на каждом входе
+  const x = new Xray({ bin: 'xray', config: '', api: '' }); x.userKeys = nodes.userKeys;
+  const filled = x.fillUsers({ inbounds: [{ tag: 'v', protocol: 'vless', port: 443, streamSettings: { network: 'raw', security: 'tls' }, settings: { clients: [] } }] }, [u2], ['vision']);
+  assert.deepEqual(filled.inbounds[0].settings.clients.map((c) => `${c.email}=${c.id}`).sort(), [`mp-2=${u2.uuid}`, ...keys.map((k) => `${k.email}=${k.uuid}`)].sort());
+  x.allKeys = () => ['x1d', 'x1b', 'x2d', 'x2b'];
+  assert.deepEqual(x.staleKeys(u2), ['mp-2-x1b', 'mp-2-x2d']);
   assert.ok(nodes.linkClients().some((c) => c.email === 'mpn-5-x1d') && nodes.linkClients().some((c) => c.email === 'mpn-5'));
 
   const cfg = exits.parts({ outbounds: [{ tag: 'direct', protocol: 'freedom' }, { tag: 'block', protocol: 'blackhole' }], routing: { rules: [{ ip: ['geoip:private'], outboundTag: 'block' }] }, api: { services: ['HandlerService'] } }, g);
@@ -116,7 +133,7 @@ test('основной сервер: выход у человека, у подк
   assert.deepEqual(cfg.routing.balancers.find((b) => b.tag === BAL(2, 'block')), { tag: 'mp-x2-b', selector: ['mp-x2.s'], strategy: { type: 'random' }, fallbackTag: 'block' });
   assert.equal(cfg.routing.rules[0].outboundTag, 'block');                                       // чужие правила впереди
   const udp = cfg.routing.rules.find((r) => r.network === 'udp');
-  assert.deepEqual([udp.inboundTag, udp.outboundTag], [['hy2-in'], 'block']);                     // у прокси без UDP — по правилу падения
+  assert.deepEqual([udp.user.sort(), udp.outboundTag], [['mp-1-x2b', 'mp-2-x2b'], 'block']);      // у прокси без UDP — по правилу падения
   assert.ok(cfg.api.services.includes('RoutingService'));
   assert.deepEqual(cfg.observatory.subjectSelector, ['mp-x1.s', 'mp-x2.s']);
   // повторная сборка из готового не плодит дублей, а без выходов всё своё убирается
