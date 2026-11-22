@@ -12,7 +12,7 @@
   const named = (s) => esc(s).replace(/((?:\p{Regional_Indicator}{2}))\s*/gu, '<span class="mp-flag">$1</span>')
   const flag = (cc) => /^[A-Z]{2}$/.test(cc || '') ? String.fromCodePoint(...[...cc].map((c) => 0x1F1A5 + c.charCodeAt(0))) : ''
   const S = () => A.state()
-  const list = () => S()?.exits || []
+  const list = () => { if (S() && A.demo()) demoSeed(S()); return S()?.exits || [] }
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
   // ---------- демо ----------
@@ -122,6 +122,8 @@
   // inherit — текст пункта «без своего выхода»: у человека это адрес сервера, у подключения — выход человека
   function fill(sel, failSel, value, failValue, inherit, off) {
     const xs = list()
+    // админка обновляет данные мимо paint(): видимость поля решаем здесь, при каждом открытии окна
+    const box = sel.closest('.mp-exit-f'); if (box) box.hidden = !xs.length
     sel.innerHTML = off ? `<option value="0">${esc(off)}</option>` : `<option value="0">${esc(inherit)}</option>` + xs.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join('')
     sel.value = String(!off && xs.some((x) => x.id === value) ? value : 0); sel.disabled = !!off
     failSel.value = failValue === 'block' ? 'block' : 'direct'
