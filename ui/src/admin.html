@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="ru" data-store="monolit" data-theme-default="system" data-accent-default="slate" data-auth="user">
+<html lang="ru" data-store="monolit" data-theme-default="system" data-accent-default="slate" data-palette-default="mono" data-auth="user">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>monolit proxy</title>
-<link rel="icon" href="mark.svg" type="image/svg+xml">
+<title>MonolitProxy</title>
+<link rel="icon" href="mark-admin.svg" type="image/svg+xml">
 <!--css--><link rel="stylesheet" href="fonts.css">
 <link rel="stylesheet" href="../ds/tokens/colors.css"><link rel="stylesheet" href="../ds/tokens/accents.css"><link rel="stylesheet" href="../ds/tokens/palettes.css">
 <link rel="stylesheet" href="../ds/tokens/motion.css">
@@ -18,7 +18,6 @@
 <link rel="stylesheet" href="../ds/tokens/layers.css">
 <link rel="stylesheet" href="../ds/tokens/data.css">
 <link rel="stylesheet" href="../ds/tokens/nav.css">
-<link rel="stylesheet" href="../ds/tokens/soft.css">
 <link rel="stylesheet" href="monolit.css">
 <link rel="stylesheet" href="admin.css"><!--/css-->
 <script src="../ds/js/theme.js"></script>
@@ -35,15 +34,16 @@
 <script src="server.js" defer></script>
 <script src="addr.js" defer></script>
 <script src="nodes.js" defer></script>
-<script src="exits.js" defer></script><!--/js-->
+<script src="exits.js" defer></script>
+<script src="home.js" defer></script><!--/js-->
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="mp-mark" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2.5" fill="currentColor"/></symbol></svg>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="mp-mark" viewBox="0 0 24 24"><path d="M4.5 19 V10.5 Q4.5 6 8.25 6 Q12 6 12 10.5 V19 M12 10.5 Q12 6 15.75 6 Q19.5 6 19.5 10.5 V19" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></symbol></svg>
 
 <!-- Вход -->
 <main class="mp-login" id="mp-login" hidden>
   <form class="mp-login-card" id="mp-login-form" novalidate>
-    <span class="mp-logo"><svg><use href="#mp-mark"/></svg><span class="mp-wm">monolit proxy</span></span>
+    <span class="mp-logo"><svg><use href="#mp-mark"/></svg><span class="mp-wm">MonolitProxy</span></span>
     <label class="field"><span class="label">Логин</span>
       <input class="input" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
     <label class="field"><span class="label">Пароль <span class="opt mp-caps" id="mp-caps" aria-hidden="true">включён Caps Lock</span></span>
@@ -53,38 +53,74 @@
 </main>
 
 <div class="app-shell" id="mp-app" hidden>
-<aside class="side" data-narrow="1180" aria-label="Меню monolit proxy">
+<aside class="side" data-narrow="1180" aria-label="Меню MonolitProxy">
   <div class="side-head">
-    <span class="side-ws mp-logo"><svg><use href="#mp-mark"/></svg><span class="side-tx mp-wm">monolit proxy</span></span>
+    <span class="side-ws mp-logo"><svg><use href="#mp-mark"/></svg><span class="side-tx mp-wm">MonolitProxy</span></span>
     <button class="icon-btn icon-btn-sm side-toggle" type="button" data-side-toggle aria-label="Свернуть меню"><i data-lucide="panel-left"></i></button>
   </div>
   <nav class="side-nav">
-    <a class="side-item" href="#" data-page="users" aria-current="page"><i data-lucide="users"></i><span class="side-tx">Пользователи</span><span class="side-count" id="mp-count-all">0</span></a>
-    <a class="side-item" href="#" data-page="nodes"><i data-lucide="waypoints"></i><span class="side-tx">Ноды</span><span class="side-count" id="nd-count">1</span><span class="side-dot" id="nd-dot" hidden></span></a>
+    <a class="side-item" href="#" data-page="home" aria-current="page"><i data-lucide="house"></i><span class="side-tx">Главная</span></a>
+    <div class="side-label"><span class="side-tx">Люди</span></div>
+    <a class="side-item" href="#" data-page="users"><i data-lucide="users"></i><span class="side-tx">Пользователи</span><span class="side-count" id="mp-count-all">0</span></a>
     <a class="side-item" href="#" data-page="subs"><i data-lucide="list-checks"></i><span class="side-tx">Подписки</span></a>
-    <a class="side-item" href="#" data-open="mp-srv"><i data-lucide="server"></i><span class="side-tx">Сервер</span></a>
-    <a class="side-item" href="#" data-open="mp-addr"><i data-lucide="map-pin"></i><span class="side-tx">Адрес</span><span class="side-dot" id="mp-addr-dot" hidden></span></a>
-    <a class="side-item" href="#" data-open="mp-routes"><i data-lucide="route"></i><span class="side-tx">Маршруты</span></a>
-    <a class="side-item" href="#" data-open="mp-exits"><i data-lucide="door-open"></i><span class="side-tx">Выходы</span></a>
-    <a class="side-item" href="#" data-open="mp-warp"><i data-lucide="cloud"></i><span class="side-tx">WARP</span></a>
-    <a class="side-item" href="#" data-open="mp-proto"><i data-lucide="network"></i><span class="side-tx">Протоколы</span></a>
-    <a class="side-item" href="#" data-open="mp-hist"><i data-lucide="history"></i><span class="side-tx">История</span></a>
-    <a class="side-item" href="#" data-open="mp-tpl"><i data-lucide="file-code"></i><span class="side-tx">Шаблон autoXRAY</span></a>
-    <a class="side-item" href="#" data-open="mp-mnt"><i data-lucide="wrench"></i><span class="side-tx">Обслуживание</span></a>
-    <a class="side-item" href="#" data-open="mp-set"><i data-lucide="settings"></i><span class="side-tx">Настройки</span></a>
+    <div class="side-label"><span class="side-tx">Сеть</span></div>
+    <a class="side-item" href="#" data-page="nodes"><i data-lucide="waypoints"></i><span class="side-tx">Ноды</span><span class="side-count" id="nd-count">1</span><span class="side-dot" id="nd-dot" hidden></span></a>
+    <a class="side-item" href="#" data-page="routes"><i data-lucide="route"></i><span class="side-tx">Маршруты</span></a>
+    <a class="side-item" href="#" data-page="exits"><i data-lucide="door-open"></i><span class="side-tx">Выходы</span></a>
+    <a class="side-item" href="#" data-page="proto"><i data-lucide="network"></i><span class="side-tx">Протоколы</span></a>
+    <div class="side-label"><span class="side-tx">Сервер</span></div>
+    <a class="side-item" href="#" data-page="srv"><i data-lucide="server"></i><span class="side-tx">Сервер</span></a>
+    <a class="side-item" href="#" data-page="addr"><i data-lucide="map-pin"></i><span class="side-tx">Адрес</span><span class="side-dot" id="mp-addr-dot" hidden></span></a>
   </nav>
+  <a class="side-item mp-side-set" href="#" data-page="set"><i data-lucide="settings"></i><span class="side-tx">Настройки</span></a>
   <div class="side-foot"><span class="avatar" data-hue="1" id="mp-acc-av" aria-hidden="true">A</span><span class="side-tx mp-acc"><b id="mp-acc-login">admin</b><span id="mp-server-foot">Сервер</span></span>
     <button class="icon-btn icon-btn-sm" type="button" id="mp-logout" aria-label="Выйти" data-tip="Выйти"><i data-lucide="log-out"></i></button></div>
 </aside>
 <main class="app-main"><div class="app-inner">
   <div class="alert alert-danger mp-alert" id="mp-block-alert" hidden><i data-lucide="circle-alert"></i><div><b id="mp-block-t">IP сервера не открывается из России</b><span id="mp-block-p">Приложения в России не подключатся. Можно сменить IP или домен</span>
-    <div class="btn-row mp-alert-act"><button class="btn btn-secondary btn-sm" type="button" data-open="mp-addr"><span>Что делать</span></button></div></div></div>
+    <div class="btn-row mp-alert-act"><button class="btn btn-secondary btn-sm" type="button" data-go="addr"><span>Что делать</span></button></div></div></div>
   <div class="alert alert-danger mp-alert" id="mp-xray-alert" hidden><i data-lucide="circle-alert"></i><div><b>Xray не отвечает</b><span id="mp-xray-err">Изменения применятся, когда он снова заработает</span></div></div>
-<section class="mp-page" id="mp-page-users">
+<!-- Главная: дела и частые действия, ниже серверы, трафик, кто в сети, у кого скоро кончится -->
+<section class="mp-page" id="mp-page-home">
+  <div class="app-head"><div><div class="app-title"><h1>Главная</h1></div></div></div>
+  <div class="hm">
+    <div class="hm-row">
+      <section class="hm-card hm-todo" aria-labelledby="hm-todo-t">
+        <div class="hm-h"><h2 id="hm-todo-t">Требует внимания</h2><span id="hm-todo-n"></span></div>
+        <div class="hm-list" id="hm-todo"></div>
+      </section>
+      <section class="hm-card" aria-labelledby="hm-act-t">
+        <div class="hm-h"><h2 id="hm-act-t">Действия</h2></div>
+        <button class="btn btn-primary hm-add" type="button" data-open="mp-add"><i data-lucide="plus"></i><span>Добавить пользователя</span></button>
+        <a class="hm-li" href="#" data-go="users"><span class="hm-ic"><i data-lucide="users"></i></span><span class="hm-tx"><b>Пользователи</b><span id="hm-users-sub"></span></span><i data-lucide="chevron-right" class="hm-go"></i></a>
+        <a class="hm-li" href="#" data-go="subs"><span class="hm-ic"><i data-lucide="list-checks"></i></span><span class="hm-tx"><b>Подписки</b><span id="hm-kits-sub"></span></span><i data-lucide="chevron-right" class="hm-go"></i></a>
+        <a class="hm-li" href="#" data-go="set"><span class="hm-ic"><i data-lucide="settings"></i></span><span class="hm-tx"><b>Настройки</b><span>Вход, Telegram, тема</span></span><i data-lucide="chevron-right" class="hm-go"></i></a>
+      </section>
+    </div>
+
+    <section class="hm-card" aria-labelledby="hm-srv-t">
+      <div class="hm-h"><h2 id="hm-srv-t">Серверы</h2><a class="link" href="#" data-go="nodes">Все ноды</a></div>
+      <div class="hm-srv" id="hm-srv"></div>
+    </section>
+
+    <div class="hm-row">
+      <section class="hm-card" id="mp-tr-card" aria-labelledby="hm-tr-t">
+        <div class="hm-h"><h2 id="hm-tr-t">Трафик за 30 дней</h2><span id="mp-tr-tz"></span></div>
+        <div class="hm-sum" id="mp-tr-sum">0</div>
+        <div class="hm-chart mp-chart" id="mp-tr-chart"></div>
+      </section>
+      <section class="hm-card" aria-labelledby="hm-on-t">
+        <div class="hm-h"><h2 id="hm-on-t">Сейчас в сети</h2><span id="hm-on-n"></span></div>
+        <div class="hm-list" id="hm-on"></div>
+      </section>
+    </div>
+  </div>
+</section>
+
+<section class="mp-page" id="mp-page-users" hidden>
   <div class="app-head">
     <div>
-      <div class="app-title"><h1>Пользователи</h1><span class="badge badge-success" id="mp-xray-badge"><span class="dot"></span>Xray работает</span></div>
-      <p class="app-sub" id="mp-sub">Загружаем</p>
+      <div class="app-title"><h1>Пользователи</h1></div>
     </div>
   </div>
 
@@ -92,13 +128,9 @@
     <div class="stat"><div class="stat-head"><span>Активны</span></div><div class="stat-num" id="mp-n-active">0</div><div class="stat-foot" id="mp-n-active-f">подписка работает</div></div>
     <div class="stat"><div class="stat-head"><span>Истекли</span></div><div class="stat-num" id="mp-n-ended">0</div><div class="stat-foot">доступ закрыт</div></div>
     <div class="stat"><div class="stat-head"><span>Трафик</span></div><div class="stat-num" id="mp-traffic">0</div><div class="stat-foot">у всех за всё время</div></div>
-    <button class="stat mp-stat-btn" type="button" data-open="mp-tpl"><div class="stat-head"><span>autoXRAY</span></div><div class="stat-num" id="mp-tpl-ver">—</div><div class="stat-foot" id="mp-tpl-foot">не загружен</div></button>
+    <button class="stat mp-stat-btn" type="button" data-go="subs"><div class="stat-head"><span>autoXRAY</span></div><div class="stat-num" id="mp-tpl-ver">—</div><div class="stat-foot" id="mp-tpl-foot">не загружен</div></button>
   </div>
 
-  <section class="card mp-chart-card" id="mp-tr-card" hidden aria-label="Трафик по дням">
-    <div class="chart-head"><div class="mp-tr-h"><h4>Трафик за 30 дней</h4><b class="mp-tr-sum" id="mp-tr-sum">0</b></div><span class="mp-note" id="mp-tr-tz"></span></div>
-    <div class="mp-chart" id="mp-tr-chart"></div>
-  </section>
 
   <div class="mp-tools">
     <span class="input-wrap search"><i data-lucide="search"></i>
@@ -120,8 +152,7 @@
 <section class="mp-page" id="mp-page-nodes" hidden>
   <div class="app-head">
     <div>
-      <div class="app-title"><h1>Ноды</h1><span class="badge badge-success" id="nd-badge"><span class="dot"></span><span>Все на связи</span></span></div>
-      <p class="app-sub" id="nd-sub"></p>
+      <div class="app-title"><h1>Ноды</h1></div>
     </div>
     <div class="btn-row"><button class="btn btn-primary" type="button" id="nd-add-btn"><i data-lucide="plus"></i><span>Добавить ноду</span></button></div>
   </div>
@@ -138,7 +169,6 @@
   <div class="app-head">
     <div>
       <div class="app-title"><h1>Подписки</h1></div>
-      <p class="app-sub">Что человек увидит в приложении</p>
     </div>
   </div>
   <div class="mp-kit-bar">
@@ -164,6 +194,230 @@
       <div class="mp-section" id="kit-del-sec"><div class="btn-row"><button class="btn btn-ghost btn-sm mp-danger" type="button" id="kit-del"><i data-lucide="trash-2"></i><span>Удалить набор</span></button></div></div>
     </aside>
   </div>
+  <div class="mp-pg-body mp-tpl-box">
+    <div class="mp-col">
+      <div class="mp-section">
+        <span class="t-label">Шаблон autoXRAY</span>
+        <p class="mp-note">Настройки приложений в подписках берутся из autoXRAY на GitHub: маршруты, отпечаток браузера, протоколы. Скрипт не запускается, из него берётся только шаблон, и каждая новая версия сначала проверяется самим Xray</p>
+        <div class="alert alert-warning" id="mp-tpl-rej" hidden><i data-lucide="triangle-alert"></i><div><b>Новая версия не прошла проверку</b><span id="mp-tpl-rej-t"></span></div></div>
+        <dl class="mp-kv" id="mp-tpl-kv"></dl>
+        <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-tpl-auto"><span>Обновлять сам<small>Раз в сутки; если выключить, новая версия будет ждать вашей кнопки</small></span></label>
+        <div class="btn-row"><button class="btn btn-secondary" type="button" id="mp-tpl-check"><i data-lucide="refresh-cw"></i><span>Проверить сейчас</span></button>
+          <button class="btn btn-ghost" type="button" id="mp-tpl-back"><i data-lucide="undo-2"></i><span>Вернуть прошлую</span></button></div>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="mp-page mp-pg" id="mp-page-routes" aria-labelledby="mp-rt-t" hidden>
+  <div class="app-head"><div><div class="app-title"><h1 id="mp-rt-t">Маршруты</h1></div></div></div>
+  <div class="mp-pg-body">
+    <div class="alert alert-warning mp-foreign" hidden><i data-lucide="triangle-alert"></i><div><b>Xray настроен через autoXRAY</b><span>Чтобы управлять им здесь, переустановите: bash install.sh --reconfigure --replace-autoxray. Ключи, выданные autoXRAY, перестанут работать</span></div></div>
+    <div class="mp-col">
+      <div class="mp-section">
+        <p class="mp-note">Куда сервер отправляет адреса: напрямую, через WARP или в блок. Правила проверяются сверху вниз, всё остальное идёт напрямую</p>
+        <div class="mp-rt-check">
+        <form class="mp-inline" id="mp-rt-test" novalidate><span class="input-wrap search"><i data-lucide="globe"></i><input class="input" name="host" placeholder="Адрес для проверки" autocomplete="off" spellcheck="false" aria-label="Адрес для проверки"><span class="trail"><button type="button" class="icon-btn icon-btn-sm clear" aria-label="Очистить"><i data-lucide="x"></i></button></span></span><button class="btn btn-secondary" type="submit"><span>Проверить</span></button></form>
+        <div class="mp-rt-out" id="mp-rt-out" hidden>
+        <p class="mp-note" id="mp-rt-res"></p>
+        <dl class="mp-kv mp-reach" id="mp-rt-reach" hidden>
+          <div><dt>С вашего устройства</dt><dd data-k="device"></dd></div>
+          <div><dt>С сервера</dt><dd data-k="server"></dd></div>
+          <div><dt>Через WARP</dt><dd data-k="warp"></dd></div>
+        </dl>
+        <button class="btn btn-secondary btn-sm mp-reach-go" id="mp-rt-go" type="button" hidden><i data-lucide="cloud"></i><span>Пускать через WARP</span></button>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="mp-col">
+      <div class="mp-section mp-managed">
+        <span class="t-label">Правила</span>
+        <div class="alist mp-rts" id="mp-rt-list"></div>
+        <div class="state state-dashed" id="mp-rt-empty" hidden><span class="state-ic"><i data-lucide="route"></i></span><h4>Правил нет</h4><p>Весь трафик идёт напрямую с адреса сервера</p></div>
+        <div class="btn-row mp-rt-foot"><button class="btn btn-primary" type="button" id="mp-rt-add"><i data-lucide="plus"></i>Добавить правило</button><button class="btn btn-ghost mp-danger" type="button" id="mp-rt-clear"><i data-lucide="trash-2"></i><span>Удалить все</span></button></div>
+        <span class="t-label mp-sub-label">Готовые наборы</span>
+        <div class="btn-row mp-presets" id="mp-rt-presets"></div>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="mp-page mp-pg" id="mp-page-exits" aria-labelledby="mp-exits-t" hidden>
+  <div class="app-head"><div><div class="app-title"><h1 id="mp-exits-t">Выходы</h1></div></div></div>
+  <div class="mp-pg-body">
+    <div class="alert alert-warning mp-foreign" hidden><i data-lucide="triangle-alert"></i><div><b>Xray настроен через autoXRAY</b><span>Чтобы управлять им здесь, переустановите: bash install.sh --reconfigure --replace-autoxray. Ключи, выданные autoXRAY, перестанут работать</span></div></div>
+    <div class="mp-col">
+      <div class="mp-section">
+        <span class="t-label">Прокси</span>
+        <p class="mp-note">Купленные SOCKS5-прокси: через них люди выходят в интернет с адреса прокси, а не сервера</p>
+        <div class="alist mp-exs" id="mp-ex-list"></div>
+        <div class="state state-dashed" id="mp-ex-empty" hidden><span class="state-ic"><i data-lucide="door-open"></i></span><h4>Выходов нет</h4><p>Все выходят в интернет с адреса сервера</p></div>
+        <div class="btn-row"><button class="btn btn-primary" type="button" id="mp-ex-add"><i data-lucide="plus"></i>Добавить выход</button></div>
+      </div>
+    </div>
+    <div class="mp-col">
+      <div class="mp-section mp-managed">
+        <span class="t-label">WARP</span>
+        <p class="mp-note">Выход через сеть Cloudflare для сайтов, которые не пускают адреса дата-центров. Сам по себе ничего не меняет: что через него идёт, решают маршруты</p>
+        <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-warp-on"><span>WARP включён<small id="mp-warp-on-h">Срабатывает сразу</small></span></label>
+        <dl class="mp-kv" id="mp-warp-kv"></dl>
+        <div class="btn-row"><button class="btn btn-secondary" type="button" id="mp-warp-check"><i data-lucide="eye"></i><span>Проверить</span></button><button class="btn btn-ghost" type="button" id="mp-warp-reg"><i data-lucide="refresh-cw"></i><span>Зарегистрировать заново</span></button></div>
+        <p class="mp-note" id="mp-warp-res" hidden></p>
+        <form class="mp-form" id="mp-warp-plus" novalidate>
+        <label class="field"><span class="label">Ключ из приложения 1.1.1.1</span><input class="input" name="key" placeholder="xxxxxxxx-xxxxxxxx-xxxxxxxx" autocomplete="off" spellcheck="false"><span class="hint">Быстрее и без ограничений бесплатного WARP</span></label>
+        <div class="btn-row"><button class="btn btn-secondary" type="submit"><span>Применить ключ</span></button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="mp-page mp-pg" id="mp-page-proto" aria-labelledby="mp-proto-t" hidden>
+  <div class="app-head"><div><div class="app-title"><h1 id="mp-proto-t">Протоколы</h1></div></div></div>
+  <div class="mp-pg-body">
+    <div class="alert alert-warning mp-foreign" hidden><i data-lucide="triangle-alert"></i><div><b>Xray настроен через autoXRAY</b><span>Чтобы управлять им здесь, переустановите: bash install.sh --reconfigure --replace-autoxray. Ключи, выданные autoXRAY, перестанут работать</span></div></div>
+    <div class="mp-col">
+      <div class="mp-section mp-managed">
+        <span class="t-label">Входы VPN</span>
+        <label class="choice"><input type="checkbox" role="switch" class="switch" checked disabled><span>Vision<small>Основной вход на 443, через него открываются и сайты. Не выключается</small></span></label>
+        <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-pr-hy2" data-k="hy2"><span>Hysteria2<small id="mp-pr-hy2-h">UDP 443, быстрее на плохой связи</small></span></label>
+        <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-pr-xhttp" data-k="xhttp"><span>XHTTP<small id="mp-pr-xhttp-h">Через nginx, если TCP режут</small></span></label>
+        <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-pr-awg"><span>AmneziaWG<small id="mp-pr-awg-h">Отдельный сервер по UDP. Для monolit client и AmneziaVPN</small></span></label>
+        <p class="mp-note">Выключенный вход пропадёт из подписок, когда приложения их обновят</p>
+      </div>
+    </div>
+    <div class="mp-col">
+      <form class="mp-section mp-managed mp-form" id="mp-socks" novalidate>
+        <span class="t-label">SOCKS5</span>
+        <label class="choice"><input type="checkbox" role="switch" class="switch" name="on"><span>SOCKS5 с паролем<small>Для программ, которые не умеют VLESS</small></span></label>
+        <div class="mp-socks-f" id="mp-socks-f">
+          <label class="field"><span class="label">Порт</span><input class="input" name="port" inputmode="numeric" autocomplete="off"></label>
+          <label class="field"><span class="label">Логин</span><input class="input" name="user" autocomplete="off" spellcheck="false"></label>
+          <label class="field"><span class="label">Пароль</span><input class="input" name="pass" autocomplete="off" spellcheck="false"></label>
+        </div>
+        <span class="copy-field" id="mp-socks-cf"><input class="input" readonly id="mp-socks-url" aria-label="Адрес SOCKS5"><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать адрес" id="mp-socks-copy" data-copy=""></button></span>
+        <div class="btn-row"><button class="btn btn-secondary" type="submit"><span>Сохранить SOCKS5</span></button></div>
+      </form>
+      <div class="mp-section mp-managed" id="mp-mtg">
+        <span class="t-label">Telegram</span>
+        <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-mtg-on"><span>Прокси для Telegram<small id="mp-mtg-h">mtg, маскируется под сайт домена</small></span></label>
+        <span class="copy-field"><input class="input" readonly id="mp-mtg-url" aria-label="Ссылка на прокси Telegram"><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать ссылку" id="mp-mtg-copy" data-copy=""></button></span>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="mp-page mp-pg" id="mp-page-srv" aria-labelledby="mp-srv-t" hidden>
+  <div class="app-head"><div><div class="app-title"><h1 id="mp-srv-t">Сервер</h1></div></div></div>
+  <div class="mp-pg-body">
+    <div class="alert alert-danger mp-alert" id="mp-srv-noagent" hidden><i data-lucide="circle-alert"></i><div><b>Помощник на сервере не отвечает</b><span id="mp-srv-noagent-t"></span></div></div>
+    <div class="alert alert-warning mp-foreign" hidden><i data-lucide="triangle-alert"></i><div><b>Xray настроен через autoXRAY</b><span>Чтобы управлять им здесь, переустановите: bash install.sh --reconfigure --replace-autoxray. Ключи, выданные autoXRAY, перестанут работать</span></div></div>
+    <div class="mp-col">
+      <div class="mp-section" id="mp-srv-state">
+        <div class="mp-srv-line"><span class="badge badge-success" id="mp-srv-badge"><span class="dot"></span><span id="mp-srv-st">Xray работает</span></span><span class="mp-note" id="mp-srv-info"></span></div>
+        <dl class="mp-kv" id="mp-srv-kv"></dl>
+        <div class="alert alert-danger" id="mp-srv-nginx" hidden><i data-lucide="circle-alert"></i><div><b>nginx не работает</b><span>Админка и страницы подписок могут не открываться. Попробуйте «Перечитать настройки nginx» или посмотрите журнал</span></div></div>
+        <div class="alert alert-warning" id="mp-srv-cert" hidden><i data-lucide="triangle-alert"></i><div><b id="mp-srv-cert-t">Сертификат скоро закончится</b><span>Нажмите «Продлить сертификат». Если не продлится, приложения перестанут подключаться</span></div></div>
+      </div>
+      <div class="mp-section">
+        <span class="t-label">Обновление</span>
+        <dl class="mp-kv" id="mp-up-kv"></dl>
+        <div class="alert alert-danger" id="mp-up-fail" hidden><i data-lucide="circle-alert"></i><div><b>Обновление не встало</b><span id="mp-up-fail-t"></span></div></div>
+        <div class="mp-up-new" id="mp-up-new" hidden><b id="mp-up-new-t"></b><p class="mp-note mp-up-notes" id="mp-up-notes"></p></div>
+        <p class="mp-note" id="mp-up-run" hidden></p>
+        <div class="btn-row"><button class="btn btn-primary" type="button" id="mp-up-go" hidden><i data-lucide="download"></i><span>Обновить</span></button>
+          <button class="btn btn-secondary" type="button" id="mp-up-check"><i data-lucide="refresh-cw"></i><span>Проверить</span></button></div>
+      </div>
+      <div class="mp-section">
+        <span class="t-label">Бэкап</span>
+        <p class="mp-note">В файле пользователи, ссылки подписок, маршруты, настройки и ключи WARP. Храните его как пароль: по нему можно подключиться</p>
+        <div class="btn-row"><a class="btn btn-secondary" id="mp-bk-get" href="api/backup" download><i data-lucide="download"></i>Скачать бэкап</a></div>
+        <label class="dz" data-max="64" data-accept=".json,application/json" tabindex="0" id="mp-bk-dz"><input type="file">
+          <span class="dz-ic"><i data-lucide="upload"></i></span><span><b>Восстановить: перетащите файл</b> или <u>выберите</u></span><span>monolit-….json, заменит всё на этом сервере</span></label>
+      </div>
+    </div>
+    <div class="mp-col">
+      <div class="mp-section"><span class="t-label">Действия</span>
+        <div class="alist mp-actions" id="mp-srv-acts">
+          <button type="button" class="alist-row" data-act="restart" data-ask="Перезапустить Xray?|Подключения оборвутся на пару секунд, приложения переподключатся сами|Перезапустить"><span class="alist-ic"><i data-lucide="rotate-ccw"></i></span><span class="alist-tx"><b>Перезапустить Xray</b><span>Связь прервётся на пару секунд</span></span></button>
+          <button type="button" class="alist-row" data-act="reload"><span class="alist-ic"><i data-lucide="refresh-cw"></i></span><span class="alist-tx"><b>Перечитать настройки nginx</b><span>Сайты не прерываются</span></span></button>
+          <button type="button" class="alist-row" data-act="update" data-ask="Обновить Xray?|Поставим последнюю версию с GitHub и перезапустим. Подключения оборвутся на пару секунд|Обновить"><span class="alist-ic"><i data-lucide="download"></i></span><span class="alist-tx"><b>Обновить Xray</b><span id="mp-srv-ver">Последняя версия с GitHub</span></span></button>
+          <button type="button" class="alist-row" data-act="geo"><span class="alist-ic"><i data-lucide="globe"></i></span><span class="alist-tx"><b>Обновить базы адресов</b><span>geosite и geoip для маршрутов</span></span></button>
+          <button type="button" class="alist-row" data-act="cert"><span class="alist-ic"><i data-lucide="shield-check"></i></span><span class="alist-tx"><b>Продлить сертификат</b><span>Если осталось меньше 30 дней</span></span></button>
+          <button type="button" class="alist-row" data-act="journal"><span class="alist-ic"><i data-lucide="scroll-text"></i></span><span class="alist-tx"><b>Журнал Xray</b><span>Последние 100 строк</span></span></button>
+        </div>
+      </div>
+      <div class="mp-section mp-managed">
+        <span class="t-label">История</span>
+        <p class="mp-note">Перед каждым изменением сохраняется прежний конфиг Xray. Вернуть можно любой, пользователи останутся как сейчас</p>
+        <ol class="tl" id="mp-hist-list"></ol>
+        <div class="state state-dashed" id="mp-hist-empty" hidden><span class="state-ic"><i data-lucide="history"></i></span><h4>Изменений ещё не было</h4><p>Они появятся здесь, когда вы поменяете маршруты, WARP или протоколы</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="mp-page mp-pg" id="mp-page-addr" aria-labelledby="mp-addr-t" hidden>
+  <div class="app-head"><div><div class="app-title"><h1 id="mp-addr-t">Адрес</h1></div></div></div>
+  <div class="mp-pg-body">
+    <div class="mp-col">
+      <div class="mp-section">
+        <span class="t-label">Доступность из России</span>
+        <div class="mp-srv-line"><span class="badge" id="mp-w-badge"><span class="dot"></span><span id="mp-w-st">Не проверялся</span></span><span class="mp-note" id="mp-w-when"></span></div>
+        <dl class="mp-kv" id="mp-w-kv"></dl>
+        <p class="mp-note" id="mp-w-err" hidden></p>
+        <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-w-on"><span>Проверять сам<small id="mp-w-on-h">Через check-host.net, ему уходит только IP сервера</small></span></label>
+        <label class="field" id="mp-w-every-f"><span class="label">Как часто</span>
+          <select class="select" id="mp-w-every"><option value="30">Раз в 30 минут</option><option value="60">Раз в час</option><option value="180">Раз в 3 часа</option><option value="360">Раз в 6 часов</option></select></label>
+        <p class="mp-note" id="mp-w-tg"></p>
+        <div class="btn-row"><button class="btn btn-secondary" type="button" id="mp-w-check"><i data-lucide="refresh-cw"></i><span>Проверить сейчас</span></button></div>
+      </div>
+    </div>
+    <div class="mp-col">
+      <div class="mp-section">
+        <span class="t-label">Домен и IP</span>
+        <div class="alert alert-danger" id="mp-a-fail" hidden><i data-lucide="circle-alert"></i><div><b>Сменить не получилось</b><span id="mp-a-fail-t"></span></div></div>
+        <div class="alert alert-info" id="mp-a-run" hidden><i data-lucide="refresh-cw"></i><div><b>Меняем адрес</b><span id="mp-a-run-t">VPN и сайты прервутся примерно на минуту</span></div></div>
+        <div class="alert alert-warning" id="mp-a-foreign" hidden><i data-lucide="triangle-alert"></i><div><b>Xray настроен через autoXRAY</b><span>Адрес меняется переустановкой: bash install.sh --reconfigure --replace-autoxray</span></div></div>
+        <dl class="mp-kv" id="mp-a-kv"></dl>
+        <dl class="mp-kv" id="mp-o-kv" hidden></dl>
+        <div class="alert alert-warning mp-alert" id="mp-a-boot" hidden><i data-lucide="triangle-alert"></i><div><b id="mp-a-boot-t">После перезагрузки адрес пропадёт</b><span id="mp-a-boot-p"></span>
+          <div class="btn-row mp-alert-act" id="mp-a-boot-act"><button class="btn btn-secondary btn-sm" type="button" id="mp-a-boot-fix"><span>Исправить</span></button></div></div></div>
+        <div class="alist" id="mp-a-alt" hidden></div>
+        <div class="btn-row"><button class="btn btn-primary" type="button" id="mp-a-edit"><i data-lucide="pencil"></i><span>Изменить адрес</span></button><button class="btn btn-secondary" type="button" id="mp-o-edit" hidden><i data-lucide="pencil"></i><span>Изменить исходящий</span></button></div>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="mp-page mp-pg" id="mp-page-set" aria-labelledby="mp-set-t" hidden>
+  <div class="app-head"><div><div class="app-title"><h1 id="mp-set-t">Настройки</h1></div></div></div>
+  <form class="mp-pg-body mp-form" id="mp-set-form" novalidate>
+    <div class="mp-col">
+      <div class="mp-section">
+        <span class="t-label">Сервер</span>
+        <label class="field"><span class="label">Название в приложениях</span><input class="input" name="server_name" maxlength="24" autocomplete="off"><span class="hint">Так подписка будет подписана в Happ и INCY</span></label>
+        <label class="field"><span class="label">Отпечаток браузера</span>
+          <select class="select" name="fp"><option value="firefox">Firefox, как в autoXRAY</option><option value="chrome">Chrome</option><option value="safari">Safari</option><option value="ios">iOS</option><option value="android">Android</option><option value="edge">Edge</option></select></label>
+        <label class="field"><span class="label">Обновлять подписку в приложениях, часов</span><input class="input" name="update_hours" inputmode="numeric" autocomplete="off"></label>
+        <label class="field"><span class="label">Ссылка на поддержку <span class="opt">необязательно</span></span><input class="input" name="support_url" placeholder="https://t.me/ваш_ник" autocomplete="off" spellcheck="false"><span class="hint">Кнопка «Поддержка» в Happ и INCY</span></label>
+      </div>
+      <div class="mp-section">
+        <span class="t-label">Оформление</span>
+        <div class="mp-theme"><span>Тема</span><div class="tseg" role="group" aria-label="Тема"><button type="button" class="tseg-b" role="radio" data-theme-v="light" aria-label="Светлая"><i data-lucide="sun"></i></button><button type="button" class="tseg-b" role="radio" data-theme-v="dark" aria-label="Тёмная"><i data-lucide="moon"></i></button><button type="button" class="tseg-b" role="radio" data-theme-v="system" aria-label="Как в системе"><i data-lucide="monitor"></i></button></div></div>
+      </div>
+    </div>
+    <div class="mp-col">
+      <div class="mp-section">
+        <span class="t-label">Уведомления в Telegram</span>
+        <p class="mp-note">Напишем, если IP сервера перестанет открываться из России, и когда сменится адрес</p>
+        <label class="field"><span class="label">Токен бота</span><input class="input" name="tg_token" autocomplete="off" spellcheck="false" placeholder="123456789:AA…"><span class="hint">Создайте бота у @BotFather и напишите ему /start</span></label>
+        <label class="field"><span class="label">ID чата <span class="opt">найдём сами</span></span><input class="input" name="tg_chat" inputmode="numeric" autocomplete="off" spellcheck="false"><span class="hint">Пусто: возьмём из вашего сообщения боту при проверке</span></label>
+        <div class="btn-row"><button class="btn btn-secondary" type="button" id="mp-tg-test"><i data-lucide="send"></i><span>Проверить</span></button></div>
+      </div>
+      <div class="mp-section">
+        <span class="t-label">Вход</span>
+        <label class="field"><span class="label">Логин</span><input class="input" name="login" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+        <label class="field"><span class="label">Новый пароль <span class="opt">не меньше 8 символов</span></span><input class="input" type="password" name="password" autocomplete="new-password"></label>
+      </div>
+    </div>
+  </form>
+  <div class="mp-pg-foot"><button class="btn btn-primary" type="submit" form="mp-set-form"><span>Сохранить</span></button></div>
 </section>
 </div></main>
 </div>
@@ -342,135 +596,14 @@
 </form></dialog>
 
 <!-- Шаблон autoXRAY -->
-<dialog class="sheet sheet-side" id="mp-tpl" aria-labelledby="mp-tpl-t">
-  <div class="sheet-head"><h2 id="mp-tpl-t">Шаблон autoXRAY</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
-  <div class="sheet-body">
-    <div class="mp-section">
-      <p class="mp-note">Настройки приложений в подписках берутся из autoXRAY на GitHub: маршруты, отпечаток браузера, протоколы. Скрипт не запускается, из него берётся только шаблон, и каждая новая версия сначала проверяется самим Xray</p>
-      <div class="alert alert-warning" id="mp-tpl-rej" hidden><i data-lucide="triangle-alert"></i><div><b>Новая версия не прошла проверку</b><span id="mp-tpl-rej-t"></span></div></div>
-      <dl class="mp-kv" id="mp-tpl-kv"></dl>
-    </div>
-    <div class="mp-section">
-      <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-tpl-auto"><span>Обновлять сам<small>Раз в сутки; если выключить, новая версия будет ждать вашей кнопки</small></span></label>
-      <div class="btn-row"><button class="btn btn-secondary" type="button" id="mp-tpl-check"><i data-lucide="refresh-cw"></i><span>Проверить сейчас</span></button>
-        <button class="btn btn-ghost" type="button" id="mp-tpl-back"><i data-lucide="undo-2"></i><span>Вернуть прошлую</span></button></div>
-    </div>
-  </div>
-</dialog>
 
 <!-- Настройки -->
-<dialog class="sheet sheet-side" id="mp-set" aria-labelledby="mp-set-t">
-  <div class="sheet-head"><h2 id="mp-set-t">Настройки</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
-  <form class="sheet-body mp-form" id="mp-set-form" novalidate>
-    <div class="mp-section">
-      <span class="t-label">Сервер</span>
-      <label class="field"><span class="label">Название в приложениях</span><input class="input" name="server_name" maxlength="24" autocomplete="off"><span class="hint">Так подписка будет подписана в Happ и INCY</span></label>
-      <label class="field"><span class="label">Отпечаток браузера</span>
-        <select class="select" name="fp"><option value="firefox">Firefox, как в autoXRAY</option><option value="chrome">Chrome</option><option value="safari">Safari</option><option value="ios">iOS</option><option value="android">Android</option><option value="edge">Edge</option></select></label>
-      <label class="field"><span class="label">Обновлять подписку в приложениях, часов</span><input class="input" name="update_hours" inputmode="numeric" autocomplete="off"></label>
-      <label class="field"><span class="label">Ссылка на поддержку <span class="opt">необязательно</span></span><input class="input" name="support_url" placeholder="https://t.me/ваш_ник" autocomplete="off" spellcheck="false"><span class="hint">Кнопка «Поддержка» в Happ и INCY</span></label>
-    </div>
-    <div class="mp-section">
-      <span class="t-label">Уведомления в Telegram</span>
-      <p class="mp-note">Напишем, если IP сервера перестанет открываться из России, и когда сменится адрес</p>
-      <label class="field"><span class="label">Токен бота</span><input class="input" name="tg_token" autocomplete="off" spellcheck="false" placeholder="123456789:AA…"><span class="hint">Создайте бота у @BotFather и напишите ему /start</span></label>
-      <label class="field"><span class="label">ID чата <span class="opt">найдём сами</span></span><input class="input" name="tg_chat" inputmode="numeric" autocomplete="off" spellcheck="false"><span class="hint">Пусто: возьмём из вашего сообщения боту при проверке</span></label>
-      <div class="btn-row"><button class="btn btn-secondary" type="button" id="mp-tg-test"><i data-lucide="send"></i><span>Проверить</span></button></div>
-    </div>
-    <div class="mp-section">
-      <span class="t-label">Вход</span>
-      <label class="field"><span class="label">Логин</span><input class="input" name="login" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
-      <label class="field"><span class="label">Новый пароль <span class="opt">не меньше 8 символов</span></span><input class="input" type="password" name="password" autocomplete="new-password"></label>
-    </div>
-    <div class="mp-section">
-      <span class="t-label">Оформление</span>
-      <div class="mp-theme"><span>Тема</span><div class="tseg" role="group" aria-label="Тема"><button type="button" class="tseg-b" role="radio" data-theme-v="light" aria-label="Светлая"><i data-lucide="sun"></i></button><button type="button" class="tseg-b" role="radio" data-theme-v="dark" aria-label="Тёмная"><i data-lucide="moon"></i></button><button type="button" class="tseg-b" role="radio" data-theme-v="system" aria-label="Как в системе"><i data-lucide="monitor"></i></button></div></div>
-    </div>
-  </form>
-  <div class="sheet-foot"><button class="btn btn-primary" type="submit" form="mp-set-form"><span>Сохранить</span></button></div>
-</dialog>
 
 <!-- Обслуживание: обновление и бэкап срабатывают сразу, без «Сохранить» -->
-<dialog class="sheet sheet-side" id="mp-mnt" aria-labelledby="mp-mnt-t">
-  <div class="sheet-head"><h2 id="mp-mnt-t">Обслуживание</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
-  <div class="sheet-body">
-    <div class="mp-section">
-      <span class="t-label">Обновление</span>
-      <dl class="mp-kv" id="mp-up-kv"></dl>
-      <div class="alert alert-danger" id="mp-up-fail" hidden><i data-lucide="circle-alert"></i><div><b>Обновление не встало</b><span id="mp-up-fail-t"></span></div></div>
-      <div class="mp-up-new" id="mp-up-new" hidden><b id="mp-up-new-t"></b><p class="mp-note mp-up-notes" id="mp-up-notes"></p></div>
-      <p class="mp-note" id="mp-up-run" hidden></p>
-      <div class="btn-row"><button class="btn btn-primary" type="button" id="mp-up-go" hidden><i data-lucide="download"></i><span>Обновить</span></button>
-        <button class="btn btn-secondary" type="button" id="mp-up-check"><i data-lucide="refresh-cw"></i><span>Проверить</span></button></div>
-    </div>
-    <div class="mp-section">
-      <span class="t-label">Бэкап</span>
-      <p class="mp-note">В файле пользователи, ссылки подписок, маршруты, настройки и ключи WARP. Храните его как пароль: по нему можно подключиться</p>
-      <div class="btn-row"><a class="btn btn-secondary" id="mp-bk-get" href="api/backup" download><i data-lucide="download"></i>Скачать бэкап</a></div>
-      <label class="dz" data-max="64" data-accept=".json,application/json" tabindex="0" id="mp-bk-dz"><input type="file">
-        <span class="dz-ic"><i data-lucide="upload"></i></span><span><b>Восстановить: перетащите файл</b> или <u>выберите</u></span><span>monolit-….json, заменит всё на этом сервере</span></label>
-    </div>
-  </div>
-</dialog>
 
 <!-- Сервер -->
-<dialog class="sheet sheet-side" id="mp-srv" aria-labelledby="mp-srv-t">
-  <div class="sheet-head"><h2 id="mp-srv-t">Сервер</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
-  <div class="sheet-body">
-    <div class="alert alert-danger mp-alert" id="mp-srv-noagent" hidden><i data-lucide="circle-alert"></i><div><b>Помощник на сервере не отвечает</b><span id="mp-srv-noagent-t"></span></div></div>
-    <div class="mp-section" id="mp-srv-state">
-      <div class="mp-srv-line"><span class="badge badge-success" id="mp-srv-badge"><span class="dot"></span><span id="mp-srv-st">Xray работает</span></span><span class="mp-note" id="mp-srv-info"></span></div>
-      <dl class="mp-kv" id="mp-srv-kv"></dl>
-      <div class="alert alert-danger" id="mp-srv-nginx" hidden><i data-lucide="circle-alert"></i><div><b>nginx не работает</b><span>Админка и страницы подписок могут не открываться. Попробуйте «Перечитать настройки nginx» или посмотрите журнал</span></div></div>
-      <div class="alert alert-warning" id="mp-srv-cert" hidden><i data-lucide="triangle-alert"></i><div><b id="mp-srv-cert-t">Сертификат скоро закончится</b><span>Нажмите «Продлить сертификат». Если не продлится, приложения перестанут подключаться</span></div></div>
-    </div>
-    <div class="mp-section"><span class="t-label">Действия</span>
-      <div class="alist mp-actions" id="mp-srv-acts">
-        <button type="button" class="alist-row" data-act="restart" data-ask="Перезапустить Xray?|Подключения оборвутся на пару секунд, приложения переподключатся сами|Перезапустить"><span class="alist-ic"><i data-lucide="rotate-ccw"></i></span><span class="alist-tx"><b>Перезапустить Xray</b><span>Связь прервётся на пару секунд</span></span></button>
-        <button type="button" class="alist-row" data-act="reload"><span class="alist-ic"><i data-lucide="refresh-cw"></i></span><span class="alist-tx"><b>Перечитать настройки nginx</b><span>Сайты не прерываются</span></span></button>
-        <button type="button" class="alist-row" data-act="update" data-ask="Обновить Xray?|Поставим последнюю версию с GitHub и перезапустим. Подключения оборвутся на пару секунд|Обновить"><span class="alist-ic"><i data-lucide="download"></i></span><span class="alist-tx"><b>Обновить Xray</b><span id="mp-srv-ver">Последняя версия с GitHub</span></span></button>
-        <button type="button" class="alist-row" data-act="geo"><span class="alist-ic"><i data-lucide="globe"></i></span><span class="alist-tx"><b>Обновить базы адресов</b><span>geosite и geoip для маршрутов</span></span></button>
-        <button type="button" class="alist-row" data-act="cert"><span class="alist-ic"><i data-lucide="shield-check"></i></span><span class="alist-tx"><b>Продлить сертификат</b><span>Если осталось меньше 30 дней</span></span></button>
-        <button type="button" class="alist-row" data-act="journal"><span class="alist-ic"><i data-lucide="scroll-text"></i></span><span class="alist-tx"><b>Журнал Xray</b><span>Последние 100 строк</span></span></button>
-      </div>
-    </div>
-  </div>
-</dialog>
 
 <!-- Адрес: доступность из России, домен, IP, способ -->
-<dialog class="sheet sheet-side" id="mp-addr" aria-labelledby="mp-addr-t">
-  <div class="sheet-head"><h2 id="mp-addr-t">Адрес</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
-  <div class="sheet-body">
-    <div class="mp-section">
-      <span class="t-label">Доступность из России</span>
-      <div class="mp-srv-line"><span class="badge" id="mp-w-badge"><span class="dot"></span><span id="mp-w-st">Не проверялся</span></span><span class="mp-note" id="mp-w-when"></span></div>
-      <dl class="mp-kv" id="mp-w-kv"></dl>
-      <p class="mp-note" id="mp-w-err" hidden></p>
-      <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-w-on"><span>Проверять сам<small id="mp-w-on-h">Через check-host.net, ему уходит только IP сервера</small></span></label>
-      <label class="field" id="mp-w-every-f"><span class="label">Как часто</span>
-        <select class="select" id="mp-w-every"><option value="30">Раз в 30 минут</option><option value="60">Раз в час</option><option value="180">Раз в 3 часа</option><option value="360">Раз в 6 часов</option></select></label>
-      <p class="mp-note" id="mp-w-tg"></p>
-      <div class="btn-row"><button class="btn btn-secondary" type="button" id="mp-w-check"><i data-lucide="refresh-cw"></i><span>Проверить сейчас</span></button></div>
-    </div>
-    <div class="mp-section">
-      <span class="t-label">Домен и IP</span>
-      <div class="alert alert-danger" id="mp-a-fail" hidden><i data-lucide="circle-alert"></i><div><b>Сменить не получилось</b><span id="mp-a-fail-t"></span></div></div>
-      <div class="alert alert-info" id="mp-a-run" hidden><i data-lucide="refresh-cw"></i><div><b>Меняем адрес</b><span id="mp-a-run-t">VPN и сайты прервутся примерно на минуту</span></div></div>
-      <div class="alert alert-warning" id="mp-a-foreign" hidden><i data-lucide="triangle-alert"></i><div><b>Xray настроен через autoXRAY</b><span>Адрес меняется переустановкой: bash install.sh --reconfigure --replace-autoxray</span></div></div>
-      <dl class="mp-kv" id="mp-a-kv"></dl>
-      <div class="alert alert-warning mp-alert" id="mp-a-boot" hidden><i data-lucide="triangle-alert"></i><div><b id="mp-a-boot-t">После перезагрузки адрес пропадёт</b><span id="mp-a-boot-p"></span>
-        <div class="btn-row mp-alert-act" id="mp-a-boot-act"><button class="btn btn-secondary btn-sm" type="button" id="mp-a-boot-fix"><span>Исправить</span></button></div></div></div>
-      <div class="alist" id="mp-a-alt" hidden></div>
-      <div class="btn-row"><button class="btn btn-primary" type="button" id="mp-a-edit"><i data-lucide="pencil"></i><span>Изменить</span></button></div>
-    </div>
-    <div class="mp-section" id="mp-o-sec" hidden>
-      <span class="t-label">Исходящий IP</span>
-      <dl class="mp-kv" id="mp-o-kv"></dl>
-      <p class="mp-note">С этого адреса сервер выходит в интернет: его видят сайты и приложения людей</p>
-      <div class="btn-row"><button class="btn btn-secondary" type="button" id="mp-o-edit"><i data-lucide="pencil"></i><span>Изменить</span></button></div>
-    </div>
-  </div>
-</dialog>
 
 <dialog class="dialog dialog-md dialog-scroll" id="mp-o-dlg" aria-labelledby="mp-od-t"><form novalidate id="mp-o-form">
   <div class="dialog-head"><div><h2 id="mp-od-t">Исходящий IP</h2><p>Сначала проверим, что с адреса есть выход в интернет. Xray перезапустится, VPN прервётся на несколько секунд</p></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
@@ -498,37 +631,6 @@
 </dialog>
 
 <!-- Маршруты -->
-<dialog class="sheet sheet-side mp-wide" id="mp-routes" aria-labelledby="mp-rt-t">
-  <div class="sheet-head"><h2 id="mp-rt-t">Маршруты</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
-  <div class="sheet-body">
-    <div class="alert alert-warning mp-foreign" hidden><i data-lucide="triangle-alert"></i><div><b>Xray настроен через autoXRAY</b><span>Чтобы управлять им здесь, переустановите: bash install.sh --reconfigure --replace-autoxray. Ключи, выданные autoXRAY, перестанут работать</span></div></div>
-    <div class="mp-section">
-      <p class="mp-note">Куда сервер отправляет адреса: напрямую, через WARP или в блок. Правила проверяются сверху вниз, всё остальное идёт напрямую</p>
-      <div class="mp-rt-check">
-      <form class="mp-inline" id="mp-rt-test" novalidate><span class="input-wrap search"><i data-lucide="globe"></i><input class="input" name="host" placeholder="Адрес для проверки" autocomplete="off" spellcheck="false" aria-label="Адрес для проверки"><span class="trail"><button type="button" class="icon-btn icon-btn-sm clear" aria-label="Очистить"><i data-lucide="x"></i></button></span></span><button class="btn btn-secondary" type="submit"><span>Проверить</span></button></form>
-      <div class="mp-rt-out" id="mp-rt-out" hidden>
-      <p class="mp-note" id="mp-rt-res"></p>
-      <dl class="mp-kv mp-reach" id="mp-rt-reach" hidden>
-        <div><dt>С вашего устройства</dt><dd data-k="device"></dd></div>
-        <div><dt>С сервера</dt><dd data-k="server"></dd></div>
-        <div><dt>Через WARP</dt><dd data-k="warp"></dd></div>
-      </dl>
-      <button class="btn btn-secondary btn-sm mp-reach-go" id="mp-rt-go" type="button" hidden><i data-lucide="cloud"></i><span>Пускать через WARP</span></button>
-      </div>
-      </div>
-    </div>
-    <div class="mp-section mp-managed">
-      <span class="t-label">Правила</span>
-      <div class="alist mp-rts" id="mp-rt-list"></div>
-      <div class="state state-dashed" id="mp-rt-empty" hidden><span class="state-ic"><i data-lucide="route"></i></span><h4>Правил нет</h4><p>Весь трафик идёт напрямую с адреса сервера</p></div>
-      <div class="btn-row mp-rt-foot"><button class="btn btn-primary" type="button" id="mp-rt-add"><i data-lucide="plus"></i>Добавить правило</button><button class="btn btn-ghost mp-danger" type="button" id="mp-rt-clear"><i data-lucide="trash-2"></i><span>Удалить все</span></button></div>
-    </div>
-    <div class="mp-section mp-managed">
-      <span class="t-label">Готовые наборы</span>
-      <div class="btn-row mp-presets" id="mp-rt-presets"></div>
-    </div>
-  </div>
-</dialog>
 
 <dialog class="dialog dialog-md dialog-scroll" id="mp-rt-dlg" aria-labelledby="mp-rtd-t"><form novalidate id="mp-rt-form">
   <div class="dialog-head"><div><h2 id="mp-rtd-t">Новое правило</h2><p>Применится сразу после проверки Xray</p></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
@@ -545,17 +647,6 @@
 </form></dialog>
 
 <!-- Выходы -->
-<dialog class="sheet sheet-side" id="mp-exits" aria-labelledby="mp-exits-t">
-  <div class="sheet-head"><h2 id="mp-exits-t">Выходы</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
-  <div class="sheet-body">
-    <div class="mp-section">
-      <p class="mp-note">Купленные SOCKS5-прокси: через них люди выходят в интернет с адреса прокси, а не сервера</p>
-      <div class="alist mp-exs" id="mp-ex-list"></div>
-      <div class="state state-dashed" id="mp-ex-empty" hidden><span class="state-ic"><i data-lucide="door-open"></i></span><h4>Выходов нет</h4><p>Все выходят в интернет с адреса сервера</p></div>
-      <div class="btn-row"><button class="btn btn-primary" type="button" id="mp-ex-add"><i data-lucide="plus"></i>Добавить выход</button></div>
-    </div>
-  </div>
-</dialog>
 
 <dialog class="dialog dialog-md dialog-scroll" id="mp-ex-dlg" aria-labelledby="mp-ex-t"><form novalidate id="mp-ex-form">
   <div class="dialog-head"><div><h2 id="mp-ex-t">Новый выход</h2><p>Сервер проверит прокси, прежде чем пускать через него людей</p></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
@@ -569,68 +660,9 @@
 </form></dialog>
 
 <!-- WARP -->
-<dialog class="sheet sheet-side" id="mp-warp" aria-labelledby="mp-warp-t">
-  <div class="sheet-head"><h2 id="mp-warp-t">WARP</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
-  <div class="sheet-body">
-    <div class="alert alert-warning mp-foreign" hidden><i data-lucide="triangle-alert"></i><div><b>Xray настроен через autoXRAY</b><span>Чтобы управлять им здесь, переустановите: bash install.sh --reconfigure --replace-autoxray. Ключи, выданные autoXRAY, перестанут работать</span></div></div>
-    <div class="mp-section mp-managed">
-      <p class="mp-note">Выход через сеть Cloudflare для сайтов, которые не пускают адреса дата-центров. Сам по себе ничего не меняет: что через него идёт, решают маршруты</p>
-      <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-warp-on"><span>WARP включён<small id="mp-warp-on-h">Срабатывает сразу</small></span></label>
-      <dl class="mp-kv" id="mp-warp-kv"></dl>
-      <div class="btn-row"><button class="btn btn-secondary" type="button" id="mp-warp-check"><i data-lucide="eye"></i><span>Проверить</span></button><button class="btn btn-ghost" type="button" id="mp-warp-reg"><i data-lucide="refresh-cw"></i><span>Зарегистрировать заново</span></button></div>
-      <p class="mp-note" id="mp-warp-res" hidden></p>
-    </div>
-    <form class="mp-section mp-managed mp-form" id="mp-warp-plus" novalidate>
-      <span class="t-label">WARP+</span>
-      <label class="field"><span class="label">Ключ из приложения 1.1.1.1</span><input class="input" name="key" placeholder="xxxxxxxx-xxxxxxxx-xxxxxxxx" autocomplete="off" spellcheck="false"><span class="hint">Быстрее и без ограничений бесплатного WARP</span></label>
-      <div class="btn-row"><button class="btn btn-secondary" type="submit"><span>Применить ключ</span></button></div>
-    </form>
-  </div>
-</dialog>
 
 <!-- Протоколы -->
-<dialog class="sheet sheet-side" id="mp-proto" aria-labelledby="mp-proto-t">
-  <div class="sheet-head"><h2 id="mp-proto-t">Протоколы</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
-  <div class="sheet-body">
-    <div class="alert alert-warning mp-foreign" hidden><i data-lucide="triangle-alert"></i><div><b>Xray настроен через autoXRAY</b><span>Чтобы управлять им здесь, переустановите: bash install.sh --reconfigure --replace-autoxray. Ключи, выданные autoXRAY, перестанут работать</span></div></div>
-    <div class="mp-section mp-managed">
-      <span class="t-label">Входы VPN</span>
-      <label class="choice"><input type="checkbox" role="switch" class="switch" checked disabled><span>Vision<small>Основной вход на 443, через него открываются и сайты. Не выключается</small></span></label>
-      <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-pr-hy2" data-k="hy2"><span>Hysteria2<small id="mp-pr-hy2-h">UDP 443, быстрее на плохой связи</small></span></label>
-      <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-pr-xhttp" data-k="xhttp"><span>XHTTP<small id="mp-pr-xhttp-h">Через nginx, если TCP режут</small></span></label>
-      <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-pr-awg"><span>AmneziaWG<small id="mp-pr-awg-h">Отдельный сервер по UDP. Для monolit client и AmneziaVPN</small></span></label>
-      <p class="mp-note">Выключенный вход пропадёт из подписок, когда приложения их обновят</p>
-    </div>
-    <form class="mp-section mp-managed mp-form" id="mp-socks" novalidate>
-      <span class="t-label">SOCKS5</span>
-      <label class="choice"><input type="checkbox" role="switch" class="switch" name="on"><span>SOCKS5 с паролем<small>Для программ, которые не умеют VLESS</small></span></label>
-      <div class="mp-socks-f" id="mp-socks-f">
-        <label class="field"><span class="label">Порт</span><input class="input" name="port" inputmode="numeric" autocomplete="off"></label>
-        <label class="field"><span class="label">Логин</span><input class="input" name="user" autocomplete="off" spellcheck="false"></label>
-        <label class="field"><span class="label">Пароль</span><input class="input" name="pass" autocomplete="off" spellcheck="false"></label>
-      </div>
-      <span class="copy-field" id="mp-socks-cf"><input class="input" readonly id="mp-socks-url" aria-label="Адрес SOCKS5"><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать адрес" id="mp-socks-copy" data-copy=""></button></span>
-      <div class="btn-row"><button class="btn btn-secondary" type="submit"><span>Сохранить SOCKS5</span></button></div>
-    </form>
-    <div class="mp-section mp-managed" id="mp-mtg">
-      <span class="t-label">Telegram</span>
-      <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-mtg-on"><span>Прокси для Telegram<small id="mp-mtg-h">mtg, маскируется под сайт домена</small></span></label>
-      <span class="copy-field"><input class="input" readonly id="mp-mtg-url" aria-label="Ссылка на прокси Telegram"><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать ссылку" id="mp-mtg-copy" data-copy=""></button></span>
-    </div>
-  </div>
-</dialog>
 
 <!-- История -->
-<dialog class="sheet sheet-side" id="mp-hist" aria-labelledby="mp-hist-t">
-  <div class="sheet-head"><h2 id="mp-hist-t">История</h2><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
-  <div class="sheet-body">
-    <div class="alert alert-warning mp-foreign" hidden><i data-lucide="triangle-alert"></i><div><b>Xray настроен через autoXRAY</b><span>Чтобы управлять им здесь, переустановите: bash install.sh --reconfigure --replace-autoxray. Ключи, выданные autoXRAY, перестанут работать</span></div></div>
-    <div class="mp-section mp-managed">
-      <p class="mp-note">Перед каждым изменением сохраняется прежний конфиг Xray. Вернуть можно любой, пользователи останутся как сейчас</p>
-      <ol class="tl" id="mp-hist-list"></ol>
-      <div class="state state-dashed" id="mp-hist-empty" hidden><span class="state-ic"><i data-lucide="history"></i></span><h4>Изменений ещё не было</h4><p>Они появятся здесь, когда вы поменяете маршруты, WARP или протоколы</p></div>
-    </div>
-  </div>
-</dialog>
 </body>
 </html>

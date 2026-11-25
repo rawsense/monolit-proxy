@@ -1,6 +1,9 @@
 /* Админка monolit proxy: только то, чего нет в системе. Каркас (.app-shell, .app-main, .app-head) — layers.css */
 *, *::before, *::after { box-sizing: border-box }
 html { color-scheme: dark; -webkit-tap-highlight-color: transparent }
+/* рамка поля в фокусе тише системной: светлая серая на тёмном слепила */
+:root[data-palette="mono"]:not([data-theme="light"]) { --focus-field: #474747 }
+:root[data-palette="mono"][data-theme="light"] { --focus-field: #c4c4c4 }
 :root { --font-sans: "Twemoji Country Flags", "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif }
 /* флаг страны в названии: отступ до текста как между иконкой и подписью */
 .mp-flag { display: inline-block; margin-right: var(--sp-2) }
@@ -17,6 +20,8 @@ h1, h2, h3, h4, p { margin: 0 }
 .mp-login-card .field .hint { color: var(--danger) }
 
 .app-title { flex-wrap: wrap; row-gap: var(--sp-2) }
+/* Характер «Монолита»: заголовки страниц и крупные цифры — шрифтом названия */
+.app-title h1, .mp-stats .stat-num, .mp-tr-sum { font-family: Geologica, var(--font-sans); font-weight: 600 }
 .mp-alert { margin-bottom: var(--sp-6) }
 .mp-alert div { display: grid; gap: 2px }
 /* Низ меню по образцу системы: аватар, логин и сервер в две строки, справа выход */
@@ -55,9 +60,49 @@ h1, h2, h3, h4, p { margin: 0 }
 .mp-what { display: block; margin-top: 2px; color: var(--text-secondary); font-size: var(--fs-sm); line-height: var(--lh-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px }
 .mp-m { display: none }
 .mp-muted { color: var(--text-muted) }
-.mp-use { display: grid; gap: 6px; min-width: 140px }
+.mp-use { display: grid; gap: 6px; justify-items: start }
 .mp-use span { white-space: nowrap }
-.mp-use .progress { width: 100% }
+/* полоса тонкая и серая: цвет только когда трафик почти кончился */
+.mp-use .progress { width: 120px; height: 2px; background: var(--border) }
+.mp-use .progress > i { background: var(--text-muted) }
+.mp-use .progress.is-warn > i { background: var(--warning) }
+.mp-use .progress.is-full > i { background: var(--danger) }
+/* статус — точка и текст, без плашки */
+.mp-st { display: inline-flex; align-items: center; gap: var(--sp-2); color: var(--text-secondary); white-space: nowrap }
+.mp-st .dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--text-faint) }
+.mp-st.is-active .dot { background: var(--success) }
+.mp-st:is(.is-expired, .is-limit, .is-devices) .dot { background: var(--warning) }
+.mp-st.is-off { color: var(--text-muted) }
+.mp-st.is-ok .dot { background: var(--success) }
+.mp-st.is-warn .dot { background: var(--warning) }
+.mp-st.is-bad .dot { background: var(--danger) }
+/* колонки фиксированной доли ширины: без пустых провалов, строки одной высоты */
+@container mplist (min-width: 841px) {
+  .mp-table { table-layout: fixed }
+  .mp-table:not(.mp-nd-table) th:nth-child(1) { width: 30% }
+  .mp-table:not(.mp-nd-table) th:nth-child(2) { width: 18% }
+  .mp-table:not(.mp-nd-table) th:nth-child(3) { width: 20% }
+  .mp-table:not(.mp-nd-table) th:nth-child(4) { width: 18% }
+  .mp-table:not(.mp-nd-table) th:nth-child(5) { width: 14%; text-align: right }
+  .mp-nd-table th:nth-child(1) { width: 30% }
+  .mp-nd-table th:nth-child(2) { width: 22% }
+  .mp-nd-table th:nth-child(3) { width: 22% }
+  .mp-nd-table th:nth-child(4) { width: 12% }
+  .mp-nd-table th:nth-child(5) { width: 14% }
+  .mp-table:not(.mp-nd-table) tbody td:last-child { text-align: right }
+  .mp-table tbody :is(th, td) { height: 60px; padding-top: 0; padding-bottom: 0; overflow: hidden; text-overflow: ellipsis }
+  /* текст заголовка в 20 px от верха карточки, как от боков (8 поле + 12) */
+  .mp-table thead th { position: relative; height: 44px }
+  /* линия под заголовком — от начала до конца текста, как линии между строками */
+  .mp-table thead th::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--border-subtle) }
+  .mp-table thead th:first-child::after { left: var(--sp-3) }
+  .mp-table thead th:last-child::after { right: var(--sp-3) }
+  /* поле 8 со всех сторон: подсветка строки при наведении отстоит от низа карточки так же, как от боков */
+  .table-wrap:has(> .mp-table) { padding: var(--sp-2) }
+}
+}
+.mp-m-exp:is(.is-expired, .is-limit, .is-devices) { color: var(--warning) }
+.mp-table tbody tr:has(.is-off) :is(.mp-who, .mp-what, .mp-m > *) { opacity: .55 }
 .mp-list { container: mplist / inline-size; transition: opacity var(--dur-swap-in) var(--ease-out) }
 .mp-list.out { opacity: 0; transition-duration: var(--dur-swap-out) }
 .mp-foot { padding: var(--sp-4) 0 }
@@ -90,9 +135,8 @@ h1, h2, h3, h4, p { margin: 0 }
   /* расход трафика — заливка карточки: слой под текстом, ширина = доля лимита */
   .mp-table.table tbody tr th { position: relative; overflow: hidden; isolation: isolate }
   /* на 1px внутри: рамка карточки остаётся видна; левые углы — как у карточки, правые скругляются только у полной */
-  .mp-m::after { content: ""; position: absolute; inset: 1px; z-index: -1; width: calc(var(--p, 0) * (100% - 2px)); border-radius: calc(var(--r-md) - 1px) 0 0 calc(var(--r-md) - 1px); background: color-mix(in oklch, var(--accent-text) 14%, transparent); pointer-events: none }
+  .mp-m::after { content: ""; position: absolute; inset: 1px; z-index: -1; width: calc(var(--p, 0) * (100% - 2px)); border-radius: calc(var(--r-md) - 1px) 0 0 calc(var(--r-md) - 1px); background: color-mix(in oklch, var(--text) 6%, transparent); pointer-events: none }
   .mp-m.is-full::after { border-radius: calc(var(--r-md) - 1px) }
-  .mp-m.is-warn::after { background: color-mix(in oklch, var(--warning) 16%, transparent) }
   .mp-table tbody tr:has(.is-off) :is(.mp-who, .mp-m > *) { opacity: .55 }
 }
 /* планшет: карточки в две колонки, чтобы не растягивать строку на всю ширину */
@@ -207,14 +251,11 @@ button.alist-row { width: 100%; border: 0; background: none; font: inherit; colo
 .alist-row { grid-template-columns: var(--al-ic) 1fr auto; min-height: 0; padding: var(--al-p) }
 .alist-row + .alist-row::before { left: calc(var(--al-p) + var(--al-ic) + var(--sp-3)); right: var(--al-p) }
 .alist-ic { width: var(--al-ic); height: var(--al-ic) }   /* 40 и на телефоне: круг почти в высоту двух строк подписи, отступы сходятся */
-/* Таблица: над заголовками и под последней строкой столько же, сколько слева до текста (поле 14 + ячейка 20).
-   Бока не трогаем: там поле системы ровное для подсветки строки */
-@container mplist (min-width: 841px) { .table-wrap:has(> .mp-table) { padding-top: calc(var(--sp-3) + var(--sp-2)); padding-bottom: calc(var(--sp-3) + var(--sp-1)) } }
 /* Свёрнутое меню: пункт 40 × 40, чтобы подсветка была кругом, а не овалом 44 × 40 (полоса 60 мягкого стиля → 56) */
 .side { --side-min: 56px }
 /* иконка и аватар — по центру круга (было 14 слева и 10 справа); в раскрытом меню центры остаются на той же вертикали */
 .side-item { padding: 0 12px }
-.side-foot { padding-left: 6px }
+.side-foot { padding-left: 8px }
 .side-ws.mp-logo { padding-left: 9px }
 
 /* Адрес: доступность из России, смена домена и IP */
@@ -246,6 +287,9 @@ button.alist-row { width: 100%; border: 0; background: none; font: inherit; colo
 /* Окно с формой-обёрткой (.dialog-scroll > form): шапка, середина и кнопки — детьми формы, она растягивается столбцом.
    Без этого прокрутка середины .dialog-scroll не работала бы: форма росла бы по содержимому */
 .dialog-scroll > form { display: flex; flex-direction: column; flex: 1; min-height: 0 }
+/* закрытые списки полей лежали под окном невидимыми и удлиняли прокрутку середины: колесо уводило поля вверх, над кнопками пустота.
+   Открытый список система и так показывает в верхнем слое (popover), а закрытый из потока убираем */
+.dialog-scroll .select-ui > .listbox:not(:popover-open) { display: none }
 
 /* Ноды и подписки */
 .mp-page { transition: opacity var(--dur-swap-in) var(--ease-out) }
@@ -255,7 +299,9 @@ button.alist-row { width: 100%; border: 0; background: none; font: inherit; colo
 /* Ноды: таблица как у пользователей; на узком списке — карточки без заливки трафика */
 #nd-sheet .sheet-head > div:first-child { flex: 1; min-width: 0 }
 .mp-nd-table .mp-hop-to { color: var(--text-muted) }
-.mp-nd-table tr.is-down :is(.mp-who, .mp-what, td:not(.mp-nd-st)) { opacity: .55 }
+/* приглушаем текст, а не ячейки: прозрачность ячейки бледнила и фон подсветки, строка шла пятнами */
+.mp-nd-table tr.is-down :is(.mp-who, .mp-what) { opacity: .55 }
+.mp-nd-table tr.is-down td:not(.mp-nd-st) { color: color-mix(in oklch, currentColor 55%, transparent) }
 
 /* Окно новой ноды: команда и состояние */
 .mp-cmd pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere }
@@ -320,3 +366,105 @@ button.alist-row { width: 100%; border: 0; background: none; font: inherit; colo
 .alist-tx b .mp-flag { display: inline-block; color: inherit; font-size: inherit; line-height: inherit }
 .alist-row.mp-ex { grid-template-columns: var(--al-ic) minmax(0, 1fr) auto; text-align: left }
 .mp-ex .badge { white-space: nowrap }
+
+/* ============ Главная ============ */
+/* Главная рядами: в одном ряду у карточек общая высота и общие края; заголовок у каждой карточки внутри, одного вида */
+.hm { display: grid; gap: var(--sp-4); margin-top: var(--sp-6) }
+.hm-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--sp-4); align-items: stretch }
+.hm-card { display: flex; flex-direction: column; min-width: 0; padding: var(--sp-5); border-radius: var(--r-xl); background: var(--surface); box-shadow: inset 0 0 0 1px var(--border-subtle) }
+.hm-h { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-4); margin-bottom: var(--sp-3) }
+.hm-h h2 { font-size: var(--fs-sm); line-height: var(--lh-sm); font-weight: var(--w-medium); color: var(--text-muted) }
+.hm-h > :not(h2) { font-size: var(--fs-sm); line-height: var(--lh-sm); color: var(--text-muted); font-weight: var(--w-regular) }
+.hm-h a.link { color: var(--text-secondary) }
+/* строка: текст в 20 от края карточки, линии между строками от начала текста до конца */
+.hm-li { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: var(--sp-3); align-items: center; min-height: 56px; padding: var(--sp-2) 0; color: inherit; text-decoration: none }
+.hm-li + .hm-li::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: var(--border-subtle) }
+.hm-li.no-ic { grid-template-columns: minmax(0, 1fr) auto }
+/* нажимаемая строка: подсветка шире текста на 8 с каждой стороны, текст на месте */
+a.hm-li { margin-inline: calc(var(--sp-2) * -1); padding-inline: var(--sp-2); border-radius: var(--r-sm); outline: 2px solid transparent; outline-offset: -2px;
+  transition: background-color var(--hd, var(--dur-hover-out)) var(--ease-hover), outline-color var(--dur-focus) var(--ease-out) }
+a.hm-li + .hm-li::before { left: var(--sp-2); right: var(--sp-2) }
+a.hm-li:focus-visible { outline-color: var(--focus) }
+@media (hover: hover) and (pointer: fine) { a.hm-li:hover { --hd: var(--dur-hover-in); background: var(--tile) } a.hm-li:hover::before, a.hm-li:hover + .hm-li::before { opacity: 0 } }
+.hm-ic { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r-sm); background: var(--fill); box-shadow: inset 0 0 0 1px var(--border-subtle); color: var(--text-muted) }
+.hm-ic svg { width: 16px; height: 16px }
+.hm-ic.is-bad { color: var(--danger) }
+.hm-ic.is-warn { color: var(--warning) }
+.hm-ic.is-ok { color: var(--success) }
+.hm-tx { min-width: 0; font-size: var(--fs-sm); line-height: var(--lh-sm) }
+.hm-tx b { display: block; font-weight: var(--w-medium); color: var(--text) }
+.hm-tx span { display: block; color: var(--text-muted) }
+.hm-go { width: 16px; height: 16px; color: var(--text-faint) }
+.hm-add { width: 100%; margin-bottom: var(--sp-2) }
+/* серверы: колонки внутри одной карточки, между ними линия */
+.hm-srv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) }
+.hm-srv > a { display: grid; gap: var(--sp-1); padding: 0 var(--sp-5); color: inherit; text-decoration: none; font-size: var(--fs-sm); line-height: var(--lh-sm) }
+.hm-srv > a:first-child { padding-left: 0 }
+.hm-srv > a:last-child { padding-right: 0 }
+.hm-srv > a + a { box-shadow: inset 1px 0 0 var(--border-subtle) }
+.hm-srv-row { display: flex; justify-content: space-between; gap: var(--sp-3); color: var(--text-muted) }
+.hm-srv b { font-weight: var(--w-medium); color: var(--text) }
+.hm-dot { display: inline-flex; align-items: center; gap: var(--sp-2); white-space: nowrap }
+.hm-dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--success) }
+.hm-dot.is-down::before { background: var(--danger) }
+/* трафик */
+.hm-sum { font-family: Geologica, var(--font-sans); font-weight: 600; font-size: var(--fs-xl); line-height: var(--lh-xl); color: var(--text); margin-bottom: var(--sp-3) }
+.hm-chart { margin-top: auto; min-height: 0 }
+@media (max-width: 1100px) { .hm-row { grid-template-columns: minmax(0, 1fr) } }
+@media (max-width: 720px) {
+  .hm-srv { grid-template-columns: minmax(0, 1fr) }
+  .hm-srv > a { padding: var(--sp-3) 0 }
+  .hm-srv > a + a { box-shadow: inset 0 1px 0 var(--border-subtle) }
+  .hm-srv > a:first-child { padding-top: 0 }
+  .hm-srv > a:last-child { padding-bottom: 0 }
+}
+/* телефон: кнопка дела под текстом, иначе заголовок дела ломался на три строки */
+@media (max-width: 640px) { .hm-todo .hm-li { grid-template-columns: 32px minmax(0, 1fr); align-items: start; padding-block: var(--sp-3) } .hm-todo .hm-li .btn { grid-column: 2; justify-self: start } }
+/* в ряду карточки одной высоты: строки делят свободное место поровну, а не оставляют пустоту внизу */
+.hm-card > .hm-li, .hm-list > .hm-li { flex: 1 0 auto }
+.hm-list { display: flex; flex-direction: column; flex: 1 0 auto }
+.hm-list > .hm-li + .hm-li::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: var(--border-subtle) }
+.hm-list > a.hm-li + a.hm-li::before { left: var(--sp-2); right: var(--sp-2) }
+/* на главной тревоги уже стоят строками в «Требует внимания»: общие плашки сверху не дублируют их */
+.app-inner:has(#mp-page-home:not([hidden])) .mp-alert { display: none }
+/* карточка, которая кончается нажимаемой строкой: снизу поле 12 — подсветка отстоит от низа как от боков (12), а текст, стоящий по центру строки, — на 20, как сбоку */
+.hm-card:has(> a.hm-li:last-child, > .hm-list > a.hm-li:last-child) { padding-bottom: var(--sp-3) }
+/* меню: подписи групп — просто подписи, не кнопки; Настройки внизу у аккаунта */
+.side-label { cursor: default; pointer-events: none }
+.mp-side-set { flex: none; margin-top: var(--sp-2) }
+/* разделы страницами (бывшие шторки): на всю ширину, как главная — две колонки .mp-col, карточки в каждой своей высоты.
+   Рядами было хуже: нечётная последняя оставляла пустой угол, а короткая карточка в ряду растягивалась пустотой */
+.mp-pg-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); align-items: stretch; margin-top: var(--sp-6) }
+.mp-pg-body > :not(.mp-col) { grid-column: 1 / -1 }
+.mp-col { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0 }
+@media (max-width: 1100px) { .mp-pg-body { grid-template-columns: minmax(0, 1fr) } }
+.mp-col > .mp-section { padding: var(--sp-5); border-radius: var(--r-xl); background: var(--surface); box-shadow: inset 0 0 0 1px var(--border-subtle) }
+.mp-col > .mp-section + .mp-section { margin-top: 0 }
+.mp-pg-foot { display: flex; justify-content: flex-end; margin-top: var(--sp-4) }
+.mp-tpl-box { margin-top: var(--sp-8) }
+/* список внутри карточки страницы — без своей рамки и фона: иконки в 20 от края карточки, как текст, подсветка строки в 12 */
+.mp-pg-body .alist { padding: 0; margin-inline: calc(var(--al-p) * -1); background: none; box-shadow: none }
+/* карточка, которая кончается списком: подсветка последней строки отстоит от низа на 12, как от боков */
+.mp-col > .mp-section:has(> .alist:last-child) { padding-bottom: var(--sp-3) }
+/* кнопки карточки — внизу, поровну на всю ширину: в ряду карточки одной высоты, и кнопки стоят на одной линии, а не висят под текстом */
+.mp-col > .mp-section { display: flex; flex-direction: column }
+.mp-col > .mp-section > .btn-row:not(.mp-presets, :has(~ :not([hidden]))) { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); margin-top: auto }
+.mp-col > .mp-section > .btn-row:not(.mp-presets, :has(~ :not([hidden]))) > .btn { width: 100% }
+/* меню крупнее системного: 256 вместо 240, пункт 36, текст 14, иконка 18.
+   Отступ 11 вместо 12 — центр иконки остаётся на 28 от края, как в свёрнутом меню (56 / 2) */
+.side:not(.collapsed) { --side-w: 256px }
+.side-item { height: 36px; padding: 0 11px; font-size: var(--fs-base); line-height: var(--lh-base) }
+.side-item .lucide { width: 18px; height: 18px }
+@media (min-width: 641px) and (max-width: 1100px) {
+  .mp-col > .mp-section > .btn-row:not(.mp-presets, :has(~ :not([hidden]))) { display: flex; flex-wrap: wrap }
+  .mp-col > .mp-section > .btn-row:not(.mp-presets, :has(~ :not([hidden]))) > .btn { width: auto }
+}
+/* одна кнопка — своей ширины и в половинной карточке: поровну делятся только две и больше */
+.mp-col > .mp-section > .btn-row:not(:has(> :not([hidden]) ~ :not([hidden]))) { display: flex }
+.mp-col > .mp-section > .btn-row:not(:has(> :not([hidden]) ~ :not([hidden]))) > .btn { width: auto }
+/* низ колонок — на одной линии: последняя карточка колонки дотягивается до общего низа, кнопки в ней прижаты книзу */
+.mp-col > .mp-section:nth-last-child(1 of :not([hidden])) { flex: 1 0 auto }
+/* вторая подпись внутри карточки (готовые наборы под правилами): отделена от кнопок над ней шагом побольше */
+.mp-sub-label { margin-top: var(--sp-2) }
+/* исходящий IP — продолжение списка адресов: тот же шаг 12, что между строками, а не 16 между блоками */
+#mp-a-kv + #mp-o-kv { margin-top: calc(var(--sp-3) - var(--sp-4)) }

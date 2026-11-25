@@ -102,8 +102,8 @@
     $('mp-a-edit').disabled = foreign || running || !D.net
     $('mp-a-edit').closest('.btn-row').hidden = foreign
     // исходящий IP: только когда конфигом Xray управляет monolit
-    $('mp-o-sec').hidden = foreign
-    $('mp-o-kv').innerHTML = kv([['Сейчас', D.out_ip || 'как решает сервер' + (D.net?.ip1 ? `, ${D.net.ip1}` : '')]])
+    $('mp-o-kv').hidden = foreign; $('mp-o-edit').hidden = foreign
+    $('mp-o-kv').innerHTML = kv([['Исходящий IP', D.out_ip || 'как решает сервер' + (D.net?.ip1 ? `, ${D.net.ip1}` : '')]])
     $('mp-o-edit').disabled = foreign || running || !D.net
   }
   // ---------- переживут ли адреса перезагрузку ----------
@@ -136,7 +136,8 @@
   const paint = () => { paintWatch(); paintAddr() }
 
   async function load() { D = await api('GET', 'api/addr'); paint(); if (D.job?.state === 'running' && now() - D.job.at < 900) follow() }
-  document.querySelectorAll('[data-open="mp-addr"]').forEach((b) => b.addEventListener('click', () => { if (!D) $('mp-a-kv').innerHTML = kv([['Домен', A().domain()]]); load().catch(fail) }))
+  // страница «Адрес» открылась — свежие данные
+  document.addEventListener('mp-page', (e) => { if (e.detail !== 'addr') return; if (!D) $('mp-a-kv').innerHTML = kv([['Домен', A().domain()]]); load().catch(fail) })
 
   // ---------- проверка ----------
   $('mp-w-check').addEventListener('click', (e) => busy(e.currentTarget, async () => {

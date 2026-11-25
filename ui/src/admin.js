@@ -38,7 +38,7 @@
     return 'до ' + date(u.expire) + (days <= 7 ? `, ${days} ${plural(days, 'день', 'дня', 'дней')}` : '')
   }
   const ST = { active: ['Активна', 'badge-success'], expired: ['Срок вышел', 'badge-warning'], limit: ['Трафик кончился', 'badge-warning'], devices: ['Много устройств', 'badge-warning'], off: ['Выключена', ''] }
-  const badge = (u) => `<span class="badge ${ST[u.state][1]}">${ST[u.state][0]}</span>`
+  const badge = (u) => `<span class="mp-st is-${u.state}"><span class="dot"></span>${ST[u.state][0]}</span>`
   const group = (u) => u.state === 'active' ? 'active' : u.state === 'off' ? 'off' : 'ended'
   const stateOf = (u, t = now()) => !u.enabled ? 'off' : u.expire && u.expire <= t ? 'expired' : u.limit && u.used >= u.limit ? 'limit' : u.block_until > t ? 'devices' : 'active'
   const MON = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
@@ -190,7 +190,6 @@
     try {
       const r = await api('GET', 'api/traffic?days=30')
       const sum = r.days.reduce((a, d) => a + d.up + d.down, 0)
-      $('mp-tr-card').hidden = !S.users.length
       $('mp-tr-sum').textContent = bytes(sum)
       $('mp-tr-tz').textContent = r.tz && r.tz !== Intl.DateTimeFormat().resolvedOptions().timeZone ? 'Дни по времени сервера, ' + r.tz : ''
       drawChart($('mp-tr-chart'), r.days, 'Трафик по дням', 120)
@@ -205,7 +204,9 @@
   const usage = (u) => u.limit ? `${NF1.format(u.used / GB)}<span class="mp-muted">/${gbOf(u.limit)} ГБ</span>` : bytes(u.used)
   const useHtml = (u) => {
     const p = u.limit ? Math.min(1, u.used / u.limit) : 0
-    return `<div class="mp-use"><span>${usage(u)}</span>${u.limit ? `<div class="progress" role="progressbar" aria-label="Трафик" aria-valuenow="${Math.round(p * 100)}"><i style="--p:${p.toFixed(3)}"></i></div>` : ''}</div>`
+    // израсходовано и предел одним цветом: серая часть вплотную к яркой читалась как склейка
+    const head = u.limit ? `<span>${NF1.format(u.used / GB)} / ${gbOf(u.limit)} ГБ</span>` : `<span>${usage(u)}</span>`
+    return `<div class="mp-use">${head}${u.limit ? `<div class="progress${p >= 1 ? " is-full" : p >= 0.8 ? " is-warn" : ""}" role="progressbar" aria-label="Трафик" aria-valuenow="${Math.round(p * 100)}"><i style="--p:${p.toFixed(3)}"></i></div>` : ''}</div>`
   }
   // Телефон и планшет: имя и трафик в первой строке, заметка и срок во второй, расход — заливкой карточки.
   // Статус без плашки: у активной срок серым, иначе вместо срока — состояние цветом
@@ -258,9 +259,6 @@
     $('mp-tpl-ver').textContent = tp ? tp.version : 'Нет'
     $('mp-tpl-foot').textContent = !tp ? 'не загружен' : tp.rejected && tp.rejected.fetched_at > tp.since ? 'новая не прошла проверку' : tp.pending ? 'есть новая версия' : 'проверена ' + (new Date(tp.checked * 1000).toDateString() === new Date().toDateString() ? 'в ' + TF.format(new Date(tp.checked * 1000)) : date(tp.checked))
     const ok = S.xray.ok
-    const b = $('mp-xray-badge')
-    b.className = 'badge ' + (ok ? 'badge-success' : 'badge-danger')
-    b.lastChild.textContent = ok ? 'Xray работает' : 'Xray не отвечает'
     $('mp-xray-alert').hidden = ok
     // IP не открывается из России: плашка над списком и точка у «Адреса»
     const w = S.watch || {}, cut = w.on && (w.state === 'blocked' || w.state === 'down')
@@ -270,7 +268,6 @@
       $('mp-block-p').textContent = w.state === 'down' ? 'Посмотрите, работает ли он у хостера' : 'Приложения в России не подключатся. Можно сменить IP или домен'
     }
     if (!ok && S.xray.error) $('mp-xray-err').textContent = S.xray.error + '. Изменения применятся, когда он снова заработает'
-    $('mp-sub').textContent = `Сервер ${S.settings.server_name}, обновлено в ${TF.format(new Date())}`
     $('mp-server-foot').textContent = S.settings.domain || S.settings.server_name
     const lg = S.settings.login || 'admin'; $('mp-acc-login').textContent = lg; $('mp-acc-av').textContent = lg.slice(0, 1).toUpperCase()
   }
@@ -446,7 +443,7 @@
     $('mp-tpl-auto').checked = !!S.settings.autoupdate
     $('mp-tpl-back').hidden = !tp?.rollback
   }
-  document.querySelectorAll('[data-open="mp-tpl"]').forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); fillTpl() }))
+  document.addEventListener('mp-page', (e) => { if (e.detail === 'subs') fillTpl() })
   $('mp-tpl-check').addEventListener('click', (e) => busy(e.currentTarget, async () => {
     try {
       const r = await api('POST', 'api/template/check'); S = r.state || S; paint(); fillTpl()
@@ -468,8 +465,8 @@
     sForm.tg_token.value = s.tg_token || ''; sForm.tg_chat.value = s.tg_chat || ''
     sForm.fp.value = s.fp; sForm.fp.dispatchEvent(new Event('change'))
   }
-  document.querySelectorAll('[data-open="mp-set"]').forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); fillSet() }))
-  document.querySelectorAll('[data-open="mp-mnt"]').forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); fillUpd() }))
+  document.addEventListener('mp-page', (e) => { if (e.detail === 'set') fillSet() })
+  document.addEventListener('mp-page', (e) => { if (e.detail === 'srv') fillUpd() })
 
   // ---------- обновление monolit из релизов GitHub ----------
   let updPoll = 0
@@ -545,7 +542,7 @@
     busy(document.querySelector('[form="mp-set-form"]'), async () => {
       try {
         S = await api('PATCH', 'api/settings', { server_name: sForm.server_name.value, tg_token: sForm.tg_token.value, tg_chat: sForm.tg_chat.value, fp: sForm.fp.value, update_hours: sForm.update_hours.value, support_url: sForm.support_url.value, login, ...(pw ? { password: pw } : {}) })
-        paint(); $('mp-set').close()
+        paint()
         if (relogin) { toast({ type: 'success', title: pw ? 'Пароль сменён' : 'Логин сменён', text: 'Войдите заново' }); showLogin() } else toast({ type: 'success', title: 'Настройки сохранены' })
       } catch (err) { fail(err) }
     })
@@ -563,7 +560,7 @@
 
   // Для разделов сервера (server.js, addr.js)
   window.mpAdmin = { demo: () => DEMO, api: (m, p, b) => api(m, p, b), confirm: confirmAct, setCopy, domain: () => S?.settings?.domain || location.hostname,
-    state: () => S, setState: (s) => { S = s; paint() }, bytes, ago, refresh: () => api('GET', 'api/state').then((s) => { S = s; paint() }).catch(() => {}) }
+    state: () => S, openUser: (id) => openDetail(id), setState: (s) => { S = s; paint() }, bytes, ago, refresh: () => api('GET', 'api/state').then((s) => { S = s; paint() }).catch(() => {}) }
 
   // ---------- QR в SVG ----------
   function qrSvg(text) {

@@ -132,10 +132,10 @@
   }
   window.mpExits = { fill, paint }
 
-  document.querySelectorAll('[data-open="mp-exits"]').forEach((b) => b.addEventListener('click', paint))
+  document.addEventListener('mp-page', (e) => { if (e.detail === 'exits') paint() })
   const prev = A.setState
   A.setState = (s) => { prev(s); paint() }
   // общий список обновляется раз в минуту в admin.js: подхватываем тем же опросом
-  setInterval(() => { if ($('mp-exits').open) paint() }, 5000)
+  setInterval(() => { if (!$('mp-page-exits').hidden) paint() }, 5000)
   setTimeout(paint, 0)
 })()

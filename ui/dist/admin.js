@@ -1,7 +1,7 @@
 // icons.js
 // Иконки Lucide 0.460.0 (ISC), только нужные: замена <i data-lucide> на svg, как lucide.createIcons()
 (() => {
-  const P = {"door-open":"<path d=\"M13 4h3a2 2 0 0 1 2 2v14\"/><path d=\"M2 20h3\"/><path d=\"M13 20h9\"/><path d=\"M10 12v.01\"/><path d=\"M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.561Z\"/>","arrow-right":"<path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/>","grip-vertical":"<circle cx=\"9\" cy=\"12\" r=\"1\"/><circle cx=\"9\" cy=\"5\" r=\"1\"/><circle cx=\"9\" cy=\"19\" r=\"1\"/><circle cx=\"15\" cy=\"12\" r=\"1\"/><circle cx=\"15\" cy=\"5\" r=\"1\"/><circle cx=\"15\" cy=\"19\" r=\"1\"/>","waypoints":"<circle cx=\"12\" cy=\"4.5\" r=\"2.5\"/><path d=\"m10.2 6.3-3.9 3.9\"/><circle cx=\"4.5\" cy=\"12\" r=\"2.5\"/><path d=\"M7 12h10\"/><circle cx=\"19.5\" cy=\"12\" r=\"2.5\"/><path d=\"m13.8 17.7 3.9-3.9\"/><circle cx=\"12\" cy=\"19.5\" r=\"2.5\"/>","terminal":"<polyline points=\"4 17 10 11 4 5\"/><line x1=\"12\" x2=\"20\" y1=\"19\" y2=\"19\"/>","list-checks":"<path d=\"m3 17 2 2 4-4\"/><path d=\"m3 7 2 2 4-4\"/><path d=\"M13 6h8\"/><path d=\"M13 12h8\"/><path d=\"M13 18h8\"/>","map-pin":"<path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/>","wrench":"<path d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z\"/>","upload":"<path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"17 8 12 3 7 8\"/><line x1=\"12\" x2=\"12\" y1=\"3\" y2=\"15\"/>","lock-open":"<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\"/><path d=\"M7 11V7a5 5 0 0 1 9.9-1\"/>","apple":"<path d=\"M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z\"/><path d=\"M10 2c1 .5 2 2 2 5\"/>","check":"<path d=\"M20 6 9 17l-5-5\"/>","chevron-right":"<path d=\"m9 18 6-6-6-6\"/>","circle-alert":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><line x1=\"12\" x2=\"12\" y1=\"8\" y2=\"12\"/><line x1=\"12\" x2=\"12.01\" y1=\"16\" y2=\"16\"/>","circle-check":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m9 12 2 2 4-4\"/>","clock":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><polyline points=\"12 6 12 12 16 14\"/>","copy":"<rect width=\"14\" height=\"14\" x=\"8\" y=\"8\" rx=\"2\" ry=\"2\"/><path d=\"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2\"/>","download":"<path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" x2=\"12\" y1=\"15\" y2=\"3\"/>","external-link":"<path d=\"M15 3h6v6\"/><path d=\"M10 14 21 3\"/><path d=\"M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6\"/>","file-code":"<path d=\"M10 12.5 8 15l2 2.5\"/><path d=\"m14 12.5 2 2.5-2 2.5\"/><path d=\"M14 2v4a2 2 0 0 0 2 2h4\"/><path d=\"M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z\"/>","infinity":"<path d=\"M12 12c-2-2.67-4-4-6-4a4 4 0 1 0 0 8c2 0 4-1.33 6-4Zm0 0c2 2.67 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.33-6 4Z\"/>","key-round":"<path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\"/><circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\"/>","link":"<path d=\"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71\"/><path d=\"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71\"/>","log-out":"<path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\"/><polyline points=\"16 17 21 12 16 7\"/><line x1=\"21\" x2=\"9\" y1=\"12\" y2=\"12\"/>","monitor":"<rect width=\"20\" height=\"14\" x=\"2\" y=\"3\" rx=\"2\"/><line x1=\"8\" x2=\"16\" y1=\"21\" y2=\"21\"/><line x1=\"12\" x2=\"12\" y1=\"17\" y2=\"21\"/>","moon":"<path d=\"M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z\"/>","panel-left":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"M9 3v18\"/>","plus":"<path d=\"M5 12h14\"/><path d=\"M12 5v14\"/>","qr-code":"<rect width=\"5\" height=\"5\" x=\"3\" y=\"3\" rx=\"1\"/><rect width=\"5\" height=\"5\" x=\"16\" y=\"3\" rx=\"1\"/><rect width=\"5\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\"/><path d=\"M21 16h-3a2 2 0 0 0-2 2v3\"/><path d=\"M21 21v.01\"/><path d=\"M12 7v3a2 2 0 0 1-2 2H7\"/><path d=\"M3 12h.01\"/><path d=\"M12 3h.01\"/><path d=\"M12 16v.01\"/><path d=\"M16 12h1\"/><path d=\"M21 12v.01\"/><path d=\"M12 21v-1\"/>","refresh-cw":"<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\"/><path d=\"M21 3v5h-5\"/><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\"/><path d=\"M8 16H3v5\"/>","rotate-ccw":"<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path d=\"M3 3v5h5\"/>","search":"<circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/>","settings":"<path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","smartphone":"<rect width=\"14\" height=\"20\" x=\"5\" y=\"2\" rx=\"2\" ry=\"2\"/><path d=\"M12 18h.01\"/>","sun":"<circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2\"/><path d=\"M12 20v2\"/><path d=\"m4.93 4.93 1.41 1.41\"/><path d=\"m17.66 17.66 1.41 1.41\"/><path d=\"M2 12h2\"/><path d=\"M20 12h2\"/><path d=\"m6.34 17.66-1.41 1.41\"/><path d=\"m19.07 4.93-1.41 1.41\"/>","trash-2":"<path d=\"M3 6h18\"/><path d=\"M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6\"/><path d=\"M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2\"/><line x1=\"10\" x2=\"10\" y1=\"11\" y2=\"17\"/><line x1=\"14\" x2=\"14\" y1=\"11\" y2=\"17\"/>","triangle-alert":"<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\"/><path d=\"M12 9v4\"/><path d=\"M12 17h.01\"/>","undo-2":"<path d=\"M9 14 4 9l5-5\"/><path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11\"/>","users":"<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\"/><path d=\"M16 3.13a4 4 0 0 1 0 7.75\"/>","x":"<path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/>","arrow-down":"<path d=\"M12 5v14\"/><path d=\"m19 12-7 7-7-7\"/>","arrow-up":"<path d=\"m5 12 7-7 7 7\"/><path d=\"M12 19V5\"/>","cloud":"<path d=\"M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z\"/>","eye":"<path d=\"M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","globe":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20\"/><path d=\"M2 12h20\"/>","history":"<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path d=\"M3 3v5h5\"/><path d=\"M12 7v5l4 2\"/>","network":"<rect x=\"16\" y=\"16\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"2\" y=\"16\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"9\" y=\"2\" width=\"6\" height=\"6\" rx=\"1\"/><path d=\"M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3\"/><path d=\"M12 12V8\"/>","pencil":"<path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\"/><path d=\"m15 5 4 4\"/>","route":"<circle cx=\"6\" cy=\"19\" r=\"3\"/><path d=\"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15\"/><circle cx=\"18\" cy=\"5\" r=\"3\"/>","scroll-text":"<path d=\"M15 12h-5\"/><path d=\"M15 8h-5\"/><path d=\"M19 17V5a2 2 0 0 0-2-2H4\"/><path d=\"M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3\"/>","send":"<path d=\"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z\"/><path d=\"m21.854 2.147-10.94 10.939\"/>","server":"<rect width=\"20\" height=\"8\" x=\"2\" y=\"2\" rx=\"2\" ry=\"2\"/><rect width=\"20\" height=\"8\" x=\"2\" y=\"14\" rx=\"2\" ry=\"2\"/><line x1=\"6\" x2=\"6.01\" y1=\"6\" y2=\"6\"/><line x1=\"6\" x2=\"6.01\" y1=\"18\" y2=\"18\"/>","shield-check":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/><path d=\"m9 12 2 2 4-4\"/>","shield":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/>"};
+  const P = {"house":"<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>","door-open":"<path d=\"M13 4h3a2 2 0 0 1 2 2v14\"/><path d=\"M2 20h3\"/><path d=\"M13 20h9\"/><path d=\"M10 12v.01\"/><path d=\"M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.561Z\"/>","arrow-right":"<path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/>","grip-vertical":"<circle cx=\"9\" cy=\"12\" r=\"1\"/><circle cx=\"9\" cy=\"5\" r=\"1\"/><circle cx=\"9\" cy=\"19\" r=\"1\"/><circle cx=\"15\" cy=\"12\" r=\"1\"/><circle cx=\"15\" cy=\"5\" r=\"1\"/><circle cx=\"15\" cy=\"19\" r=\"1\"/>","waypoints":"<circle cx=\"12\" cy=\"4.5\" r=\"2.5\"/><path d=\"m10.2 6.3-3.9 3.9\"/><circle cx=\"4.5\" cy=\"12\" r=\"2.5\"/><path d=\"M7 12h10\"/><circle cx=\"19.5\" cy=\"12\" r=\"2.5\"/><path d=\"m13.8 17.7 3.9-3.9\"/><circle cx=\"12\" cy=\"19.5\" r=\"2.5\"/>","terminal":"<polyline points=\"4 17 10 11 4 5\"/><line x1=\"12\" x2=\"20\" y1=\"19\" y2=\"19\"/>","list-checks":"<path d=\"m3 17 2 2 4-4\"/><path d=\"m3 7 2 2 4-4\"/><path d=\"M13 6h8\"/><path d=\"M13 12h8\"/><path d=\"M13 18h8\"/>","map-pin":"<path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/>","wrench":"<path d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z\"/>","upload":"<path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"17 8 12 3 7 8\"/><line x1=\"12\" x2=\"12\" y1=\"3\" y2=\"15\"/>","lock-open":"<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\"/><path d=\"M7 11V7a5 5 0 0 1 9.9-1\"/>","apple":"<path d=\"M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z\"/><path d=\"M10 2c1 .5 2 2 2 5\"/>","check":"<path d=\"M20 6 9 17l-5-5\"/>","chevron-right":"<path d=\"m9 18 6-6-6-6\"/>","circle-alert":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><line x1=\"12\" x2=\"12\" y1=\"8\" y2=\"12\"/><line x1=\"12\" x2=\"12.01\" y1=\"16\" y2=\"16\"/>","circle-check":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m9 12 2 2 4-4\"/>","clock":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><polyline points=\"12 6 12 12 16 14\"/>","copy":"<rect width=\"14\" height=\"14\" x=\"8\" y=\"8\" rx=\"2\" ry=\"2\"/><path d=\"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2\"/>","download":"<path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" x2=\"12\" y1=\"15\" y2=\"3\"/>","external-link":"<path d=\"M15 3h6v6\"/><path d=\"M10 14 21 3\"/><path d=\"M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6\"/>","file-code":"<path d=\"M10 12.5 8 15l2 2.5\"/><path d=\"m14 12.5 2 2.5-2 2.5\"/><path d=\"M14 2v4a2 2 0 0 0 2 2h4\"/><path d=\"M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z\"/>","infinity":"<path d=\"M12 12c-2-2.67-4-4-6-4a4 4 0 1 0 0 8c2 0 4-1.33 6-4Zm0 0c2 2.67 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.33-6 4Z\"/>","key-round":"<path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\"/><circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\"/>","link":"<path d=\"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71\"/><path d=\"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71\"/>","log-out":"<path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\"/><polyline points=\"16 17 21 12 16 7\"/><line x1=\"21\" x2=\"9\" y1=\"12\" y2=\"12\"/>","monitor":"<rect width=\"20\" height=\"14\" x=\"2\" y=\"3\" rx=\"2\"/><line x1=\"8\" x2=\"16\" y1=\"21\" y2=\"21\"/><line x1=\"12\" x2=\"12\" y1=\"17\" y2=\"21\"/>","moon":"<path d=\"M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z\"/>","panel-left":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"M9 3v18\"/>","plus":"<path d=\"M5 12h14\"/><path d=\"M12 5v14\"/>","qr-code":"<rect width=\"5\" height=\"5\" x=\"3\" y=\"3\" rx=\"1\"/><rect width=\"5\" height=\"5\" x=\"16\" y=\"3\" rx=\"1\"/><rect width=\"5\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\"/><path d=\"M21 16h-3a2 2 0 0 0-2 2v3\"/><path d=\"M21 21v.01\"/><path d=\"M12 7v3a2 2 0 0 1-2 2H7\"/><path d=\"M3 12h.01\"/><path d=\"M12 3h.01\"/><path d=\"M12 16v.01\"/><path d=\"M16 12h1\"/><path d=\"M21 12v.01\"/><path d=\"M12 21v-1\"/>","refresh-cw":"<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\"/><path d=\"M21 3v5h-5\"/><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\"/><path d=\"M8 16H3v5\"/>","rotate-ccw":"<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path d=\"M3 3v5h5\"/>","search":"<circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/>","settings":"<path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","smartphone":"<rect width=\"14\" height=\"20\" x=\"5\" y=\"2\" rx=\"2\" ry=\"2\"/><path d=\"M12 18h.01\"/>","sun":"<circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2\"/><path d=\"M12 20v2\"/><path d=\"m4.93 4.93 1.41 1.41\"/><path d=\"m17.66 17.66 1.41 1.41\"/><path d=\"M2 12h2\"/><path d=\"M20 12h2\"/><path d=\"m6.34 17.66-1.41 1.41\"/><path d=\"m19.07 4.93-1.41 1.41\"/>","trash-2":"<path d=\"M3 6h18\"/><path d=\"M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6\"/><path d=\"M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2\"/><line x1=\"10\" x2=\"10\" y1=\"11\" y2=\"17\"/><line x1=\"14\" x2=\"14\" y1=\"11\" y2=\"17\"/>","triangle-alert":"<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\"/><path d=\"M12 9v4\"/><path d=\"M12 17h.01\"/>","undo-2":"<path d=\"M9 14 4 9l5-5\"/><path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11\"/>","users":"<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\"/><path d=\"M16 3.13a4 4 0 0 1 0 7.75\"/>","x":"<path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/>","arrow-down":"<path d=\"M12 5v14\"/><path d=\"m19 12-7 7-7-7\"/>","arrow-up":"<path d=\"m5 12 7-7 7 7\"/><path d=\"M12 19V5\"/>","cloud":"<path d=\"M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z\"/>","eye":"<path d=\"M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","globe":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20\"/><path d=\"M2 12h20\"/>","history":"<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path d=\"M3 3v5h5\"/><path d=\"M12 7v5l4 2\"/>","network":"<rect x=\"16\" y=\"16\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"2\" y=\"16\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"9\" y=\"2\" width=\"6\" height=\"6\" rx=\"1\"/><path d=\"M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3\"/><path d=\"M12 12V8\"/>","pencil":"<path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\"/><path d=\"m15 5 4 4\"/>","route":"<circle cx=\"6\" cy=\"19\" r=\"3\"/><path d=\"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15\"/><circle cx=\"18\" cy=\"5\" r=\"3\"/>","scroll-text":"<path d=\"M15 12h-5\"/><path d=\"M15 8h-5\"/><path d=\"M19 17V5a2 2 0 0 0-2-2H4\"/><path d=\"M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3\"/>","send":"<path d=\"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z\"/><path d=\"m21.854 2.147-10.94 10.939\"/>","server":"<rect width=\"20\" height=\"8\" x=\"2\" y=\"2\" rx=\"2\" ry=\"2\"/><rect width=\"20\" height=\"8\" x=\"2\" y=\"14\" rx=\"2\" ry=\"2\"/><line x1=\"6\" x2=\"6.01\" y1=\"6\" y2=\"6\"/><line x1=\"6\" x2=\"6.01\" y1=\"18\" y2=\"18\"/>","shield-check":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/><path d=\"m9 12 2 2 4-4\"/>","shield":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/>"};
   const make = (i) => { const n = i.getAttribute('data-lucide'), p = P[n]; if (!p) return;
     const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     for (const [k, v] of Object.entries({ xmlns: 'http://www.w3.org/2000/svg', width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) s.setAttribute(k, v);
@@ -4303,7 +4303,7 @@ var qrcode = function() {
     return 'до ' + date(u.expire) + (days <= 7 ? `, ${days} ${plural(days, 'день', 'дня', 'дней')}` : '')
   }
   const ST = { active: ['Активна', 'badge-success'], expired: ['Срок вышел', 'badge-warning'], limit: ['Трафик кончился', 'badge-warning'], devices: ['Много устройств', 'badge-warning'], off: ['Выключена', ''] }
-  const badge = (u) => `<span class="badge ${ST[u.state][1]}">${ST[u.state][0]}</span>`
+  const badge = (u) => `<span class="mp-st is-${u.state}"><span class="dot"></span>${ST[u.state][0]}</span>`
   const group = (u) => u.state === 'active' ? 'active' : u.state === 'off' ? 'off' : 'ended'
   const stateOf = (u, t = now()) => !u.enabled ? 'off' : u.expire && u.expire <= t ? 'expired' : u.limit && u.used >= u.limit ? 'limit' : u.block_until > t ? 'devices' : 'active'
   const MON = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
@@ -4455,7 +4455,6 @@ var qrcode = function() {
     try {
       const r = await api('GET', 'api/traffic?days=30')
       const sum = r.days.reduce((a, d) => a + d.up + d.down, 0)
-      $('mp-tr-card').hidden = !S.users.length
       $('mp-tr-sum').textContent = bytes(sum)
       $('mp-tr-tz').textContent = r.tz && r.tz !== Intl.DateTimeFormat().resolvedOptions().timeZone ? 'Дни по времени сервера, ' + r.tz : ''
       drawChart($('mp-tr-chart'), r.days, 'Трафик по дням', 120)
@@ -4470,7 +4469,9 @@ var qrcode = function() {
   const usage = (u) => u.limit ? `${NF1.format(u.used / GB)}<span class="mp-muted">/${gbOf(u.limit)} ГБ</span>` : bytes(u.used)
   const useHtml = (u) => {
     const p = u.limit ? Math.min(1, u.used / u.limit) : 0
-    return `<div class="mp-use"><span>${usage(u)}</span>${u.limit ? `<div class="progress" role="progressbar" aria-label="Трафик" aria-valuenow="${Math.round(p * 100)}"><i style="--p:${p.toFixed(3)}"></i></div>` : ''}</div>`
+    // израсходовано и предел одним цветом: серая часть вплотную к яркой читалась как склейка
+    const head = u.limit ? `<span>${NF1.format(u.used / GB)} / ${gbOf(u.limit)} ГБ</span>` : `<span>${usage(u)}</span>`
+    return `<div class="mp-use">${head}${u.limit ? `<div class="progress${p >= 1 ? " is-full" : p >= 0.8 ? " is-warn" : ""}" role="progressbar" aria-label="Трафик" aria-valuenow="${Math.round(p * 100)}"><i style="--p:${p.toFixed(3)}"></i></div>` : ''}</div>`
   }
   // Телефон и планшет: имя и трафик в первой строке, заметка и срок во второй, расход — заливкой карточки.
   // Статус без плашки: у активной срок серым, иначе вместо срока — состояние цветом
@@ -4523,9 +4524,6 @@ var qrcode = function() {
     $('mp-tpl-ver').textContent = tp ? tp.version : 'Нет'
     $('mp-tpl-foot').textContent = !tp ? 'не загружен' : tp.rejected && tp.rejected.fetched_at > tp.since ? 'новая не прошла проверку' : tp.pending ? 'есть новая версия' : 'проверена ' + (new Date(tp.checked * 1000).toDateString() === new Date().toDateString() ? 'в ' + TF.format(new Date(tp.checked * 1000)) : date(tp.checked))
     const ok = S.xray.ok
-    const b = $('mp-xray-badge')
-    b.className = 'badge ' + (ok ? 'badge-success' : 'badge-danger')
-    b.lastChild.textContent = ok ? 'Xray работает' : 'Xray не отвечает'
     $('mp-xray-alert').hidden = ok
     // IP не открывается из России: плашка над списком и точка у «Адреса»
     const w = S.watch || {}, cut = w.on && (w.state === 'blocked' || w.state === 'down')
@@ -4535,7 +4533,6 @@ var qrcode = function() {
       $('mp-block-p').textContent = w.state === 'down' ? 'Посмотрите, работает ли он у хостера' : 'Приложения в России не подключатся. Можно сменить IP или домен'
     }
     if (!ok && S.xray.error) $('mp-xray-err').textContent = S.xray.error + '. Изменения применятся, когда он снова заработает'
-    $('mp-sub').textContent = `Сервер ${S.settings.server_name}, обновлено в ${TF.format(new Date())}`
     $('mp-server-foot').textContent = S.settings.domain || S.settings.server_name
     const lg = S.settings.login || 'admin'; $('mp-acc-login').textContent = lg; $('mp-acc-av').textContent = lg.slice(0, 1).toUpperCase()
   }
@@ -4711,7 +4708,7 @@ var qrcode = function() {
     $('mp-tpl-auto').checked = !!S.settings.autoupdate
     $('mp-tpl-back').hidden = !tp?.rollback
   }
-  document.querySelectorAll('[data-open="mp-tpl"]').forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); fillTpl() }))
+  document.addEventListener('mp-page', (e) => { if (e.detail === 'subs') fillTpl() })
   $('mp-tpl-check').addEventListener('click', (e) => busy(e.currentTarget, async () => {
     try {
       const r = await api('POST', 'api/template/check'); S = r.state || S; paint(); fillTpl()
@@ -4733,8 +4730,8 @@ var qrcode = function() {
     sForm.tg_token.value = s.tg_token || ''; sForm.tg_chat.value = s.tg_chat || ''
     sForm.fp.value = s.fp; sForm.fp.dispatchEvent(new Event('change'))
   }
-  document.querySelectorAll('[data-open="mp-set"]').forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); fillSet() }))
-  document.querySelectorAll('[data-open="mp-mnt"]').forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); fillUpd() }))
+  document.addEventListener('mp-page', (e) => { if (e.detail === 'set') fillSet() })
+  document.addEventListener('mp-page', (e) => { if (e.detail === 'srv') fillUpd() })
 
   // ---------- обновление monolit из релизов GitHub ----------
   let updPoll = 0
@@ -4810,7 +4807,7 @@ var qrcode = function() {
     busy(document.querySelector('[form="mp-set-form"]'), async () => {
       try {
         S = await api('PATCH', 'api/settings', { server_name: sForm.server_name.value, tg_token: sForm.tg_token.value, tg_chat: sForm.tg_chat.value, fp: sForm.fp.value, update_hours: sForm.update_hours.value, support_url: sForm.support_url.value, login, ...(pw ? { password: pw } : {}) })
-        paint(); $('mp-set').close()
+        paint()
         if (relogin) { toast({ type: 'success', title: pw ? 'Пароль сменён' : 'Логин сменён', text: 'Войдите заново' }); showLogin() } else toast({ type: 'success', title: 'Настройки сохранены' })
       } catch (err) { fail(err) }
     })
@@ -4828,7 +4825,7 @@ var qrcode = function() {
 
   // Для разделов сервера (server.js, addr.js)
   window.mpAdmin = { demo: () => DEMO, api: (m, p, b) => api(m, p, b), confirm: confirmAct, setCopy, domain: () => S?.settings?.domain || location.hostname,
-    state: () => S, setState: (s) => { S = s; paint() }, bytes, ago, refresh: () => api('GET', 'api/state').then((s) => { S = s; paint() }).catch(() => {}) }
+    state: () => S, openUser: (id) => openDetail(id), setState: (s) => { S = s; paint() }, bytes, ago, refresh: () => api('GET', 'api/state').then((s) => { S = s; paint() }).catch(() => {}) }
 
   // ---------- QR в SVG ----------
   function qrSvg(text) {
@@ -5298,8 +5295,8 @@ var qrcode = function() {
   })
 
   // Открытие шторки — свежие данные
-  for (const id of ['mp-srv', 'mp-routes', 'mp-warp', 'mp-proto', 'mp-hist'])
-    document.querySelectorAll(`[data-open="${id}"]`).forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); if (M) paintAll(); ensure().catch(fail) }))
+  // (WARP — на странице «Выходы», история — на «Сервере»)
+  document.addEventListener('mp-page', (e) => { if (!['srv', 'routes', 'exits', 'proto'].includes(e.detail)) return; if (M) paintAll(); ensure().catch(fail) })
 })()
 
 ;
@@ -5408,8 +5405,8 @@ var qrcode = function() {
     $('mp-a-edit').disabled = foreign || running || !D.net
     $('mp-a-edit').closest('.btn-row').hidden = foreign
     // исходящий IP: только когда конфигом Xray управляет monolit
-    $('mp-o-sec').hidden = foreign
-    $('mp-o-kv').innerHTML = kv([['Сейчас', D.out_ip || 'как решает сервер' + (D.net?.ip1 ? `, ${D.net.ip1}` : '')]])
+    $('mp-o-kv').hidden = foreign; $('mp-o-edit').hidden = foreign
+    $('mp-o-kv').innerHTML = kv([['Исходящий IP', D.out_ip || 'как решает сервер' + (D.net?.ip1 ? `, ${D.net.ip1}` : '')]])
     $('mp-o-edit').disabled = foreign || running || !D.net
   }
   // ---------- переживут ли адреса перезагрузку ----------
@@ -5442,7 +5439,8 @@ var qrcode = function() {
   const paint = () => { paintWatch(); paintAddr() }
 
   async function load() { D = await api('GET', 'api/addr'); paint(); if (D.job?.state === 'running' && now() - D.job.at < 900) follow() }
-  document.querySelectorAll('[data-open="mp-addr"]').forEach((b) => b.addEventListener('click', () => { if (!D) $('mp-a-kv').innerHTML = kv([['Домен', A().domain()]]); load().catch(fail) }))
+  // страница «Адрес» открылась — свежие данные
+  document.addEventListener('mp-page', (e) => { if (e.detail !== 'addr') return; if (!D) $('mp-a-kv').innerHTML = kv([['Домен', A().domain()]]); load().catch(fail) })
 
   // ---------- проверка ----------
   $('mp-w-check').addEventListener('click', (e) => busy(e.currentTarget, async () => {
@@ -5678,16 +5676,33 @@ var qrcode = function() {
   }
 
   // ---------- страницы ----------
-  let page = 'users'
+  let page = 'home'
   const items = () => document.querySelectorAll('.side-item[data-page]')
   const mark = () => { document.querySelectorAll('.side-item[aria-current]').forEach((x) => x.removeAttribute('aria-current')); document.querySelector(`.side-item[data-page="${page}"]`).setAttribute('aria-current', 'page') }
-  function go(p) {
+  // адрес страницы — в ссылке (#users, #set …): перезагрузка и «назад» возвращают на неё, а не на главную.
+  // Решётка, а не путь: админка отдаётся одним файлом, и относительные ссылки на api и файлы не ломаются
+  const pages = [...items()].map((a) => a.dataset.page)
+  const fromUrl = () => { const p = decodeURIComponent(location.hash.slice(1)); return pages.includes(p) ? p : 'home' }
+  const opened = (p) => document.dispatchEvent(new CustomEvent('mp-page', { detail: p }))
+  function go(p, push = true) {
     if (p === page) return
-    const o = $('mp-page-' + page), n = $('mp-page-' + p); page = p
+    if (push) history.pushState(null, '', p === 'home' ? location.pathname + location.search : '#' + p)
+    const o = $('mp-page-' + page), n = $('mp-page-' + p); page = p; mark()
     o.classList.add('out')
-    setTimeout(() => { o.hidden = true; o.classList.remove('out'); n.classList.add('out'); n.hidden = false; paint(); void n.offsetWidth; n.classList.remove('out') }, 200)
+    setTimeout(() => { o.hidden = true; o.classList.remove('out'); n.classList.add('out'); n.hidden = false; paint(); opened(p); void n.offsetWidth; n.classList.remove('out') }, 200)
   }
   items().forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); go(a.dataset.page) }))
+  addEventListener('popstate', () => go(fromUrl(), false))
+  // открыли по ссылке на страницу: показываем её сразу, без перехода; заполняем, когда скрипты загружены и состояние пришло
+  const first = fromUrl()
+  if (first !== 'home') {
+    $('mp-page-home').hidden = true; $('mp-page-' + first).hidden = false; page = first; mark()
+    addEventListener('DOMContentLoaded', () => {
+      if (S()?.users) { paint(); opened(first); return }
+      const kick = () => { document.removeEventListener('mp-state', kick); paint(); opened(first) }
+      document.addEventListener('mp-state', kick)
+    })
+  }
   // пункт меню, открывший шторку, после её закрытия отдаёт отметку обратно странице
   document.querySelectorAll('dialog').forEach((d) => d.addEventListener('close', () => setTimeout(mark, 0)))
 
@@ -5701,19 +5716,16 @@ var qrcode = function() {
   }
   const since = (t) => { const m = Math.max(1, Math.round((Date.now() / 1000 - t) / 60)), h = Math.round(m / 60), d = Math.round(h / 24); return m < 90 ? `${m} мин` : h < 36 ? `${h} ч` : `${d} ${plural(d, 'день', 'дня', 'дней')}` }
   const stText = (n) => n.waiting && !n.joined ? 'Ждёт команду' : n.up ? (n.err ? 'Ошибка настроек' : n.xray_ok ? 'На связи' : 'Xray не запущен') : n.joined ? 'Нет связи ' + since(n.seen) : 'Не подключалась'
-  const stKind = (n) => n.up && !n.err && n.xray_ok ? 'badge-success' : n.up || (n.waiting && !n.joined) ? 'badge-warning' : 'badge-danger'
+  const stKind = (n) => n.up && !n.err && n.xray_ok ? 'is-ok' : n.up || (n.waiting && !n.joined) ? 'is-warn' : 'is-bad'
   function paintNodes() {
     const s = S(), peopleOn = s.users.filter((u) => u.online?.length).length
     const rows = [{ id: 0, name: s.settings.server_name, addr: s.settings.domain, up: s.xray.ok, joined: true, err: '', xray_ok: true, online: peopleOn, day: s.main.day, main: true }, ...s.nodes]
     put($('nd-rows'), rows.map((n) => `<tr tabindex="0" data-id="${n.id}" class="${n.up || n.waiting ? '' : 'is-down'}">
       <th scope="row"><span class="mp-who">${esc(n.name)}</span><span class="mp-what">${esc(n.addr || 'адрес появится после команды')}</span>
         <span class="mp-m"><span class="mp-m-note">${esc(usage(n.id))}</span><span class="mp-m-exp${n.up ? '' : ' is-expired'}">${n.main ? (n.up ? 'На связи' : 'Xray не отвечает') : esc(stText(n))}</span><span class="mp-m-use">${n.up ? n.online + ' в сети' : ''}</span></span></th>
-      <td>${esc(usage(n.id))}</td><td class="mp-nd-st"><span class="badge ${n.main ? (n.up ? 'badge-success' : 'badge-danger') : stKind(n)}"><span class="dot"></span>${n.main ? (n.up ? 'На связи' : 'Xray не отвечает') : esc(stText(n))}</span></td>
+      <td>${esc(usage(n.id))}</td><td class="mp-nd-st"><span class="mp-st ${n.main ? (n.up ? 'is-ok' : 'is-bad') : stKind(n)}"><span class="dot"></span>${n.main ? (n.up ? 'На связи' : 'Xray не отвечает') : esc(stText(n))}</span></td>
       <td class="num">${n.up ? n.online : ''}</td><td class="num">${n.up && n.day ? A.bytes(n.day) : ''}</td></tr>`).join(''))
     const bad = s.nodes.filter((n) => n.joined && (!n.up || n.err || !n.xray_ok)).length + (s.xray.ok ? 0 : 1)
-    $('nd-badge').className = 'badge ' + (bad ? 'badge-warning' : 'badge-success')
-    $('nd-badge').lastElementChild.textContent = bad ? `${bad} ${plural(bad, 'не в порядке', 'не в порядке', 'не в порядке')}` : 'Все на связи'
-    $('nd-sub').textContent = `${rows.length} ${plural(rows.length, 'сервер', 'сервера', 'серверов')}`
     $('nd-count').textContent = rows.length; $('nd-dot').hidden = !bad; $('nd-count').hidden = !!bad
     if ($('nd-sheet').open && sheetId) fillSheet(false)
     if ($('nd-add').open && addId) checkJoined()
@@ -5723,7 +5735,7 @@ var qrcode = function() {
   function fillSheet(form = true) {
     const n = node(sheetId); if (!n) { $('nd-sheet').close(); return }
     $('nd-s-t').textContent = n.name; $('nd-s-ip').textContent = n.addr || 'ещё не подключалась'
-    $('nd-s-badge').className = 'badge ' + stKind(n); $('nd-s-badge').lastElementChild.textContent = stText(n)
+    $('nd-s-badge').className = 'badge badge-' + { 'is-ok': 'success', 'is-warn': 'warning', 'is-bad': 'danger' }[stKind(n)]; $('nd-s-badge').lastElementChild.textContent = stText(n)
     $('nd-s-seen').textContent = n.up && n.seen ? 'отчёт ' + since(n.seen) + ' назад' : ''
     $('nd-s-err').hidden = !n.err; $('nd-s-err-t').textContent = n.err
     put($('nd-s-kv'), [['Занята', usage(n.id)], ['Xray', n.xray || 'нет данных'], ['В сети', n.up ? n.online : 'нет данных'], ['За сутки', n.day ? A.bytes(n.day) : '0'], ['Нагрузка', n.load || 'нет данных']].map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join(''))
@@ -5733,7 +5745,7 @@ var qrcode = function() {
     // с доменом и сертификатом Reality маскируется под сам домен ноды: чужой сайт не используется, поле только путает
     $('nd-s-form').mask.closest('.field').hidden = !!n.tls
   }
-  const openRow = (id) => { if (!Number(id)) { document.querySelector('.side-item[data-open="mp-srv"]').click(); return } sheetId = Number(id); fillSheet(); $('nd-sheet').showModal() }
+  const openRow = (id) => { if (!Number(id)) { document.querySelector('.side-item[data-page="srv"]').click(); return } sheetId = Number(id); fillSheet(); $('nd-sheet').showModal() }
   $('nd-rows').addEventListener('click', (e) => { const tr = e.target.closest('tr'); if (tr) openRow(tr.dataset.id) })
   $('nd-rows').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('tr')) openRow(e.target.dataset.id) })
   $('nd-s-form').addEventListener('submit', (e) => {
@@ -6060,10 +6072,78 @@ var qrcode = function() {
   }
   window.mpExits = { fill, paint }
 
-  document.querySelectorAll('[data-open="mp-exits"]').forEach((b) => b.addEventListener('click', paint))
+  document.addEventListener('mp-page', (e) => { if (e.detail === 'exits') paint() })
   const prev = A.setState
   A.setState = (s) => { prev(s); paint() }
   // общий список обновляется раз в минуту в admin.js: подхватываем тем же опросом
-  setInterval(() => { if ($('mp-exits').open) paint() }, 5000)
+  setInterval(() => { if (!$('mp-page-exits').hidden) paint() }, 5000)
   setTimeout(paint, 0)
+})()
+
+;
+// home.js
+// Главная: что требует внимания (с действием), серверы, кто сейчас в сети.
+// Данные — то же состояние админки (mpAdmin.state), перерисовка по событию mp-state
+(() => {
+  const $ = (id) => document.getElementById(id)
+  const A = window.mpAdmin
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+  const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c }
+  const now = () => Math.floor(Date.now() / 1000)
+  const since = (t) => { const m = Math.max(1, Math.round((now() - t) / 60)), h = Math.round(m / 60), d = Math.round(h / 24); return m < 90 ? `${m} мин` : h < 36 ? `${h} ч` : `${d} ${plural(d, 'день', 'дня', 'дней')}` }
+  const ic = (name) => `<i data-lucide="${name}"></i>`
+  const paintIcons = (el) => el.querySelectorAll('i[data-lucide]').length && window.lucide?.createIcons()
+
+  // переходы на страницы — тем же пунктом меню
+  const page = (p) => document.querySelector(`.side-item[data-page="${p}"]`)?.click()
+  document.addEventListener('click', (e) => {
+    const g = e.target.closest('[data-go]'); if (g) { e.preventDefault(); page(g.dataset.go); return }
+    const u = e.target.closest('[data-user]'); if (u) { e.preventDefault(); A.openUser(u.dataset.user) }
+  })
+
+  const row = (icon, kind, title, sub, act) => `<div class="hm-li"><span class="hm-ic${kind ? ' is-' + kind : ''}">${ic(icon)}</span><span class="hm-tx"><b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</span>${act || '<span></span>'}</div>`
+  const btn = (attr, text) => `<button class="btn btn-secondary btn-sm" type="button" ${attr}><span>${text}</span></button>`
+
+  function todo(S) {
+    const out = []
+    if (!S.xray.ok) out.push(row('circle-alert', 'bad', 'Xray не отвечает', S.xray.error || 'Изменения применятся, когда он заработает', btn('data-go="srv"', 'Сервер')))
+    const w = S.watch || {}
+    if (w.on && w.state === 'blocked') out.push(row('circle-alert', 'bad', `IP ${w.ip} не открывается из России`, 'Приложения в России не подключатся', btn('data-go="addr"', 'Сменить адрес')))
+    if (w.on && w.state === 'down') out.push(row('circle-alert', 'bad', 'Сервер не отвечает ни из России, ни из-за границы', 'Посмотрите, работает ли он у хостера', btn('data-go="addr"', 'Подробнее')))
+    for (const n of S.nodes || []) if (n.joined && (!n.up || n.err || !n.xray_ok))
+      out.push(row('triangle-alert', 'warn', n.up ? `Нода ${n.name}: ${n.err ? 'ошибка настроек' : 'Xray не запущен'}` : `Нода ${n.name} не на связи`, n.up ? '' : since(n.seen), btn('data-go="nodes"', 'Открыть')))
+    const u = S.update
+    if (u?.available && u.latest) out.push(row('download', '', `Вышла версия ${String(u.latest.tag).replace(/^v/, '')}`, `Сейчас стоит ${u.current}`, btn('data-go="srv"', 'Обновить')))
+    $('hm-todo-n').textContent = out.length || ''
+    $('hm-todo').innerHTML = out.length ? out.join('') : row('circle-check', 'ok', 'Всё работает', 'Сервер, ноды и адрес в порядке')
+    paintIcons($('hm-todo'))
+  }
+
+  function servers(S) {
+    const lines = (S.kits || []).flatMap((k) => k.lines.filter((l) => l.on))
+    const role = (id) => [lines.some((l) => l.out === id) && 'сервер', lines.some((l) => l.via === id) && 'мост'].filter(Boolean).join(', ') || 'не используется'
+    const on = S.users.filter((u) => u.online?.length).length
+    const list = [{ name: S.settings.server_name, role: 'основной', ok: S.xray.ok, st: S.xray.ok ? 'на связи' : 'Xray не отвечает', online: on, id: 0 },
+      ...(S.nodes || []).map((n) => ({ name: n.name, role: role(n.id), ok: n.up && !n.err && n.xray_ok, st: n.waiting && !n.joined ? 'ждёт команду' : n.up ? (n.err ? 'ошибка настроек' : n.xray_ok ? 'на связи' : 'Xray не запущен') : 'нет связи ' + since(n.seen), online: n.up ? n.online : 0, id: n.id }))]
+    $('hm-srv').innerHTML = list.map((s) => `<a href="#" ${s.id ? 'data-go="nodes"' : 'data-go="srv"'}><span class="hm-srv-row"><b>${esc(s.name)}</b><span>${esc(s.role)}</span></span>`
+      + `<span class="hm-srv-row"><span class="hm-dot${s.ok ? '' : ' is-down'}">${esc(s.st)}</span><span>${s.online} в сети</span></span></a>`).join('')
+  }
+
+  function online(S) {
+    const us = S.users.filter((u) => u.online?.length)
+    $('hm-on-n').textContent = us.length || ''
+    $('hm-on').innerHTML = us.length ? us.map((u) => `<a class="hm-li" href="#" data-user="${u.id}"><span class="avatar avatar-sm" data-hue="${u.id % 8 || 8}">${esc(u.name.trim()[0] || '?').toUpperCase()}</span>`
+      + `<span class="hm-tx"><b>${esc(u.name)}</b><span>${esc(u.online.length > 1 ? `${u.online.length} IP` : u.note || u.online[0].ip)}</span></span><span></span></a>`).join('')
+      : `<div class="hm-li no-ic"><span class="hm-tx"><span>Сейчас никого</span></span></div>`
+  }
+
+  function paint() {
+    const S = A.state(); if (!S?.users) return
+    const on = S.users.filter((u) => u.online?.length).length, n = S.users.length, k = (S.kits || []).length
+    $('hm-users-sub').textContent = `${n} ${plural(n, 'человек', 'человека', 'человек')}, ${on} в сети`
+    $('hm-kits-sub').textContent = `${k} ${plural(k, 'набор', 'набора', 'наборов')}`
+    todo(S); servers(S); online(S)
+  }
+  document.addEventListener('mp-state', paint)
+  paint()
 })()

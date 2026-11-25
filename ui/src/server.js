@@ -438,6 +438,6 @@
   })
 
   // Открытие шторки — свежие данные
-  for (const id of ['mp-srv', 'mp-routes', 'mp-warp', 'mp-proto', 'mp-hist'])
-    document.querySelectorAll(`[data-open="${id}"]`).forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); if (M) paintAll(); ensure().catch(fail) }))
+  // (WARP — на странице «Выходы», история — на «Сервере»)
+  document.addEventListener('mp-page', (e) => { if (!['srv', 'routes', 'exits', 'proto'].includes(e.detail)) return; if (M) paintAll(); ensure().catch(fail) })
 })()

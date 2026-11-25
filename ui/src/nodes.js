@@ -67,16 +67,33 @@
   }
 
   // ---------- страницы ----------
-  let page = 'users'
+  let page = 'home'
   const items = () => document.querySelectorAll('.side-item[data-page]')
   const mark = () => { document.querySelectorAll('.side-item[aria-current]').forEach((x) => x.removeAttribute('aria-current')); document.querySelector(`.side-item[data-page="${page}"]`).setAttribute('aria-current', 'page') }
-  function go(p) {
+  // адрес страницы — в ссылке (#users, #set …): перезагрузка и «назад» возвращают на неё, а не на главную.
+  // Решётка, а не путь: админка отдаётся одним файлом, и относительные ссылки на api и файлы не ломаются
+  const pages = [...items()].map((a) => a.dataset.page)
+  const fromUrl = () => { const p = decodeURIComponent(location.hash.slice(1)); return pages.includes(p) ? p : 'home' }
+  const opened = (p) => document.dispatchEvent(new CustomEvent('mp-page', { detail: p }))
+  function go(p, push = true) {
     if (p === page) return
-    const o = $('mp-page-' + page), n = $('mp-page-' + p); page = p
+    if (push) history.pushState(null, '', p === 'home' ? location.pathname + location.search : '#' + p)
+    const o = $('mp-page-' + page), n = $('mp-page-' + p); page = p; mark()
     o.classList.add('out')
-    setTimeout(() => { o.hidden = true; o.classList.remove('out'); n.classList.add('out'); n.hidden = false; paint(); void n.offsetWidth; n.classList.remove('out') }, 200)
+    setTimeout(() => { o.hidden = true; o.classList.remove('out'); n.classList.add('out'); n.hidden = false; paint(); opened(p); void n.offsetWidth; n.classList.remove('out') }, 200)
   }
   items().forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); go(a.dataset.page) }))
+  addEventListener('popstate', () => go(fromUrl(), false))
+  // открыли по ссылке на страницу: показываем её сразу, без перехода; заполняем, когда скрипты загружены и состояние пришло
+  const first = fromUrl()
+  if (first !== 'home') {
+    $('mp-page-home').hidden = true; $('mp-page-' + first).hidden = false; page = first; mark()
+    addEventListener('DOMContentLoaded', () => {
+      if (S()?.users) { paint(); opened(first); return }
+      const kick = () => { document.removeEventListener('mp-state', kick); paint(); opened(first) }
+      document.addEventListener('mp-state', kick)
+    })
+  }
   // пункт меню, открывший шторку, после её закрытия отдаёт отметку обратно странице
   document.querySelectorAll('dialog').forEach((d) => d.addEventListener('close', () => setTimeout(mark, 0)))
 
@@ -90,19 +107,16 @@
   }
   const since = (t) => { const m = Math.max(1, Math.round((Date.now() / 1000 - t) / 60)), h = Math.round(m / 60), d = Math.round(h / 24); return m < 90 ? `${m} мин` : h < 36 ? `${h} ч` : `${d} ${plural(d, 'день', 'дня', 'дней')}` }
   const stText = (n) => n.waiting && !n.joined ? 'Ждёт команду' : n.up ? (n.err ? 'Ошибка настроек' : n.xray_ok ? 'На связи' : 'Xray не запущен') : n.joined ? 'Нет связи ' + since(n.seen) : 'Не подключалась'
-  const stKind = (n) => n.up && !n.err && n.xray_ok ? 'badge-success' : n.up || (n.waiting && !n.joined) ? 'badge-warning' : 'badge-danger'
+  const stKind = (n) => n.up && !n.err && n.xray_ok ? 'is-ok' : n.up || (n.waiting && !n.joined) ? 'is-warn' : 'is-bad'
   function paintNodes() {
     const s = S(), peopleOn = s.users.filter((u) => u.online?.length).length
     const rows = [{ id: 0, name: s.settings.server_name, addr: s.settings.domain, up: s.xray.ok, joined: true, err: '', xray_ok: true, online: peopleOn, day: s.main.day, main: true }, ...s.nodes]
     put($('nd-rows'), rows.map((n) => `<tr tabindex="0" data-id="${n.id}" class="${n.up || n.waiting ? '' : 'is-down'}">
       <th scope="row"><span class="mp-who">${esc(n.name)}</span><span class="mp-what">${esc(n.addr || 'адрес появится после команды')}</span>
         <span class="mp-m"><span class="mp-m-note">${esc(usage(n.id))}</span><span class="mp-m-exp${n.up ? '' : ' is-expired'}">${n.main ? (n.up ? 'На связи' : 'Xray не отвечает') : esc(stText(n))}</span><span class="mp-m-use">${n.up ? n.online + ' в сети' : ''}</span></span></th>
-      <td>${esc(usage(n.id))}</td><td class="mp-nd-st"><span class="badge ${n.main ? (n.up ? 'badge-success' : 'badge-danger') : stKind(n)}"><span class="dot"></span>${n.main ? (n.up ? 'На связи' : 'Xray не отвечает') : esc(stText(n))}</span></td>
+      <td>${esc(usage(n.id))}</td><td class="mp-nd-st"><span class="mp-st ${n.main ? (n.up ? 'is-ok' : 'is-bad') : stKind(n)}"><span class="dot"></span>${n.main ? (n.up ? 'На связи' : 'Xray не отвечает') : esc(stText(n))}</span></td>
       <td class="num">${n.up ? n.online : ''}</td><td class="num">${n.up && n.day ? A.bytes(n.day) : ''}</td></tr>`).join(''))
     const bad = s.nodes.filter((n) => n.joined && (!n.up || n.err || !n.xray_ok)).length + (s.xray.ok ? 0 : 1)
-    $('nd-badge').className = 'badge ' + (bad ? 'badge-warning' : 'badge-success')
-    $('nd-badge').lastElementChild.textContent = bad ? `${bad} ${plural(bad, 'не в порядке', 'не в порядке', 'не в порядке')}` : 'Все на связи'
-    $('nd-sub').textContent = `${rows.length} ${plural(rows.length, 'сервер', 'сервера', 'серверов')}`
     $('nd-count').textContent = rows.length; $('nd-dot').hidden = !bad; $('nd-count').hidden = !!bad
     if ($('nd-sheet').open && sheetId) fillSheet(false)
     if ($('nd-add').open && addId) checkJoined()
@@ -112,7 +126,7 @@
   function fillSheet(form = true) {
     const n = node(sheetId); if (!n) { $('nd-sheet').close(); return }
     $('nd-s-t').textContent = n.name; $('nd-s-ip').textContent = n.addr || 'ещё не подключалась'
-    $('nd-s-badge').className = 'badge ' + stKind(n); $('nd-s-badge').lastElementChild.textContent = stText(n)
+    $('nd-s-badge').className = 'badge badge-' + { 'is-ok': 'success', 'is-warn': 'warning', 'is-bad': 'danger' }[stKind(n)]; $('nd-s-badge').lastElementChild.textContent = stText(n)
     $('nd-s-seen').textContent = n.up && n.seen ? 'отчёт ' + since(n.seen) + ' назад' : ''
     $('nd-s-err').hidden = !n.err; $('nd-s-err-t').textContent = n.err
     put($('nd-s-kv'), [['Занята', usage(n.id)], ['Xray', n.xray || 'нет данных'], ['В сети', n.up ? n.online : 'нет данных'], ['За сутки', n.day ? A.bytes(n.day) : '0'], ['Нагрузка', n.load || 'нет данных']].map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join(''))
@@ -122,7 +136,7 @@
     // с доменом и сертификатом Reality маскируется под сам домен ноды: чужой сайт не используется, поле только путает
     $('nd-s-form').mask.closest('.field').hidden = !!n.tls
   }
-  const openRow = (id) => { if (!Number(id)) { document.querySelector('.side-item[data-open="mp-srv"]').click(); return } sheetId = Number(id); fillSheet(); $('nd-sheet').showModal() }
+  const openRow = (id) => { if (!Number(id)) { document.querySelector('.side-item[data-page="srv"]').click(); return } sheetId = Number(id); fillSheet(); $('nd-sheet').showModal() }
   $('nd-rows').addEventListener('click', (e) => { const tr = e.target.closest('tr'); if (tr) openRow(tr.dataset.id) })
   $('nd-rows').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('tr')) openRow(e.target.dataset.id) })
   $('nd-s-form').addEventListener('submit', (e) => {
