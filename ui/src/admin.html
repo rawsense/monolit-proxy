@@ -35,7 +35,8 @@
 <script src="addr.js" defer></script>
 <script src="nodes.js" defer></script>
 <script src="exits.js" defer></script>
-<script src="home.js" defer></script><!--/js-->
+<script src="home.js" defer></script>
+<script src="flags.js" defer></script><!--/js-->
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="mp-mark" viewBox="0 0 24 24"><path d="M4.5 19 V10.5 Q4.5 6 8.25 6 Q12 6 12 10.5 V19 M12 10.5 Q12 6 15.75 6 Q19.5 6 19.5 10.5 V19" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></symbol></svg>
@@ -165,45 +166,33 @@
 </section>
 
 <!-- Подписки -->
-<section class="mp-page" id="mp-page-subs" hidden>
+<section class="mp-page mp-pg" id="mp-page-subs" hidden>
   <div class="app-head">
     <div>
       <div class="app-title"><h1>Подписки</h1></div>
     </div>
   </div>
-  <div class="mp-kit-bar">
-    <div class="tabs" role="tablist" aria-label="Наборы" id="kit-tabs"><span class="line"></span></div>
-    <button class="btn btn-ghost btn-sm mp-kit-new" type="button" id="kit-new" aria-label="Новый набор"><i data-lucide="plus"></i><span>Набор</span></button>
-  </div>
-  <div class="mp-kit" id="kit-box">
-    <div class="mp-kit-main">
-      <div class="alist mp-lines" id="ln-list"></div>
-      <div class="state state-dashed" id="ln-empty" hidden><span class="state-ic"><i data-lucide="list-checks"></i></span><h4>В наборе пусто</h4><p>Люди с этим набором не увидят в приложении ни одного сервера</p></div>
-      <div class="btn-row"><button class="btn btn-primary" type="button" id="ln-add"><i data-lucide="plus"></i><span>Добавить подключение</span></button></div>
+  <div class="mp-pg-body mp-kit" id="kit-box">
+    <div class="mp-kit-bar">
+      <div class="tabs" role="tablist" aria-label="Наборы" id="kit-tabs"><span class="line"></span></div>
+      <button class="btn btn-ghost btn-sm mp-kit-new" type="button" id="kit-new" aria-label="Новый набор"><i data-lucide="plus"></i><span>Набор</span></button>
     </div>
-    <aside class="mp-kit-side">
+    <div class="mp-col">
+      <div class="mp-section">
+        <span class="t-label">Подключения</span>
+        <div class="alist mp-lines" id="ln-list"></div>
+        <div class="state state-dashed" id="ln-empty" hidden><span class="state-ic"><i data-lucide="list-checks"></i></span><h4>В наборе пусто</h4><p>Люди с этим набором не увидят в приложении ни одного сервера</p></div>
+        <div class="btn-row"><button class="btn btn-primary" type="button" id="ln-add"><i data-lucide="plus"></i><span>Добавить подключение</span></button></div>
+      </div>
+    </div>
+    <div class="mp-col">
       <div class="mp-section">
         <span class="t-label">Набор</span>
         <label class="field"><span class="label">Название</span><input class="input" id="kit-name" maxlength="24" autocomplete="off"></label>
         <label class="choice"><input type="checkbox" role="switch" class="switch" id="kit-def"><span>Для новых людей</span></label>
-      </div>
-      <div class="mp-section">
-        <span class="t-label">У кого</span>
+        <span class="t-label mp-sub-label">У кого</span>
         <div class="mp-kit-who"><span class="avatars avatars-md" id="kit-avs"></span><button class="btn btn-secondary btn-sm" type="button" id="kit-who"><span>Изменить</span></button></div>
-      </div>
-      <div class="mp-section" id="kit-del-sec"><div class="btn-row"><button class="btn btn-ghost btn-sm mp-danger" type="button" id="kit-del"><i data-lucide="trash-2"></i><span>Удалить набор</span></button></div></div>
-    </aside>
-  </div>
-  <div class="mp-pg-body mp-tpl-box">
-    <div class="mp-col">
-      <div class="mp-section">
-        <span class="t-label">Шаблон autoXRAY</span>
-        <p class="mp-note">Настройки приложений в подписках берутся из autoXRAY на GitHub: маршруты, отпечаток браузера, протоколы. Скрипт не запускается, из него берётся только шаблон, и каждая новая версия сначала проверяется самим Xray</p>
-        <div class="alert alert-warning" id="mp-tpl-rej" hidden><i data-lucide="triangle-alert"></i><div><b>Новая версия не прошла проверку</b><span id="mp-tpl-rej-t"></span></div></div>
-        <dl class="mp-kv" id="mp-tpl-kv"></dl>
-        <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-tpl-auto"><span>Обновлять сам<small>Раз в сутки; если выключить, новая версия будет ждать вашей кнопки</small></span></label>
-        <div class="btn-row"><button class="btn btn-secondary" type="button" id="mp-tpl-check"><i data-lucide="refresh-cw"></i><span>Проверить сейчас</span></button>
-          <button class="btn btn-ghost" type="button" id="mp-tpl-back"><i data-lucide="undo-2"></i><span>Вернуть прошлую</span></button></div>
+        <div class="btn-row" id="kit-del-sec"><button class="btn btn-ghost mp-danger" type="button" id="kit-del"><i data-lucide="trash-2"></i><span>Удалить набор</span></button></div>
       </div>
     </div>
   </div>
@@ -316,14 +305,15 @@
         <div class="alert alert-danger" id="mp-srv-nginx" hidden><i data-lucide="circle-alert"></i><div><b>nginx не работает</b><span>Админка и страницы подписок могут не открываться. Попробуйте «Перечитать настройки nginx» или посмотрите журнал</span></div></div>
         <div class="alert alert-warning" id="mp-srv-cert" hidden><i data-lucide="triangle-alert"></i><div><b id="mp-srv-cert-t">Сертификат скоро закончится</b><span>Нажмите «Продлить сертификат». Если не продлится, приложения перестанут подключаться</span></div></div>
       </div>
-      <div class="mp-section">
-        <span class="t-label">Обновление</span>
-        <dl class="mp-kv" id="mp-up-kv"></dl>
-        <div class="alert alert-danger" id="mp-up-fail" hidden><i data-lucide="circle-alert"></i><div><b>Обновление не встало</b><span id="mp-up-fail-t"></span></div></div>
-        <div class="mp-up-new" id="mp-up-new" hidden><b id="mp-up-new-t"></b><p class="mp-note mp-up-notes" id="mp-up-notes"></p></div>
-        <p class="mp-note" id="mp-up-run" hidden></p>
-        <div class="btn-row"><button class="btn btn-primary" type="button" id="mp-up-go" hidden><i data-lucide="download"></i><span>Обновить</span></button>
-          <button class="btn btn-secondary" type="button" id="mp-up-check"><i data-lucide="refresh-cw"></i><span>Проверить</span></button></div>
+      <div class="mp-section"><span class="t-label">Действия</span>
+        <div class="alist mp-actions" id="mp-srv-acts">
+          <button type="button" class="alist-row" data-act="restart" data-ask="Перезапустить Xray?|Подключения оборвутся на пару секунд, приложения переподключатся сами|Перезапустить"><span class="alist-ic"><i data-lucide="rotate-ccw"></i></span><span class="alist-tx"><b>Перезапустить Xray</b><span>Связь прервётся на пару секунд</span></span></button>
+          <button type="button" class="alist-row" data-act="reload"><span class="alist-ic"><i data-lucide="refresh-cw"></i></span><span class="alist-tx"><b>Перечитать настройки nginx</b><span>Сайты не прерываются</span></span></button>
+          <button type="button" class="alist-row" data-act="update" data-ask="Обновить Xray?|Поставим последнюю версию с GitHub и перезапустим. Подключения оборвутся на пару секунд|Обновить"><span class="alist-ic"><i data-lucide="download"></i></span><span class="alist-tx"><b>Обновить Xray</b><span id="mp-srv-ver">Последняя версия с GitHub</span></span></button>
+          <button type="button" class="alist-row" data-act="geo"><span class="alist-ic"><i data-lucide="globe"></i></span><span class="alist-tx"><b>Обновить базы адресов</b><span>geosite и geoip для маршрутов</span></span></button>
+          <button type="button" class="alist-row" data-act="cert"><span class="alist-ic"><i data-lucide="shield-check"></i></span><span class="alist-tx"><b>Продлить сертификат</b><span>Если осталось меньше 30 дней</span></span></button>
+          <button type="button" class="alist-row" data-act="journal"><span class="alist-ic"><i data-lucide="scroll-text"></i></span><span class="alist-tx"><b>Журнал Xray</b><span>Последние 100 строк</span></span></button>
+        </div>
       </div>
       <div class="mp-section">
         <span class="t-label">Бэкап</span>
@@ -334,15 +324,23 @@
       </div>
     </div>
     <div class="mp-col">
-      <div class="mp-section"><span class="t-label">Действия</span>
-        <div class="alist mp-actions" id="mp-srv-acts">
-          <button type="button" class="alist-row" data-act="restart" data-ask="Перезапустить Xray?|Подключения оборвутся на пару секунд, приложения переподключатся сами|Перезапустить"><span class="alist-ic"><i data-lucide="rotate-ccw"></i></span><span class="alist-tx"><b>Перезапустить Xray</b><span>Связь прервётся на пару секунд</span></span></button>
-          <button type="button" class="alist-row" data-act="reload"><span class="alist-ic"><i data-lucide="refresh-cw"></i></span><span class="alist-tx"><b>Перечитать настройки nginx</b><span>Сайты не прерываются</span></span></button>
-          <button type="button" class="alist-row" data-act="update" data-ask="Обновить Xray?|Поставим последнюю версию с GitHub и перезапустим. Подключения оборвутся на пару секунд|Обновить"><span class="alist-ic"><i data-lucide="download"></i></span><span class="alist-tx"><b>Обновить Xray</b><span id="mp-srv-ver">Последняя версия с GitHub</span></span></button>
-          <button type="button" class="alist-row" data-act="geo"><span class="alist-ic"><i data-lucide="globe"></i></span><span class="alist-tx"><b>Обновить базы адресов</b><span>geosite и geoip для маршрутов</span></span></button>
-          <button type="button" class="alist-row" data-act="cert"><span class="alist-ic"><i data-lucide="shield-check"></i></span><span class="alist-tx"><b>Продлить сертификат</b><span>Если осталось меньше 30 дней</span></span></button>
-          <button type="button" class="alist-row" data-act="journal"><span class="alist-ic"><i data-lucide="scroll-text"></i></span><span class="alist-tx"><b>Журнал Xray</b><span>Последние 100 строк</span></span></button>
-        </div>
+      <div class="mp-section">
+        <span class="t-label">Обновление</span>
+        <dl class="mp-kv" id="mp-up-kv"></dl>
+        <div class="alert alert-danger" id="mp-up-fail" hidden><i data-lucide="circle-alert"></i><div><b>Обновление не встало</b><span id="mp-up-fail-t"></span></div></div>
+        <div class="mp-up-new" id="mp-up-new" hidden><b id="mp-up-new-t"></b><p class="mp-note mp-up-notes" id="mp-up-notes"></p></div>
+        <p class="mp-note" id="mp-up-run" hidden></p>
+        <div class="btn-row"><button class="btn btn-primary" type="button" id="mp-up-go" hidden><i data-lucide="download"></i><span>Обновить</span></button>
+          <button class="btn btn-secondary" type="button" id="mp-up-check"><i data-lucide="refresh-cw"></i><span>Проверить</span></button></div>
+      </div>
+      <div class="mp-section">
+        <span class="t-label">Шаблон autoXRAY</span>
+        <p class="mp-note">Настройки приложений в подписках берутся из autoXRAY на GitHub: маршруты, отпечаток браузера, протоколы. Скрипт не запускается, из него берётся только шаблон, и каждая новая версия сначала проверяется самим Xray</p>
+        <div class="alert alert-warning" id="mp-tpl-rej" hidden><i data-lucide="triangle-alert"></i><div><b>Новая версия не прошла проверку</b><span id="mp-tpl-rej-t"></span></div></div>
+        <dl class="mp-kv" id="mp-tpl-kv"></dl>
+        <label class="choice"><input type="checkbox" role="switch" class="switch" id="mp-tpl-auto"><span>Обновлять сам<small>Раз в сутки; если выключить, новая версия будет ждать вашей кнопки</small></span></label>
+        <div class="btn-row"><button class="btn btn-secondary" type="button" id="mp-tpl-check"><i data-lucide="refresh-cw"></i><span>Проверить сейчас</span></button>
+          <button class="btn btn-ghost" type="button" id="mp-tpl-back"><i data-lucide="undo-2"></i><span>Вернуть прошлую</span></button></div>
       </div>
       <div class="mp-section mp-managed">
         <span class="t-label">История</span>
@@ -386,12 +384,12 @@
   </div>
 </section>
 <section class="mp-page mp-pg" id="mp-page-set" aria-labelledby="mp-set-t" hidden>
-  <div class="app-head"><div><div class="app-title"><h1 id="mp-set-t">Настройки</h1></div></div></div>
+  <div class="app-head"><div><div class="app-title"><h1 id="mp-set-t">Настройки</h1></div></div><div class="btn-row"><button class="btn btn-primary" type="submit" form="mp-set-form"><span>Сохранить</span></button></div></div>
   <form class="mp-pg-body mp-form" id="mp-set-form" novalidate>
     <div class="mp-col">
       <div class="mp-section">
         <span class="t-label">Сервер</span>
-        <label class="field"><span class="label">Название в приложениях</span><input class="input" name="server_name" maxlength="24" autocomplete="off"><span class="hint">Так подписка будет подписана в Happ и INCY</span></label>
+        <label class="field"><span class="label">Название в приложениях</span><input data-flag class="input" name="server_name" maxlength="24" autocomplete="off"><span class="hint">Так подписка будет подписана в Happ и INCY</span></label>
         <label class="field"><span class="label">Отпечаток браузера</span>
           <select class="select" name="fp"><option value="firefox">Firefox, как в autoXRAY</option><option value="chrome">Chrome</option><option value="safari">Safari</option><option value="ios">iOS</option><option value="android">Android</option><option value="edge">Edge</option></select></label>
         <label class="field"><span class="label">Обновлять подписку в приложениях, часов</span><input class="input" name="update_hours" inputmode="numeric" autocomplete="off"></label>
@@ -417,7 +415,6 @@
       </div>
     </div>
   </form>
-  <div class="mp-pg-foot"><button class="btn btn-primary" type="submit" form="mp-set-form"><span>Сохранить</span></button></div>
 </section>
 </div></main>
 </div>
@@ -529,7 +526,7 @@
   <div class="dialog-head"><div><h2 id="nd-add-t">Новая нода</h2><p>Запустите команду на новом сервере</p></div>
     <button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
   <div class="dialog-main mp-form">
-    <label class="field"><span class="label">Название</span><input class="input" name="name" maxlength="24" autocomplete="off"></label>
+    <label class="field"><span class="label">Название</span><input data-flag class="input" name="name" maxlength="24" autocomplete="off"></label>
     <div class="code mp-cmd"><div class="code-head"><span class="code-file"><i data-lucide="terminal"></i>от root</span><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать команду" id="nd-add-copy" data-copy=""></button></div><pre><code id="nd-add-cmd"></code></pre></div>
     <div class="mp-wait" id="nd-add-wait"><span class="mp-wait-a"><span class="spinner"></span><span>Ждём сервер</span></span><span class="mp-wait-b"><span class="badge badge-success"><span class="dot"></span>На связи</span><span id="nd-add-ip"></span></span></div>
   </div>
@@ -547,7 +544,7 @@
     </div>
     <form class="mp-section mp-form" id="nd-s-form" novalidate>
       <span class="t-label">Настройки</span>
-      <label class="field"><span class="label">Название</span><input class="input" name="name" maxlength="24" autocomplete="off"></label>
+      <label class="field"><span class="label">Название</span><input data-flag class="input" name="name" maxlength="24" autocomplete="off"></label>
       <label class="field"><span class="label">Домен <span class="opt">необязательно</span></span><input class="input" name="domain" placeholder="msk.example.ru" autocomplete="off" spellcheck="false" autocapitalize="none"><span class="hint" id="nd-s-dom-h"></span></label>
       <label class="field"><span class="label">Маскировка под сайт</span><input class="input" name="mask" autocomplete="off" spellcheck="false" autocapitalize="none"></label>
       <label class="choice"><input type="checkbox" role="switch" class="switch" name="ru_direct"><span>Российские сайты напрямую<small>Для моста в России: выходят с адреса ноды, а не через зарубежный сервер</small></span></label>
@@ -567,7 +564,7 @@
 <dialog class="dialog dialog-md dialog-scroll" id="ln-dlg" aria-labelledby="ln-dlg-t"><form novalidate id="ln-form">
   <div class="dialog-head"><div><h2 id="ln-dlg-t">Подключение</h2></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
   <div class="dialog-main mp-form">
-    <label class="field"><span class="label">Название</span><input class="input" name="name" maxlength="40" autocomplete="off"></label>
+    <label class="field"><span class="label">Название</span><input data-flag class="input" name="name" maxlength="40" autocomplete="off"></label>
     <div class="mp-pair">
       <label class="field"><span class="label">Сервер</span><select class="select" name="out"></select></label>
       <label class="field"><span class="label">Мост</span><select class="select" name="via"></select></label>
@@ -590,16 +587,11 @@
 
 <!-- У кого набор -->
 <dialog class="dialog dialog-md dialog-scroll" id="who-dlg" aria-labelledby="who-dlg-t"><form novalidate id="who-form">
-  <div class="dialog-head"><div><h2 id="who-dlg-t">У кого набор</h2></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="dialog-head"><div><h2 id="who-dlg-t">Наборы людей</h2></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
   <div class="dialog-main"><div class="mp-checks" id="who-list"></div></div>
   <div class="dialog-foot"><button type="button" class="btn btn-ghost" data-close>Отмена</button><button class="btn btn-primary" type="submit"><span>Сохранить</span></button></div>
 </form></dialog>
 
-<!-- Шаблон autoXRAY -->
-
-<!-- Настройки -->
-
-<!-- Обслуживание: обновление и бэкап срабатывают сразу, без «Сохранить» -->
 
 <!-- Сервер -->
 
@@ -653,7 +645,7 @@
   <div class="dialog-main mp-form">
     <label class="field"><span class="label">Прокси</span><input class="input" name="proxy" placeholder="логин:пароль@1.2.3.4:1080" autocomplete="off" spellcheck="false" autocapitalize="none">
       <span class="hint">Подойдёт и 1.2.3.4:1080:логин:пароль</span></label>
-    <label class="field"><span class="label">Название <span class="opt">необязательно</span></span><input class="input" name="name" maxlength="40" autocomplete="off" placeholder="Подставится по стране"></label>
+    <label class="field"><span class="label">Название <span class="opt">необязательно</span></span><input data-flag class="input" name="name" maxlength="40" autocomplete="off" placeholder="Подставится по стране"></label>
     <dl class="mp-kv" id="mp-ex-kv" hidden></dl>
   </div>
   <div class="dialog-foot"><button type="button" class="btn btn-ghost mp-danger mp-ln-del" id="mp-ex-del"><i data-lucide="trash-2"></i><span>Удалить</span></button><button type="button" class="btn btn-secondary" id="mp-ex-check"><span>Проверить</span></button><button class="btn btn-primary" type="submit"><span>Сохранить</span></button></div>

@@ -75,6 +75,9 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
   const kits = () => db.prepare('SELECT * FROM kits ORDER BY is_default DESC, id').all();
   const defKit = () => db.prepare('SELECT * FROM kits ORDER BY is_default DESC, id LIMIT 1').get();
   const kitOf = (u) => (u.kit_id && db.prepare('SELECT * FROM kits WHERE id = ?').get(u.kit_id)) || defKit();
+  // набор человека хранится явно: смена набора «для новых людей» не трогает тех, кто уже есть
+  const pickKit = (v) => (Number(v) && db.prepare('SELECT id FROM kits WHERE id = ?').get(Number(v))?.id) || defKit().id;
+  db.prepare('UPDATE users SET kit_id = ? WHERE kit_id NOT IN (SELECT id FROM kits)').run(defKit().id);
   const linesOf = (kitId) => db.prepare('SELECT * FROM kit_lines WHERE kit_id = ? ORDER BY pos, id').all(kitId);
   const linesOn = () => db.prepare('SELECT * FROM kit_lines WHERE enabled = 1').all();
   const entry = (l) => l.via || l.out;
@@ -362,6 +365,12 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
         online.delete(n.id); await xray.removeClient('vision', LINK(n.id)).catch(() => {}); log(`нода «${n.name}» убрана`); return ok();
       }
     }
+    // наборы людей разом: { kits: { id человека: id набора } }
+    if (path === '/api/kits/assign' && M === 'POST') {
+      const b = (await h.readBody(req)).kits || {};
+      for (const [uid, kid] of Object.entries(b)) db.prepare('UPDATE users SET kit_id = ? WHERE id = ?').run(pickKit(kid), Number(uid) || 0);
+      return ok();
+    }
     if (path === '/api/kits' && M === 'POST') {
       const name = cleanName((await h.readBody(req)).name, 24); if (!name) return bad('Нужно название');
       return ok({ kit: Number(db.prepare('INSERT INTO kits (name) VALUES (?)').run(name).lastInsertRowid) }, false);
@@ -376,7 +385,7 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
       }
       if (!m[2] && M === 'DELETE') {
         if (k.id === defKit().id) return bad('Этот набор получают новые люди. Сначала назначьте другой');
-        db.prepare('UPDATE users SET kit_id = 0 WHERE kit_id = ?').run(k.id); db.prepare('DELETE FROM kit_lines WHERE kit_id = ?').run(k.id); db.prepare('DELETE FROM kits WHERE id = ?').run(k.id); return ok();
+        db.prepare('UPDATE users SET kit_id = ? WHERE kit_id = ?').run(defKit().id, k.id); db.prepare('DELETE FROM kit_lines WHERE kit_id = ?').run(k.id); db.prepare('DELETE FROM kits WHERE id = ?').run(k.id); return ok();
       }
       if (m[2] === '/lines' && M === 'POST') {
         const l = cleanLine(await h.readBody(req)); if (l.error) return bad(l.error);
@@ -390,7 +399,7 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
         const ids = new Set([].concat((await h.readBody(req)).ids || []).map(Number)), def = defKit().id;
         for (const u of users()) { const has = kitOf(u).id === k.id, want = ids.has(u.id);
           if (want && !has) db.prepare('UPDATE users SET kit_id = ? WHERE id = ?').run(k.id, u.id);
-          else if (!want && has && k.id !== def) db.prepare('UPDATE users SET kit_id = 0 WHERE id = ?').run(u.id) }
+          else if (!want && has && k.id !== def) db.prepare('UPDATE users SET kit_id = ? WHERE id = ?').run(def, u.id) }
         return ok();
       }
     }
@@ -405,5 +414,5 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
     return bad('Нет такого действия', 404);
   }
 
-  return { kindsOn, linkClients, exitGroups, userKeys, ensureLinks, render, links, linkList, onlineMap, http, api, state, kitOf, defKit, nodeConfig, usable, wantsAwg };
+  return { kindsOn, linkClients, exitGroups, userKeys, ensureLinks, render, links, linkList, onlineMap, http, api, state, kitOf, defKit, pickKit, nodeConfig, usable, wantsAwg };
 }

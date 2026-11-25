@@ -4708,7 +4708,7 @@ var qrcode = function() {
     $('mp-tpl-auto').checked = !!S.settings.autoupdate
     $('mp-tpl-back').hidden = !tp?.rollback
   }
-  document.addEventListener('mp-page', (e) => { if (e.detail === 'subs') fillTpl() })
+  document.addEventListener('mp-page', (e) => { if (e.detail === 'srv') fillTpl() })
   $('mp-tpl-check').addEventListener('click', (e) => busy(e.currentTarget, async () => {
     try {
       const r = await api('POST', 'api/template/check'); S = r.state || S; paint(); fillTpl()
@@ -5655,7 +5655,8 @@ var qrcode = function() {
       if (m[2]) extra = { command: `bash <(curl -fsSL https://${s.settings.domain}/s/_n/install.sh) --join 9Zp4nWc2kR8sDemo` }
       else if (method === 'PATCH') { Object.assign(n, { name: b.name || n.name, mask: b.mask || n.mask, domain: b.domain ?? n.domain, ru_direct: !!b.ru_direct, tls: false, cert_err: '' }); if (n.domain) setTimeout(() => { n.tls = true; A.setState(s) }, 4000) }
       else { s.nodes = s.nodes.filter((x) => x !== n); s.kits.forEach((k) => { k.lines = k.lines.filter((l) => l.out !== n.id && l.via !== n.id) }) }
-    } else if (path === 'api/kits') { const k = { id: ++demoId, name: b.name, is_default: false, users: 0, lines: [] }; s.kits.push(k); extra = { kit: k.id } }
+    } else if (path === 'api/kits/assign') { s.users.forEach((u) => { if (b.kits[u.id]) u.kit = Number(b.kits[u.id]) }) }
+    else if (path === 'api/kits') { const k = { id: ++demoId, name: b.name, is_default: false, users: 0, lines: [] }; s.kits.push(k); extra = { kit: k.id } }
     else if ((m = /^api\/kits\/(\d+)(\/lines|\/order|\/users)?$/.exec(path))) {
       const k = kit(m[1])
       if (m[2] === '/lines') k.lines.push({ id: ++demoId, ...line(b) })
@@ -5794,9 +5795,13 @@ var qrcode = function() {
   let kitId = 0, tabsHtml = ''
   const kit = () => S().kits.find((k) => k.id === kitId) || S().kits[0]
   const chain = (l) => `<span class="mp-chain"><span class="mp-hops">${l.via ? esc(nodeName(l.via)) + icon('arrow-right') + esc(nodeName(l.out)) : esc(nodeName(l.out))}</span><span class="badge badge-mono">${PROTO[l.proto] || l.proto}</span>${l.problem ? `<span class="badge badge-warning" data-tip="${esc(l.problem)}">не работает</span>` : ''}</span>`
+  const lineRow = (l) => `<div class="alist-row mp-line${l.on ? '' : ' is-off'}" data-id="${l.id}">
+      <button type="button" class="icon-btn icon-btn-sm mp-grip" aria-label="Переместить «${esc(l.name)}»">${icon('grip-vertical')}</button>
+      <button type="button" class="mp-line-open"><b>${named(l.name)}</b>${chain(l)}</button>
+      <input type="checkbox" role="switch" class="switch" aria-label="Показывать «${esc(l.name)}»"${l.on ? ' checked' : ''}></div>`
   function paintSubs() {
     const s = S(), k = kit(); kitId = k.id
-    const th = s.kits.map((x) => `${x.id}:${x.name}:${x.users}`).join('|')
+    const th = s.kits.map((x) => `${x.id}:${x.name}`).join('|')
     if (th !== tabsHtml) {
       tabsHtml = th
       // вкладки библиотека запускает один раз на элемент: набор сменился — ставим новый элемент
@@ -5804,12 +5809,10 @@ var qrcode = function() {
       box.innerHTML = '<span class="line"></span>' + s.kits.map((x) => `<button class="tab" role="tab" aria-selected="${x.id === k.id}" data-kit="${x.id}">${esc(x.name)}<span class="mp-n">${x.users}</span></button>`).join('')
       $('kit-tabs').replaceWith(box); box.addEventListener('pick', pickKit); window.initInputs?.(box.parentElement)
     }
+    s.kits.forEach((x) => { const n = $('kit-tabs').querySelector(`[data-kit="${x.id}"] .mp-n`); if (n && n.textContent !== String(x.users)) n.textContent = x.users })
     const cur = $('kit-tabs').querySelector(`[data-kit="${k.id}"]`)
     if (cur && cur.getAttribute('aria-selected') !== 'true') $('kit-tabs').select?.(cur, false)
-    if (!dragging) put($('ln-list'), k.lines.map((l) => `<div class="alist-row mp-line${l.on ? '' : ' is-off'}" data-id="${l.id}">
-      <button type="button" class="icon-btn icon-btn-sm mp-grip" aria-label="Переместить «${esc(l.name)}»">${icon('grip-vertical')}</button>
-      <button type="button" class="mp-line-open"><b>${named(l.name)}</b>${chain(l)}</button>
-      <input type="checkbox" role="switch" class="switch" aria-label="Показывать «${esc(l.name)}»"${l.on ? ' checked' : ''}></div>`).join('')) && window.initLayers?.($('ln-list'))
+    if (!dragging) put($('ln-list'), k.lines.map(lineRow).join('')) && window.initLayers?.($('ln-list'))
     $('ln-list').hidden = !k.lines.length; $('ln-empty').hidden = !!k.lines.length
     if (document.activeElement !== $('kit-name')) $('kit-name').value = k.name
     $('kit-def').checked = k.is_default; $('kit-def').disabled = k.is_default
@@ -5833,15 +5836,17 @@ var qrcode = function() {
     if (!await A.confirm(`Удалить набор «${k.name}»?`, k.users ? `${k.users} ${plural(k.users, 'человек перейдёт', 'человека перейдут', 'человек перейдут')} на набор «${def.name}»` : 'Им никто не пользуется', 'Удалить')) return
     try { kitId = def.id; await call('DELETE', 'api/kits/' + k.id); toast({ type: 'success', title: 'Набор удалён', text: k.name }) } catch (err) { fail(err) }
   })
+  // наборы людей: все люди списком, у каждого справа его набор
   $('kit-who').addEventListener('click', () => {
-    const k = kit()
-    $('who-dlg-t').textContent = `У кого набор «${k.name}»`
-    $('who-list').innerHTML = S().users.map((u) => `<label class="choice"><input type="checkbox" class="check" value="${u.id}"${u.kit === k.id ? ' checked' : ''}${k.is_default && u.kit === k.id ? ' disabled' : ''}><span>${esc(u.name)}${u.kit !== k.id ? `<small>сейчас «${esc(S().kits.find((x) => x.id === u.kit)?.name || '')}»</small>` : ''}</span></label>`).join('') || '<p class="mp-note">Людей пока нет</p>'
-    $('who-dlg').showModal()
+    const ks = S().kits, us = S().users
+    $('who-list').innerHTML = us.length ? us.map((u) => `<div class="mp-who-row"><span>${esc(u.name)}</span><select class="select input-sm" data-u="${u.id}" aria-label="Набор для «${esc(u.name)}»">${ks.map((k) => `<option value="${k.id}"${k.id === u.kit ? ' selected' : ''}>${esc(k.name)}</option>`).join('')}</select></div>`).join('') : '<p class="mp-note">Людей пока нет</p>'
+    window.enhanceSelects?.($('who-list')); $('who-dlg').showModal()
   })
   $('who-form').addEventListener('submit', (e) => {
-    e.preventDefault(); const ids = [...$('who-list').querySelectorAll('input:checked')].map((i) => Number(i.value))
-    busy(e.target.querySelector('[type=submit]'), async () => { try { await call('POST', `api/kits/${kitId}/users`, { ids }); $('who-dlg').close() } catch (err) { fail(err) } })
+    e.preventDefault(); const kits = {}
+    $('who-list').querySelectorAll('select[data-u]').forEach((sel) => { const u = S().users.find((x) => x.id === Number(sel.dataset.u)); if (u && Number(sel.value) !== u.kit) kits[u.id] = Number(sel.value) })
+    if (!Object.keys(kits).length) return $('who-dlg').close()
+    busy(e.target.querySelector('[type=submit]'), async () => { try { await call('POST', 'api/kits/assign', { kits }); $('who-dlg').close() } catch (err) { fail(err) } })
   })
 
   // подключение: правка в окне
@@ -5885,34 +5890,43 @@ var qrcode = function() {
     try { await call('PATCH', 'api/lines/' + row.dataset.id, { on }) } catch (err) { e.target.checked = !on; row.classList.toggle('is-off', on); fail(err) }
   })
 
-  // порядок: строка едет за указателем, соседи уступают место переходом
+  // порядок: строка идёт ровно за указателем, соседи отъезжают переходом; DOM меняется один раз — после отпускания
   let dragging = false
   $('ln-list').addEventListener('pointerdown', (e) => {
-    const grip = e.target.closest('.mp-grip'); if (!grip) return
-    const row = grip.closest('.mp-line'), list = row.parentElement, before = [...list.children].map((r) => r.dataset.id).join()
+    const grip = e.target.closest('.mp-grip'); if (!grip || dragging || e.button) return
+    const row = grip.closest('.mp-line'), list = row.parentElement, rows = [...list.children], i0 = rows.indexOf(row)
+    if (rows.length < 2) return
     e.preventDefault(); try { grip.setPointerCapture(e.pointerId) } catch (err) {}
-    const y0 = e.clientY; let shift = 0; dragging = true
-    row.classList.add('mp-drag')
-    const dyNow = () => new DOMMatrix(getComputedStyle(row).transform).m42
-    const step = (sib, up) => {
-      const a = sib.getBoundingClientRect().top, r0 = row.getBoundingClientRect().top - dyNow()
-      list.insertBefore(row, up ? sib : sib.nextSibling)
-      shift += row.getBoundingClientRect().top - dyNow() - r0
-      sib.animate([{ transform: `translateY(${a - sib.getBoundingClientRect().top}px)` }, { transform: 'none' }], { duration: 180, easing: 'cubic-bezier(.2,.8,.2,1)' })
-    }
+    rows.forEach((r) => r.getAnimations().forEach((x) => x.finish()))
+    const top = rows.map((r) => r.offsetTop), h = rows.map((r) => r.offsetHeight), H = h[i0], last = rows.length - 1
+    const lo = top[0] - top[i0], hi = top[last] + h[last] - top[i0] - H, y0 = e.clientY
+    let to = i0, dy = 0; dragging = true
+    list.classList.add('mp-sorting'); row.classList.add('mp-drag')
     const move = (ev) => {
-      const dy = ev.clientY - y0 - shift, prev = row.previousElementSibling, next = row.nextElementSibling
-      if (prev && dy < -prev.offsetHeight / 2) step(prev, true); else if (next && dy > next.offsetHeight / 2) step(next, false)
-      row.style.transform = `translateY(${Math.round(ev.clientY - y0 - shift)}px)`
+      dy = Math.min(hi, Math.max(lo, ev.clientY - y0)); row.style.transform = `translateY(${dy}px)`
+      const y = top[i0] + dy; to = i0   // сосед уступает, когда край строки прошёл его середину
+      rows.forEach((r, j) => {
+        if (j === i0) return
+        const c = top[j] + h[j] / 2, sh = j < i0 && y < c ? H : j > i0 && y + H > c ? -H : 0
+        if (sh > 0) to = Math.min(to, j); if (sh < 0) to = Math.max(to, j)
+        r.style.transform = sh ? `translateY(${sh}px)` : ''
+      })
     }
-    const up = async () => {
+    const up = () => {
       grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); grip.removeEventListener('pointercancel', up)
-      const a = row.animate([{ transform: row.style.transform || 'none' }, { transform: 'none' }], { duration: 180, easing: 'cubic-bezier(.2,.8,.2,1)' })
-      row.style.transform = ''; a.onfinish = () => row.classList.remove('mp-drag')
-      const ids = [...list.children].map((r) => Number(r.dataset.id)); dragging = false
-      if (ids.join() === before) return
-      list._html = ''   // разметка уже переставлена руками: следующая отрисовка сверит с данными
-      try { await call('POST', `api/kits/${kitId}/order`, { ids }) } catch (err) { fail(err); paintSubs() }
+      const slot = (to > i0 ? top[to] + h[to] - H : top[to]) - top[i0]
+      const done = () => {
+        rows.forEach((r) => { r.style.transition = 'none'; r.style.transform = '' })
+        list.insertBefore(row, to > i0 ? rows[to].nextSibling : rows[to])
+        list.offsetHeight; rows.forEach((r) => { r.style.transition = '' })
+        row.classList.remove('mp-drag'); list.classList.remove('mp-sorting'); dragging = false
+        if (to === i0) return
+        const ids = [...list.children].map((r) => Number(r.dataset.id)), k = kit()
+        k.lines.sort((x, y) => ids.indexOf(x.id) - ids.indexOf(y.id)); list._html = k.lines.map(lineRow).join('')
+        call('POST', `api/kits/${kitId}/order`, { ids }).catch((err) => { fail(err); list._html = ''; A.refresh?.() })
+      }
+      const a = row.animate([{ transform: `translateY(${dy}px)` }, { transform: `translateY(${slot}px)` }], { duration: 180, easing: 'cubic-bezier(.2,.8,.2,1)' })
+      row.style.transform = `translateY(${slot}px)`; a.onfinish = a.oncancel = done
     }
     grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up)
   })
@@ -6146,4 +6160,99 @@ var qrcode = function() {
   }
   document.addEventListener('mp-state', paint)
   paint()
+})()
+
+;
+// flags.js
+// Флаг страны у названия — отдельным полем «Флаг» рядом с полем названия (input[data-flag]).
+// Хранится по-прежнему в начале названия («🇳🇱 Амстердам»): value поля отдаёт и принимает название целиком,
+// поэтому формы и сервер ничего не знают о поле флага. В Windows флагов в панели эмодзи нет — отсюда список с поиском
+(() => {
+  const FLAG = /^(\p{Regional_Indicator}{2})\s*/u
+  const flagOf = (cc) => String.fromCodePoint(...[...cc].map((c) => 0x1F1A5 + c.charCodeAt(0)))
+  const ccOf = (f) => [...f].map((c) => String.fromCharCode(c.codePointAt(0) - 0x1F1A5)).join('')
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+  const CHEV = '<svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>'
+  // только действующие коды ISO 3166-1: у устаревших (AN, YU, SU…) браузер знает название, а рисунка флага нет
+  const ISO = ('AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ '
+    + 'DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP '
+    + 'KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ '
+    + 'OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ '
+    + 'UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW').split(' ')
+  // частые для серверов — первыми
+  const TOP = ['NL', 'DE', 'FI', 'SE', 'FR', 'GB', 'US', 'PL', 'LV', 'EE', 'LT', 'TR', 'KZ', 'RU']
+  let LIST = null, DN = null
+  const nameOf = (cc) => { DN ||= new Intl.DisplayNames(['ru'], { type: 'region', fallback: 'code' }); return DN.of(cc) }
+  const list = () => {
+    if (LIST) return LIST
+    const all = ISO.map((cc) => ({ cc, name: nameOf(cc), flag: flagOf(cc) })).sort((x, y) => x.name.localeCompare(y.name, 'ru'))
+    return (LIST = [...TOP.map((cc) => all.find((x) => x.cc === cc)), ...all.filter((x) => !TOP.includes(x.cc))])
+  }
+
+  // одна панель на все поля; кладётся в открытое окно, иначе модальное окно сделало бы её недоступной
+  const panel = document.createElement('div')
+  panel.className = 'menu mp-flags'; panel.popover = 'auto'
+  panel.innerHTML = '<input class="input input-sm" type="search" placeholder="Страна" autocomplete="off" spellcheck="false" aria-label="Поиск страны"><div class="mp-flags-list" role="listbox"></div>'
+  const q = panel.querySelector('input'), box = panel.querySelector('.mp-flags-list')
+  let cur = null   // { set, trigger } открытого поля
+  const paint = () => {
+    const s = q.value.trim().toLowerCase(), hit = list().filter((x) => !s || x.name.toLowerCase().includes(s) || x.cc.toLowerCase() === s)
+    box.innerHTML = (s ? '' : '<button type="button" class="menu-item" data-cc=""><span class="mp-flags-no"></span><span>Без флага</span></button>')
+      + hit.map((x) => `<button type="button" class="menu-item" data-cc="${x.cc}"><span class="mp-flags-f">${x.flag}</span><span>${esc(x.name)}</span></button>`).join('')
+      || '<p class="mp-note mp-flags-none">Ничего не нашлось</p>'
+    box.scrollTop = 0
+  }
+  const pick = (cc) => { const c = cur; if (!c) return; panel.hidePopover(); c.set(cc ? flagOf(cc) : ''); c.trigger.focus() }
+  box.addEventListener('click', (e) => { const b = e.target.closest('[data-cc]'); if (b) pick(b.dataset.cc) })
+  q.addEventListener('input', paint)
+  q.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); const b = box.querySelector('[data-cc]:not([data-cc=""])') || box.querySelector('[data-cc]'); if (b) pick(b.dataset.cc) }
+    if (e.key === 'ArrowDown') { e.preventDefault(); box.querySelector('[data-cc]')?.focus() }
+  })
+  box.addEventListener('keydown', (e) => {
+    const b = e.target.closest('[data-cc]'); if (!b) return
+    if (e.key === 'ArrowDown') { e.preventDefault(); b.nextElementSibling?.focus() }
+    if (e.key === 'ArrowUp') { e.preventDefault(); (b.previousElementSibling || q).focus() }
+  })
+  panel.addEventListener('toggle', (e) => { if (e.newState === 'closed') { panel.classList.remove('open'); cur?.trigger.setAttribute('aria-expanded', 'false'); cur = null } })
+
+  function open(c) {
+    (c.trigger.closest('dialog') || document.body).append(panel)
+    cur = c; q.value = ''; paint()
+    const r = c.trigger.getBoundingClientRect(), w = Math.max(280, r.width), h = 340, below = innerHeight - r.bottom >= h + 16 || r.top < h + 16
+    Object.assign(panel.style, { left: Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px', top: below ? r.bottom + 4 + 'px' : 'auto', bottom: below ? 'auto' : innerHeight - r.top + 4 + 'px', width: w + 'px' })
+    // .menu без .open невидимо (visibility), и фокус в поле поиска не встал бы
+    panel.showPopover(); panel.classList.add('open'); c.trigger.setAttribute('aria-expanded', 'true'); q.focus()
+  }
+
+  function attach(inp) {
+    if (inp.dataset.flagReady) return; inp.dataset.flagReady = '1'
+    const field = inp.closest('.field'), row = document.createElement('div'), ff = document.createElement('div')
+    row.className = 'mp-flag-row'; ff.className = 'field mp-flag-field'
+    ff.innerHTML = `<span class="label">Флаг</span><button type="button" class="select select-trigger mp-flag-trigger" aria-haspopup="listbox" aria-expanded="false"><span class="value"></span>${CHEV}</button>`
+    field.before(row); row.append(ff, field)
+    const trigger = ff.querySelector('button'), val = trigger.querySelector('.value')
+    trigger.setAttribute('aria-label', 'Флаг страны')
+    const d = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value'), max = inp.maxLength
+    let flag = ''
+    const sync = () => {
+      val.innerHTML = flag ? `<span class="mp-flags-f">${flag}</span><span class="mp-flag-name">${esc(nameOf(ccOf(flag)))}</span>` : 'Нет'
+      val.classList.toggle('placeholder', !flag)
+      if (max > 0) inp.maxLength = flag ? max - flag.length - 1 : max   // сервер режет название целиком, с флагом
+    }
+    const split = (v) => { const m = FLAG.exec(v); flag = m ? m[1] : ''; d.set.call(inp, m ? v.slice(m[0].length) : v); sync() }
+    Object.defineProperty(inp, 'value', { get() { const t = d.get.call(this); return flag ? (t ? flag + ' ' + t : flag) : t }, set: split })
+    // флаг вставили в поле названия руками — переезжает в поле флага
+    inp.addEventListener('input', () => { if (FLAG.test(d.get.call(inp))) split(d.get.call(inp)) })
+    split(d.get.call(inp))
+    const set = (f) => { flag = f; sync(); inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })) }
+    const c = { set, trigger }
+    // панель закрывается сама уже на нажатии мимо неё, до клика — запоминаем, была ли она открыта этим полем
+    let was = false
+    trigger.addEventListener('pointerdown', () => { was = panel.matches(':popover-open') && cur === c })
+    trigger.addEventListener('click', () => { if (was || (panel.matches(':popover-open') && cur === c)) { if (panel.matches(':popover-open')) panel.hidePopover(); was = false } else open(c) })
+    trigger.addEventListener('keydown', (e) => { if (['ArrowDown', 'Enter', ' '].includes(e.key) && !panel.matches(':popover-open')) { e.preventDefault(); open(c) } })
+  }
+  const init = () => document.querySelectorAll('input[data-flag]').forEach(attach)
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init()
 })()

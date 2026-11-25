@@ -46,7 +46,8 @@
       if (m[2]) extra = { command: `bash <(curl -fsSL https://${s.settings.domain}/s/_n/install.sh) --join 9Zp4nWc2kR8sDemo` }
       else if (method === 'PATCH') { Object.assign(n, { name: b.name || n.name, mask: b.mask || n.mask, domain: b.domain ?? n.domain, ru_direct: !!b.ru_direct, tls: false, cert_err: '' }); if (n.domain) setTimeout(() => { n.tls = true; A.setState(s) }, 4000) }
       else { s.nodes = s.nodes.filter((x) => x !== n); s.kits.forEach((k) => { k.lines = k.lines.filter((l) => l.out !== n.id && l.via !== n.id) }) }
-    } else if (path === 'api/kits') { const k = { id: ++demoId, name: b.name, is_default: false, users: 0, lines: [] }; s.kits.push(k); extra = { kit: k.id } }
+    } else if (path === 'api/kits/assign') { s.users.forEach((u) => { if (b.kits[u.id]) u.kit = Number(b.kits[u.id]) }) }
+    else if (path === 'api/kits') { const k = { id: ++demoId, name: b.name, is_default: false, users: 0, lines: [] }; s.kits.push(k); extra = { kit: k.id } }
     else if ((m = /^api\/kits\/(\d+)(\/lines|\/order|\/users)?$/.exec(path))) {
       const k = kit(m[1])
       if (m[2] === '/lines') k.lines.push({ id: ++demoId, ...line(b) })
@@ -185,9 +186,13 @@
   let kitId = 0, tabsHtml = ''
   const kit = () => S().kits.find((k) => k.id === kitId) || S().kits[0]
   const chain = (l) => `<span class="mp-chain"><span class="mp-hops">${l.via ? esc(nodeName(l.via)) + icon('arrow-right') + esc(nodeName(l.out)) : esc(nodeName(l.out))}</span><span class="badge badge-mono">${PROTO[l.proto] || l.proto}</span>${l.problem ? `<span class="badge badge-warning" data-tip="${esc(l.problem)}">не работает</span>` : ''}</span>`
+  const lineRow = (l) => `<div class="alist-row mp-line${l.on ? '' : ' is-off'}" data-id="${l.id}">
+      <button type="button" class="icon-btn icon-btn-sm mp-grip" aria-label="Переместить «${esc(l.name)}»">${icon('grip-vertical')}</button>
+      <button type="button" class="mp-line-open"><b>${named(l.name)}</b>${chain(l)}</button>
+      <input type="checkbox" role="switch" class="switch" aria-label="Показывать «${esc(l.name)}»"${l.on ? ' checked' : ''}></div>`
   function paintSubs() {
     const s = S(), k = kit(); kitId = k.id
-    const th = s.kits.map((x) => `${x.id}:${x.name}:${x.users}`).join('|')
+    const th = s.kits.map((x) => `${x.id}:${x.name}`).join('|')
     if (th !== tabsHtml) {
       tabsHtml = th
       // вкладки библиотека запускает один раз на элемент: набор сменился — ставим новый элемент
@@ -195,12 +200,10 @@
       box.innerHTML = '<span class="line"></span>' + s.kits.map((x) => `<button class="tab" role="tab" aria-selected="${x.id === k.id}" data-kit="${x.id}">${esc(x.name)}<span class="mp-n">${x.users}</span></button>`).join('')
       $('kit-tabs').replaceWith(box); box.addEventListener('pick', pickKit); window.initInputs?.(box.parentElement)
     }
+    s.kits.forEach((x) => { const n = $('kit-tabs').querySelector(`[data-kit="${x.id}"] .mp-n`); if (n && n.textContent !== String(x.users)) n.textContent = x.users })
     const cur = $('kit-tabs').querySelector(`[data-kit="${k.id}"]`)
     if (cur && cur.getAttribute('aria-selected') !== 'true') $('kit-tabs').select?.(cur, false)
-    if (!dragging) put($('ln-list'), k.lines.map((l) => `<div class="alist-row mp-line${l.on ? '' : ' is-off'}" data-id="${l.id}">
-      <button type="button" class="icon-btn icon-btn-sm mp-grip" aria-label="Переместить «${esc(l.name)}»">${icon('grip-vertical')}</button>
-      <button type="button" class="mp-line-open"><b>${named(l.name)}</b>${chain(l)}</button>
-      <input type="checkbox" role="switch" class="switch" aria-label="Показывать «${esc(l.name)}»"${l.on ? ' checked' : ''}></div>`).join('')) && window.initLayers?.($('ln-list'))
+    if (!dragging) put($('ln-list'), k.lines.map(lineRow).join('')) && window.initLayers?.($('ln-list'))
     $('ln-list').hidden = !k.lines.length; $('ln-empty').hidden = !!k.lines.length
     if (document.activeElement !== $('kit-name')) $('kit-name').value = k.name
     $('kit-def').checked = k.is_default; $('kit-def').disabled = k.is_default
@@ -224,15 +227,17 @@
     if (!await A.confirm(`Удалить набор «${k.name}»?`, k.users ? `${k.users} ${plural(k.users, 'человек перейдёт', 'человека перейдут', 'человек перейдут')} на набор «${def.name}»` : 'Им никто не пользуется', 'Удалить')) return
     try { kitId = def.id; await call('DELETE', 'api/kits/' + k.id); toast({ type: 'success', title: 'Набор удалён', text: k.name }) } catch (err) { fail(err) }
   })
+  // наборы людей: все люди списком, у каждого справа его набор
   $('kit-who').addEventListener('click', () => {
-    const k = kit()
-    $('who-dlg-t').textContent = `У кого набор «${k.name}»`
-    $('who-list').innerHTML = S().users.map((u) => `<label class="choice"><input type="checkbox" class="check" value="${u.id}"${u.kit === k.id ? ' checked' : ''}${k.is_default && u.kit === k.id ? ' disabled' : ''}><span>${esc(u.name)}${u.kit !== k.id ? `<small>сейчас «${esc(S().kits.find((x) => x.id === u.kit)?.name || '')}»</small>` : ''}</span></label>`).join('') || '<p class="mp-note">Людей пока нет</p>'
-    $('who-dlg').showModal()
+    const ks = S().kits, us = S().users
+    $('who-list').innerHTML = us.length ? us.map((u) => `<div class="mp-who-row"><span>${esc(u.name)}</span><select class="select input-sm" data-u="${u.id}" aria-label="Набор для «${esc(u.name)}»">${ks.map((k) => `<option value="${k.id}"${k.id === u.kit ? ' selected' : ''}>${esc(k.name)}</option>`).join('')}</select></div>`).join('') : '<p class="mp-note">Людей пока нет</p>'
+    window.enhanceSelects?.($('who-list')); $('who-dlg').showModal()
   })
   $('who-form').addEventListener('submit', (e) => {
-    e.preventDefault(); const ids = [...$('who-list').querySelectorAll('input:checked')].map((i) => Number(i.value))
-    busy(e.target.querySelector('[type=submit]'), async () => { try { await call('POST', `api/kits/${kitId}/users`, { ids }); $('who-dlg').close() } catch (err) { fail(err) } })
+    e.preventDefault(); const kits = {}
+    $('who-list').querySelectorAll('select[data-u]').forEach((sel) => { const u = S().users.find((x) => x.id === Number(sel.dataset.u)); if (u && Number(sel.value) !== u.kit) kits[u.id] = Number(sel.value) })
+    if (!Object.keys(kits).length) return $('who-dlg').close()
+    busy(e.target.querySelector('[type=submit]'), async () => { try { await call('POST', 'api/kits/assign', { kits }); $('who-dlg').close() } catch (err) { fail(err) } })
   })
 
   // подключение: правка в окне
@@ -276,34 +281,43 @@
     try { await call('PATCH', 'api/lines/' + row.dataset.id, { on }) } catch (err) { e.target.checked = !on; row.classList.toggle('is-off', on); fail(err) }
   })
 
-  // порядок: строка едет за указателем, соседи уступают место переходом
+  // порядок: строка идёт ровно за указателем, соседи отъезжают переходом; DOM меняется один раз — после отпускания
   let dragging = false
   $('ln-list').addEventListener('pointerdown', (e) => {
-    const grip = e.target.closest('.mp-grip'); if (!grip) return
-    const row = grip.closest('.mp-line'), list = row.parentElement, before = [...list.children].map((r) => r.dataset.id).join()
+    const grip = e.target.closest('.mp-grip'); if (!grip || dragging || e.button) return
+    const row = grip.closest('.mp-line'), list = row.parentElement, rows = [...list.children], i0 = rows.indexOf(row)
+    if (rows.length < 2) return
     e.preventDefault(); try { grip.setPointerCapture(e.pointerId) } catch (err) {}
-    const y0 = e.clientY; let shift = 0; dragging = true
-    row.classList.add('mp-drag')
-    const dyNow = () => new DOMMatrix(getComputedStyle(row).transform).m42
-    const step = (sib, up) => {
-      const a = sib.getBoundingClientRect().top, r0 = row.getBoundingClientRect().top - dyNow()
-      list.insertBefore(row, up ? sib : sib.nextSibling)
-      shift += row.getBoundingClientRect().top - dyNow() - r0
-      sib.animate([{ transform: `translateY(${a - sib.getBoundingClientRect().top}px)` }, { transform: 'none' }], { duration: 180, easing: 'cubic-bezier(.2,.8,.2,1)' })
-    }
+    rows.forEach((r) => r.getAnimations().forEach((x) => x.finish()))
+    const top = rows.map((r) => r.offsetTop), h = rows.map((r) => r.offsetHeight), H = h[i0], last = rows.length - 1
+    const lo = top[0] - top[i0], hi = top[last] + h[last] - top[i0] - H, y0 = e.clientY
+    let to = i0, dy = 0; dragging = true
+    list.classList.add('mp-sorting'); row.classList.add('mp-drag')
     const move = (ev) => {
-      const dy = ev.clientY - y0 - shift, prev = row.previousElementSibling, next = row.nextElementSibling
-      if (prev && dy < -prev.offsetHeight / 2) step(prev, true); else if (next && dy > next.offsetHeight / 2) step(next, false)
-      row.style.transform = `translateY(${Math.round(ev.clientY - y0 - shift)}px)`
+      dy = Math.min(hi, Math.max(lo, ev.clientY - y0)); row.style.transform = `translateY(${dy}px)`
+      const y = top[i0] + dy; to = i0   // сосед уступает, когда край строки прошёл его середину
+      rows.forEach((r, j) => {
+        if (j === i0) return
+        const c = top[j] + h[j] / 2, sh = j < i0 && y < c ? H : j > i0 && y + H > c ? -H : 0
+        if (sh > 0) to = Math.min(to, j); if (sh < 0) to = Math.max(to, j)
+        r.style.transform = sh ? `translateY(${sh}px)` : ''
+      })
     }
-    const up = async () => {
+    const up = () => {
       grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); grip.removeEventListener('pointercancel', up)
-      const a = row.animate([{ transform: row.style.transform || 'none' }, { transform: 'none' }], { duration: 180, easing: 'cubic-bezier(.2,.8,.2,1)' })
-      row.style.transform = ''; a.onfinish = () => row.classList.remove('mp-drag')
-      const ids = [...list.children].map((r) => Number(r.dataset.id)); dragging = false
-      if (ids.join() === before) return
-      list._html = ''   // разметка уже переставлена руками: следующая отрисовка сверит с данными
-      try { await call('POST', `api/kits/${kitId}/order`, { ids }) } catch (err) { fail(err); paintSubs() }
+      const slot = (to > i0 ? top[to] + h[to] - H : top[to]) - top[i0]
+      const done = () => {
+        rows.forEach((r) => { r.style.transition = 'none'; r.style.transform = '' })
+        list.insertBefore(row, to > i0 ? rows[to].nextSibling : rows[to])
+        list.offsetHeight; rows.forEach((r) => { r.style.transition = '' })
+        row.classList.remove('mp-drag'); list.classList.remove('mp-sorting'); dragging = false
+        if (to === i0) return
+        const ids = [...list.children].map((r) => Number(r.dataset.id)), k = kit()
+        k.lines.sort((x, y) => ids.indexOf(x.id) - ids.indexOf(y.id)); list._html = k.lines.map(lineRow).join('')
+        call('POST', `api/kits/${kitId}/order`, { ids }).catch((err) => { fail(err); list._html = ''; A.refresh?.() })
+      }
+      const a = row.animate([{ transform: `translateY(${dy}px)` }, { transform: `translateY(${slot}px)` }], { duration: 180, easing: 'cubic-bezier(.2,.8,.2,1)' })
+      row.style.transform = `translateY(${slot}px)`; a.onfinish = a.oncancel = done
     }
     grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up)
   })

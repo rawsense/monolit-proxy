@@ -320,7 +320,7 @@ async function adminApi(req, res, path) {
     const r = db.prepare('INSERT INTO users (name, note, token, uuid, hy2, limit_bytes, expire_at, created_at, period, reset_at, devices) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
       .run(name, String(b.note || '').slice(0, 200), token(16), newUuid(), token(12), Math.max(0, Math.round(Number(b.limit) || 0)), Math.max(0, Math.round(Number(b.expire) || 0)), t,
         period, period ? nextReset(t, t) : 0, cleanDevices(b.devices));
-    if (b.kit) db.prepare('UPDATE users SET kit_id = ? WHERE id = ?').run(Number(b.kit) === nodes.defKit().id ? 0 : Number(b.kit) || 0, r.lastInsertRowid);
+    db.prepare('UPDATE users SET kit_id = ? WHERE id = ?').run(nodes.pickKit(b.kit), r.lastInsertRowid);
     const x = exits.pick(b); if (!x.error) db.prepare('UPDATE users SET exit_id = ?, exit_fail = ? WHERE id = ?').run(x.exit_id, x.exit_fail, r.lastInsertRowid);
     await queueSync(); return json(res, 200, { user: { ...publicUser(userById(r.lastInsertRowid)), url: subUrl(userById(r.lastInsertRowid)) } });
   }
@@ -343,7 +343,7 @@ async function adminApi(req, res, path) {
     if (block_until !== u.block_until) over.delete(u.id);
     db.prepare('UPDATE users SET name = ?, note = ?, limit_bytes = ?, expire_at = ?, enabled = ?, period = ?, reset_at = ?, devices = ?, block_until = ? WHERE id = ?')
       .run(f.name, f.note, f.limit_bytes, f.expire_at, f.enabled, f.period, reset_at, f.devices, block_until, u.id);
-    if (b.kit !== undefined) db.prepare('UPDATE users SET kit_id = ? WHERE id = ?').run(Number(b.kit) === nodes.defKit().id ? 0 : Number(b.kit) || 0, u.id);
+    if (b.kit !== undefined) db.prepare('UPDATE users SET kit_id = ? WHERE id = ?').run(nodes.pickKit(b.kit), u.id);
     const x = exits.pick(b, u); if (x.error) return json(res, 400, { error: x.error });
     db.prepare('UPDATE users SET exit_id = ?, exit_fail = ? WHERE id = ?').run(x.exit_id, x.exit_fail, u.id);
     // набор или выход поменялся — правила выходов пересобрать

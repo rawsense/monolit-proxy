@@ -151,6 +151,9 @@ h1, h2, h3, h4, p { margin: 0 }
 .mp-links .label { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-4) }
 .mp-links .label > :first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .mp-links .label .opt { flex: none }
+/* приписка к подписи поля («необязательно», «включён Caps Lock») — в правом конце строки, не вплотную к подписи */
+.label:has(> .opt) { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-4) }
+.label > .opt { flex: none }
 .sheet-side.mp-detail { width: min(560px, 100vw) }   /* 420 системы мало: поле со ссылкой и форма в одной колонке */
 .mp-detail .sheet-head > div:first-child { flex: 1; min-width: 0 }
 .mp-did { color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-sm) }
@@ -294,7 +297,7 @@ button.alist-row { width: 100%; border: 0; background: none; font: inherit; colo
 /* Ноды и подписки */
 .mp-page { transition: opacity var(--dur-swap-in) var(--ease-out) }
 .mp-page.out { opacity: 0; transition-duration: var(--dur-swap-out) }
-:is(#mp-page-nodes, #mp-page-subs) .app-head { margin-bottom: var(--sp-8) }
+#mp-page-nodes .app-head { margin-bottom: var(--sp-8) }
 
 /* Ноды: таблица как у пользователей; на узком списке — карточки без заливки трафика */
 #nd-sheet .sheet-head > div:first-child { flex: 1; min-width: 0 }
@@ -311,18 +314,14 @@ button.alist-row { width: 100%; border: 0; background: none; font: inherit; colo
 .mp-wait.ready .mp-wait-a { opacity: 0; transition-duration: var(--dur-swap-out) }
 .mp-wait.ready .mp-wait-b { opacity: 1; transition-delay: var(--dur-swap-out) }
 
-/* Подписки: вкладки наборов и кнопка нового набора одним рядом */
-.mp-kit-bar { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-6) }
+/* Подписки: вкладки наборов и кнопка нового набора одним рядом над карточками набора */
+.mp-kit-bar { display: flex; align-items: center; gap: var(--sp-3) }
 .mp-kit-bar .tabs { flex: 1; min-width: 0 }
 .mp-kit-bar .btn { flex: none }
-/* слева подключения (берут остаток), справа узкая панель по своему содержимому */
-.mp-kit { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--sp-8); align-items: start; transition: opacity var(--dur-swap-in) var(--ease-out) }
-.mp-kit.out { opacity: 0; transition-duration: var(--dur-swap-out) }
-.mp-kit[hidden] { display: none }
-.mp-kit-main { display: grid; gap: var(--sp-4); min-width: 0 }
-.mp-kit-side { display: grid; align-content: start; min-width: 0 }
+/* смена набора: карточки гаснут и появляются, вкладки остаются */
+.mp-kit .mp-section { transition: opacity var(--dur-swap-in) var(--ease-out) }
+.mp-kit.out .mp-section { opacity: 0; transition-duration: var(--dur-swap-out) }
 .mp-kit-who { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3) }
-@media (max-width: 1000px) { .mp-kit { grid-template-columns: minmax(0, 1fr) } }
 
 /* Цепочка: вход, стрелка, выход, протокол */
 .mp-chain { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); color: var(--text-secondary); font-size: var(--fs-sm); line-height: var(--lh-sm) }
@@ -343,10 +342,10 @@ button.alist-row { width: 100%; border: 0; background: none; font: inherit; colo
 
 /* Ручка перетаскивания: общая для двух вариантов */
 .mp-grip { cursor: grab; touch-action: none; color: var(--text-muted) }
-.mp-drag { position: relative; z-index: 2; cursor: grabbing; box-shadow: 0 8px 24px #0000004d, inset 0 0 0 1px var(--border) }
+.mp-sorting > .alist-row { transition: transform 200ms cubic-bezier(.2, .8, .2, 1) }
+.mp-sorting > .alist-row::before { opacity: 0 }
+.alist-row.mp-drag { position: relative; z-index: 2; cursor: grabbing; transition: none; border-radius: var(--r-md); background: linear-gradient(var(--surface-hover), var(--surface-hover)) var(--surface); box-shadow: 0 8px 24px #0000004d, inset 0 0 0 1px var(--border) }
 .mp-drag .mp-grip { cursor: grabbing }
-.alist-row.mp-drag { border-radius: var(--r-md); background: var(--surface-hover) }
-.alist-row.mp-drag::before, .alist-row.mp-drag + .alist-row::before { opacity: 0 }
 
 /* Телефон */
 @media (max-width: 640px) {
@@ -357,7 +356,7 @@ button.alist-row { width: 100%; border: 0; background: none; font: inherit; colo
 
 /* Телефон */
 @media (max-width: 640px) {
-  :is(#mp-page-nodes, #mp-page-subs) .app-head { margin-bottom: var(--sp-6) }
+  #mp-page-nodes .app-head { margin-bottom: var(--sp-6) }
   .app-head .btn-row { width: 100% }
   .app-head .btn-row > .btn, .app-head .btn-row > .seg { flex: 1 }
 }
@@ -440,8 +439,6 @@ a.hm-li:focus-visible { outline-color: var(--focus) }
 @media (max-width: 1100px) { .mp-pg-body { grid-template-columns: minmax(0, 1fr) } }
 .mp-col > .mp-section { padding: var(--sp-5); border-radius: var(--r-xl); background: var(--surface); box-shadow: inset 0 0 0 1px var(--border-subtle) }
 .mp-col > .mp-section + .mp-section { margin-top: 0 }
-.mp-pg-foot { display: flex; justify-content: flex-end; margin-top: var(--sp-4) }
-.mp-tpl-box { margin-top: var(--sp-8) }
 /* список внутри карточки страницы — без своей рамки и фона: иконки в 20 от края карточки, как текст, подсветка строки в 12 */
 .mp-pg-body .alist { padding: 0; margin-inline: calc(var(--al-p) * -1); background: none; box-shadow: none }
 /* карточка, которая кончается списком: подсветка последней строки отстоит от низа на 12, как от боков */
@@ -468,3 +465,39 @@ a.hm-li:focus-visible { outline-color: var(--focus) }
 .mp-sub-label { margin-top: var(--sp-2) }
 /* исходящий IP — продолжение списка адресов: тот же шаг 12, что между строками, а не 16 между блоками */
 #mp-a-kv + #mp-o-kv { margin-top: calc(var(--sp-3) - var(--sp-4)) }
+
+/* Окно «Наборы людей»: имя слева, набор справа */
+.mp-who-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); min-height: 32px }
+.mp-who-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.mp-who-row > :is(select, .select-ui) { flex: none; width: 180px }
+
+/* Список выбора: после выбора мышью или закрытия фокус остаётся на кнопке — обводку держим только для клавиатуры */
+.select-trigger:focus:not(:focus-visible, [aria-expanded=true]) { box-shadow: inset 0 0 0 1px var(--border); --fd: var(--dur-focus-out) }
+/* открытый список — той же рамкой, что при наведении; нажатое поле под мышью рамку наведения не теряет */
+.select-trigger[aria-expanded=true] { box-shadow: inset 0 0 0 1px var(--border-strong) }
+@media (hover: hover) and (pointer: fine) { .select-trigger:focus:not(:focus-visible, [aria-expanded=true]):hover { box-shadow: inset 0 0 0 1px var(--border-strong); --fd: var(--dur-hover-in) } }
+/* список выбора — ровно по ширине поля: общее правило меню (не уже 200px) вылезало за узкое поле */
+.select-ui > .listbox { min-width: 0 }
+/* список выбора не двигается: края и верх стоят на месте, он разворачивается вниз от поля (вверх — если открыт вверх) и проявляется */
+.select-ui > .listbox, .select-ui > .listbox:not(.open) { transform: none }
+.select-ui > .listbox { clip-path: inset(0 -32px 100% -32px round var(--r-md)); transition: opacity var(--dur-exit) var(--ease-out), clip-path var(--dur-exit) var(--ease-out), visibility 0s linear var(--dur-exit) }
+.select-ui > .listbox.up { clip-path: inset(100% -32px 0 -32px round var(--r-md)) }
+.select-ui > .listbox.open { clip-path: inset(0 -32px -32px -32px round var(--r-md)); transition: opacity 200ms var(--ease-out), clip-path 220ms var(--ease-out), visibility 0s }
+.select-ui > .listbox.up.open { clip-path: inset(-32px -32px 0 -32px round var(--r-md)) }
+
+/* Флаг у названия: отдельное поле слева и список стран с поиском */
+.mp-flag-row { display: grid; grid-template-columns: 176px minmax(0, 1fr); gap: var(--sp-3); align-items: start }
+@media (max-width: 640px) { .mp-flag-row { grid-template-columns: 88px minmax(0, 1fr) } .mp-flag-name { display: none } }
+.mp-flag-trigger { background-image: none }   /* у .select своя фоновая стрелка, а здесь стрелка — svg */
+.mp-flag-trigger .value { display: flex; align-items: center; gap: var(--sp-2) }
+.mp-flag-name { min-width: 0; overflow: hidden; text-overflow: ellipsis }
+.mp-flags-f { font-family: var(--font-sans); font-size: 16px; line-height: 1 }
+.mp-flags { position: fixed; inset: auto; margin: 0; border: 0; color: var(--text); padding: var(--sp-2); display: flex; flex-direction: column; gap: var(--sp-2); max-height: 340px; overflow: hidden }
+.mp-flags:not(:popover-open) { display: none }
+.mp-flags > .input { flex: none }
+.mp-flags-list { overflow-y: auto; overscroll-behavior: contain; min-height: 0 }
+.mp-flags .menu-item { gap: var(--sp-3); text-align: left }
+.mp-flags-no { display: inline-flex; color: var(--text-faint) }
+.mp-flags-none { padding: var(--sp-2) }
+.mp-flags .menu-item > :is(.mp-flags-f, .mp-flags-no) { flex: none }
+.mp-flags .menu-item > :is(.mp-flags-f, .mp-flags-no) { width: 20px; text-align: center }

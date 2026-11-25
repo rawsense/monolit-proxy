@@ -443,7 +443,7 @@
     $('mp-tpl-auto').checked = !!S.settings.autoupdate
     $('mp-tpl-back').hidden = !tp?.rollback
   }
-  document.addEventListener('mp-page', (e) => { if (e.detail === 'subs') fillTpl() })
+  document.addEventListener('mp-page', (e) => { if (e.detail === 'srv') fillTpl() })
   $('mp-tpl-check').addEventListener('click', (e) => busy(e.currentTarget, async () => {
     try {
       const r = await api('POST', 'api/template/check'); S = r.state || S; paint(); fillTpl()
