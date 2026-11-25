@@ -11,7 +11,12 @@ die() { say "Ошибка: $*"; exit 1; }
 [ "$(id -u)" = 0 ] || die "запустите от root"
 [ -n "$TOKEN" ] || die "нужен ключ из админки: --join КЛЮЧ"
 command -v systemctl >/dev/null || die "нужна система с systemd (Ubuntu, Debian)"
-if ! command -v curl >/dev/null; then say "Ставим curl"; (apt-get update -y && apt-get install -y curl) >/dev/null 2>&1 || die "не поставился curl"; fi
+# curl и unzip (unzip нужен установщику Xray). Свежий сервер: списков пакетов ещё нет, а apt может быть занят автообновлением — ждём его до 5 минут
+NEED=""; for p in curl unzip; do command -v $p >/dev/null || NEED="$NEED $p"; done
+if [ -n "$NEED" ]; then
+  say "Ставим$NEED"
+  (apt-get -o DPkg::Lock::Timeout=300 update -y && DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y$NEED) >/tmp/monolit-node-apt.log 2>&1 || die "не поставилось:$NEED, подробности в /tmp/monolit-node-apt.log"
+fi
 
 # 443 должен быть свободен: на нём нода принимает людей
 BUSY=$(ss -ltnp 2>/dev/null | awk '$4 ~ /:443$/' | grep -v xray | head -n 1)
