@@ -12,13 +12,13 @@
 import { writeFileSync, readFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { register } from './warp.mjs';
-import { scan, toSockets, toIp, realIp, includeIn, has80, fromSockets, fromIp, excludeFrom, SOCK_H1, SOCK_H2 } from './nginx.mjs';
+import { scan, toSockets, toIp, realIp, includeIn, has80, fromSockets, fromIp, excludeFrom, realitySite, realityGroups, SOCK_H1, SOCK_H2 } from './nginx.mjs';
 
 const [cmd, ...rest] = process.argv.slice(2);
 const arg = (k, d = '') => { const i = rest.indexOf('--' + k); return i >= 0 && rest[i + 1] !== undefined && !rest[i + 1].startsWith('--') ? rest[i + 1] : d };
 const NGINX = process.env.MP_NGINX_DIR || '/etc/nginx';
 const CONFIG = process.env.MP_XRAY_CONFIG || '/usr/local/etc/xray/config.json';
-const INC = `${NGINX}/monolit.conf`, VPN_SITE = `${NGINX}/conf.d/monolit-vpn.conf`, ACME = '/var/lib/monolit/acme';
+const INC = `${NGINX}/monolit.conf`, VPN_SITE = `${NGINX}/conf.d/monolit-vpn.conf`, REALITY_SITE = `${NGINX}/conf.d/monolit-reality.conf`, ACME = '/var/lib/monolit/acme';
 const fail = (msg, code = 1) => { console.error(msg); process.exit(code) };
 
 // Локации monolit: админка, подписки, XHTTP. Включаются в сайт домена VPN
@@ -55,6 +55,15 @@ if (cmd === 'entry') {
   excludeFrom(NGINX, domain ? [domain] : [], INC);
   if (domain && !includeIn(NGINX, domain, INC)) fail(`В nginx нет сайта ${domain} на 443`, 4);
   console.log('ok'); process.exit(0);
+}
+
+// Сайт для входа Reality (способы bare и ip2): nginx сам принимает TLS на внутреннем сокете. Пока Reality выключен,
+// сокет никто не трогает, поэтому сайт пишется всегда — переключатель в админке меняет только Xray
+if (cmd === 'tlssite') {
+  const groups = realityGroups(arg('domain'), arg('cert'), arg('key'), arg('alt'));
+  if (!groups.length) fail('Нет сертификата домена: Reality без него не включить', 3);
+  writeFileSync(REALITY_SITE, realitySite(groups, { port: Number(arg('port', '7380')), inc: INC }));
+  console.log(JSON.stringify({ names: groups.flatMap((g) => g.names) })); process.exit(0);
 }
 
 if (cmd === 'warp') {

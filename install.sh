@@ -119,7 +119,7 @@ restore_before() {
     systemctl is-active --quiet xray && ok "Конфиг Xray как до установки, Xray работает" || warn "Конфиг Xray вернул, но Xray не запустился: journalctl -u xray"
   fi
   if [ -n "$nb" ] && [ -f "$nb" ] && has_nginx; then
-    rm -f /etc/nginx/monolit.conf /etc/nginx/conf.d/monolit-vpn.conf
+    rm -f /etc/nginx/monolit.conf /etc/nginx/conf.d/monolit-vpn.conf /etc/nginx/conf.d/monolit-reality.conf
     tar xzf "$nb" -C /
     nginx -t >>"$LOG" 2>&1 && systemctl restart nginx && ok "nginx как до установки" || warn "nginx после возврата не прошёл проверку: nginx -t"
   fi
@@ -183,7 +183,7 @@ READY=0
 if [ -f "$XRAY_CONFIG" ]; then
   READY=$(node_in -v "$CFGDIR:$CFGDIR:ro" monolit-proxy node -e "
     const c=JSON.parse(require('fs').readFileSync('$XRAY_CONFIG','utf8')||'{}');
-    console.log((c.inbounds||[]).some(i=>i.protocol==='hysteria'||(i.protocol==='vless'&&i.streamSettings?.security==='tls'))?1:0)" 2>>"$LOG" || echo 0)
+    console.log((c.inbounds||[]).some(i=>i.protocol==='hysteria'||(i.protocol==='vless'&&(i.streamSettings?.security==='tls'||(i.streamSettings?.security==='reality'&&i.tag==='vsRAWtlsVISION'))))?1:0)" 2>>"$LOG" || echo 0)
 fi
 nginx_files() { nginx -T 2>/dev/null | sed -n 's/^# configuration file \(.*\):$/\1/p' | sort -u; }
 NGX_FILES=""; SITES="[]"
@@ -398,7 +398,7 @@ else
   MP_BACKUP_XRAY="${MP_BACKUP_XRAY:-$(ls "$BK"/xray-config-*-before-monolit.json 2>/dev/null | sort | head -1)}"
   MP_BACKUP_NGINX="${MP_BACKUP_NGINX:-$(ls "$BK"/nginx-*-before-monolit.tgz 2>/dev/null | sort | head -1)}"
 fi
-NEWFILES=""; for f in /etc/nginx/monolit.conf /etc/nginx/conf.d/monolit-vpn.conf; do [ -e "$f" ] || NEWFILES="$NEWFILES $f"; done
+NEWFILES=""; for f in /etc/nginx/monolit.conf /etc/nginx/conf.d/monolit-vpn.conf /etc/nginx/conf.d/monolit-reality.conf; do [ -e "$f" ] || NEWFILES="$NEWFILES $f"; done
 rollback() {
   # Xray первым останавливаем: после смены способа он держит 443 на всех адресах и не дал бы nginx вернуться на свой адрес
   systemctl stop xray 2>/dev/null || true
@@ -422,14 +422,14 @@ if [ "$NEED_APPLY" = 1 ]; then
     if run certbot certonly -n --agree-tos --register-unsafely-without-email --nginx -d "$DOMAIN"; then
       CERT=/etc/letsencrypt/live/$DOMAIN/fullchain.pem KEY=/etc/letsencrypt/live/$DOMAIN/privkey.pem
       mkdir -p /etc/letsencrypt/renewal-hooks/deploy
-      printf '#!/bin/sh\n# monolit proxy: Xray подхватывает продлённые сертификаты\nsystemctl restart xray\n' > /etc/letsencrypt/renewal-hooks/deploy/monolit-xray.sh
+      printf '#!/bin/sh\n# monolit proxy: Xray и nginx подхватывают продлённые сертификаты\nsystemctl restart xray\nsystemctl reload nginx\n' > /etc/letsencrypt/renewal-hooks/deploy/monolit-xray.sh
       chmod +x /etc/letsencrypt/renewal-hooks/deploy/monolit-xray.sh; ok "Let's Encrypt, продление — certbot"
     else
       warn "Let's Encrypt не выдал (подробности в $LOG), пробую ZeroSSL"
       [ -x ~/.acme.sh/acme.sh ] || curl -fsSL https://get.acme.sh | sh -s email="admin@$DOMAIN" >>"$LOG" 2>&1 || die "acme.sh не установился"
       mkdir -p /etc/monolit/cert
       run ~/.acme.sh/acme.sh --issue --nginx -d "$DOMAIN" --server zerossl --keylength ec-256 || die "Сертификат не выдан ни Let's Encrypt, ни ZeroSSL. Проверьте, что $DOMAIN смотрит на сервер и порт 80 открыт"
-      run ~/.acme.sh/acme.sh --install-cert -d "$DOMAIN" --ecc --fullchain-file /etc/monolit/cert/fullchain.pem --key-file /etc/monolit/cert/privkey.pem --reloadcmd "systemctl restart xray"
+      run ~/.acme.sh/acme.sh --install-cert -d "$DOMAIN" --ecc --fullchain-file /etc/monolit/cert/fullchain.pem --key-file /etc/monolit/cert/privkey.pem --reloadcmd "systemctl restart xray; systemctl reload nginx"
       CERT=/etc/monolit/cert/fullchain.pem KEY=/etc/monolit/cert/privkey.pem; ok "ZeroSSL, продление — acme.sh"
     fi
   fi
@@ -447,6 +447,10 @@ if [ "$NEED_APPLY" = 1 ]; then
     node /app/server/init.mjs apply --mode "$MODE" --domain "$DOMAIN" --port "$PORT" --admin-path "$MP_ADMIN_PATH" --ip2 "$IP2" --ip1 "$IP1" \
     --cert "$CERT" --key "$KEY" --xhttp-port "${XPORT:-0}" --xhttp-path "$XPATH" --socks "$SOCKS_FULL" --warp "$WARPF" --from-mode "$FROM_MODE" --alt "$ALT" --entry "${MP_ENTRY:-}" 2>>"$LOG") || rollback "Не получилось собрать конфиг"
   echo "$OUT" >>"$LOG"
+  # сайт для входа Reality: TLS принимает nginx. Пишется всегда, включается переключателем в админке
+  if [ "$MODE" = bare ] || [ "$MODE" = ip2 ]; then
+    node_in -v /etc/nginx:/etc/nginx monolit-proxy node /app/server/init.mjs tlssite --domain "$DOMAIN" --port "$PORT" --cert "$CERT" --key "$KEY" --alt "$ALT" >>"$LOG" 2>&1 || warn "Сайт для Reality не собрался: включить Reality в админке не получится (подробности в $LOG)"
+  fi
   "$XRAY_BIN" run -test -c "$XRAY_CONFIG" >>"$LOG" 2>&1 || rollback "Xray не принял новый конфиг"
   nginx -t >>"$LOG" 2>&1 || rollback "nginx не принял правку"
   ok "Конфиги собраны и проверены"

@@ -4878,7 +4878,7 @@ var qrcode = function() {
   const demo = {
     M: { mode: 'front', managed: true, targets: ['direct', 'warp', 'block'],
       routes: [{ id: 1, on: true, name: 'Нейросети', values: ['openai.com', 'chatgpt.com', 'claude.ai', 'anthropic.com', 'gemini.google.com'], to: 'warp' }, { id: 2, on: true, name: 'Реклама', values: ['geosite:category-ads-all'], to: 'block' }, { id: 3, on: false, name: 'Почта', values: ['25', '465', '587'], to: 'block' }],
-      warp: { on: true, registered: true, plus: true, account: 'free' }, proto: { vision: true, hy2: true, xhttp: true, hy2_known: true, xhttp_known: true },
+      warp: { on: true, registered: true, plus: true, account: 'free' }, proto: { vision: true, hy2: true, xhttp: true, hy2_known: true, xhttp_known: true, reality: false, reality_can: true },
       socks: { on: false, port: 1080, user: 'u7k2pq', pass: 'Zr8vX2mQp4Lk' }, mtg: { port: 8443, link: 'tg://proxy?server=vpn.example.ru&port=8443&secret=ee1fc7b3' },
       history: [{ id: 3, at: Date.now() / 1000 - 300, note: 'Маршрут добавлен' }, { id: 2, at: Date.now() / 1000 - 7200, note: 'WARP включён' }, { id: 1, at: Date.now() / 1000 - 90000, note: 'Протоколы' }] },
     ST: { agent: true, xray: 'active', nginx: 'active', version: '26.11.9', since: Date.now() / 1000 - 3 * 86400, mem: 41 * 1048576, cert_end: Date.now() / 1000 + 61 * 86400, mtg: 'running', load: '0.14 0.11 0.08', uptime: 12 * 86400 },
@@ -4903,7 +4903,7 @@ var qrcode = function() {
     if (path === 'api/warp/check') return { ok: true, warp: 'on', ip: '104.28.0.7', loc: 'NL', colo: 'AMS' }
     if (path === 'api/warp/register') { hist('WARP: новая регистрация'); return { ok: true, manage: m } }
     if (path === 'api/warp/license') { m.warp.account = 'unlimited'; return { ok: true, account: 'unlimited', manage: m } }
-    if (path === 'api/proto') { if ('hy2' in body) m.proto.hy2 = body.hy2; if ('xhttp' in body) m.proto.xhttp = body.xhttp; if (body.socks) Object.assign(m.socks, body.socks); hist('Протоколы'); return { ok: true, manage: m } }
+    if (path === 'api/proto') { if ('hy2' in body) m.proto.hy2 = body.hy2; if ('xhttp' in body) m.proto.xhttp = body.xhttp; if ('reality' in body) m.proto.reality = body.reality; if (body.socks) Object.assign(m.socks, body.socks); hist('Протоколы'); return { ok: true, manage: m } }
     if (path === 'api/mtg') { demo.ST.mtg = body.on ? 'running' : 'exited'; return { ok: true, manage: m } }
     if (/history\/\d+\/rollback/.test(path)) { hist('Возврат к прошлой версии'); return { ok: true, manage: m } }
     if (/history\/\d+$/.test(path)) return { inbounds: [], outbounds: [], routing: { rules: [] } }
@@ -5218,6 +5218,9 @@ var qrcode = function() {
       const sw = $('mp-pr-' + k); sw.checked = M.proto[k]; sw.disabled = !M.proto[k + '_known']
       if (!M.proto[k + '_known']) $(`mp-pr-${k}-h`).textContent = 'На этом сервере его не ставили: включается переустановкой'
     }
+    const rs = $('mp-pr-reality'); rs.checked = !!M.proto.reality; rs.disabled = !M.proto.reality_can
+    $('mp-pr-main').textContent = M.proto.reality ? 'Reality' : 'Vision'
+    if (!M.proto.reality_can) $('mp-pr-reality-h').textContent = 'Включается, когда на 443 только monolit: без сайтов рядом'
     const s = M.socks
     if (document.activeElement?.form !== sForm) { sForm.on.checked = s.on; sForm.port.value = s.port; sForm.user.value = s.user; sForm.pass.value = s.pass }
     $('mp-socks-cf').hidden = !s.on
@@ -5231,6 +5234,14 @@ var qrcode = function() {
     const on = e.target.checked; e.target.disabled = true
     try { take(await run('PATCH', 'api/proto', { [k]: on })); paintAll(); toast({ type: 'success', title: `${k === 'hy2' ? 'Hysteria2' : 'XHTTP'} ${on ? 'включён' : 'выключен'}` }) }
     catch (err) { e.target.checked = !on; fail(err) } finally { e.target.disabled = false }
+  })
+  // Основной вход: Vision или Reality. Ключи у людей те же, но подключение в подписке другое — приложениям нужно её обновить
+  $('mp-pr-reality').addEventListener('change', async (e) => {
+    const on = e.target.checked
+    if (!await window.mpAdmin.confirm(on ? 'Включить Reality?' : 'Вернуть Vision?', 'Подключения к основному входу оборвутся и не вернутся, пока приложения не обновят подписку. Ноды переключатся сами за минуту', on ? 'Включить' : 'Вернуть')) { e.target.checked = !on; return }
+    e.target.disabled = true
+    try { take(await run('PATCH', 'api/proto', { reality: on })); paintAll(); window.mpAdmin.refresh?.(); toast({ type: 'success', title: on ? 'Основной вход: Reality' : 'Основной вход: Vision', text: 'Обновите подписку в приложениях' }) }
+    catch (err) { e.target.checked = !on; fail(err) } finally { e.target.disabled = !M.proto.reality_can }
   })
   // AmneziaWG ставится отдельным контейнером: первая сборка идёт несколько минут, состояние приходит с общим состоянием админки
   const AWG_HINT = 'Отдельный сервер по UDP. Для monolit client и AmneziaVPN'
@@ -5856,7 +5867,9 @@ var qrcode = function() {
   // ---------- подписки ----------
   let kitId = 0, tabsHtml = ''
   const kit = () => S().kits.find((k) => k.id === kitId) || S().kits[0]
-  const chain = (l) => `<span class="mp-chain"><span class="mp-hops">${l.via ? esc(nodeName(l.via)) + icon('arrow-right') + esc(nodeName(l.out)) : esc(nodeName(l.out))}</span><span class="badge badge-mono">${PROTO[l.proto] || l.proto}</span>${l.problem ? `<span class="badge badge-warning" data-tip="${esc(l.problem)}">не работает</span>` : ''}</span>`
+  // основной вход сервера переключён на Reality: подключение Vision этого сервера на деле Reality
+  const label = (l) => !l.via && !l.out && l.proto === 'vision' && S().main?.reality ? PROTO.reality : PROTO[l.proto] || l.proto
+  const chain = (l) => `<span class="mp-chain"><span class="mp-hops">${l.via ? esc(nodeName(l.via)) + icon('arrow-right') + esc(nodeName(l.out)) : esc(nodeName(l.out))}</span><span class="badge badge-mono">${label(l)}</span>${l.problem ? `<span class="badge badge-warning" data-tip="${esc(l.problem)}">не работает</span>` : ''}</span>`
   const lineRow = (l) => `<div class="alist-row mp-line${l.on ? '' : ' is-off'}" data-id="${l.id}">
       <button type="button" class="icon-btn icon-btn-sm mp-grip" aria-label="Переместить «${esc(l.name)}»">${icon('grip-vertical')}</button>
       <button type="button" class="mp-line-open"><b>${named(l.name)}</b>${chain(l)}</button>
@@ -5916,7 +5929,7 @@ var qrcode = function() {
   const lForm = $('ln-form'), lineOf = (id) => kit().lines.find((l) => l.id === Number(id))
   function fillProto(keep) {
     const e = Number(lForm.via.value) || Number(lForm.out.value), list = e ? ['reality', ...(node(e)?.domain ? ['vision', 'hy2'] : [])] : S().main.protos
-    setSelect(lForm.proto, list.map((p) => `<option value="${p}">${PROTO[p]}</option>`).join(''), list.includes(keep) ? keep : list[0])
+    setSelect(lForm.proto, list.map((p) => `<option value="${p}">${label({ proto: p, out: e, via: 0 })}</option>`).join(''), list.includes(keep) ? keep : list[0])
   }
   function fillVia(keep) {
     const out = Number(lForm.out.value), list = S().nodes.filter((n) => n.id !== out)

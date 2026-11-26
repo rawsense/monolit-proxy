@@ -55,7 +55,8 @@ const dayOf = t => DAYF.format(new Date(t * 1000));
 const kindsOn = () => nodes.kindsOn();   // входы этого сервера, которые есть в наборах подключений
 const serverCtx = () => {
   const d = xray.detect();
-  return { name: getSetting(db, 'server_name'), domain: getSetting(db, 'domain'), fp: getSetting(db, 'fp', 'firefox'), xhttpPath: d.xhttp?.path || '', ports: { vision: d.vision?.port, hy2: d.hy2?.port, xhttp: 443 } };
+  return { name: getSetting(db, 'server_name'), domain: getSetting(db, 'domain'), fp: getSetting(db, 'fp', 'firefox'), xhttpPath: d.xhttp?.path || '', ports: { vision: d.vision?.port, hy2: d.hy2?.port, xhttp: 443 },
+    reality: d.vision?.reality ? mgr.reality() : null };   // основной вход переключён на Reality: ключ и короткий id для подписок и мостов
 };
 const users = () => db.prepare('SELECT * FROM users ORDER BY id').all();
 const userById = id => db.prepare('SELECT * FROM users WHERE id = ?').get(id);

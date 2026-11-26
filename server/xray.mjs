@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 export const EMAIL = id => `mp-${id}`;
+export const MAIN_TAG = 'vsRAWtlsVISION';   // основной вход, как его называет установка (и autoXRAY); чужой вход Reality своим не считаем
 // mp-N — люди, mpn-N — ноды (ходят сюда за людей, пришедших по мосту)
 // mp-N-x<выход><d|b> — тот же человек на подключении с выходом через прокси (exits.mjs), mpn-N-x… — нода с такими людьми
 const isOurs = c => typeof c?.email === 'string' && /^mpn?-\d+(-x\d+[db])?$/.test(c.email);
@@ -20,8 +21,9 @@ export class Xray {
     const out = { vision: null, hy2: null, xhttp: null, api: !!cfg.api?.listen || !!cfg.api?.tag, stats: !!cfg.stats };
     for (const i of cfg.inbounds || []) {
       const ss = i.streamSettings || {};
-      if (i.protocol === 'vless' && (ss.network === 'raw' || ss.network === 'tcp' || !ss.network) && ss.security === 'tls' && !out.vision)
-        out.vision = { tag: i.tag, port: i.port, listen: i.listen || '0.0.0.0' };
+      // основной вход: Vision с сертификатом в самом Xray или Reality (тогда сертификат отдаёт nginx) — для людей это одно подключение
+      if (i.protocol === 'vless' && (ss.network === 'raw' || ss.network === 'tcp' || !ss.network) && (ss.security === 'tls' || (ss.security === 'reality' && i.tag === MAIN_TAG)) && !out.vision)
+        out.vision = { tag: i.tag, port: i.port, listen: i.listen || '0.0.0.0', reality: ss.security === 'reality' };
       else if (i.protocol === 'vless' && ss.network === 'xhttp' && !out.xhttp)
         out.xhttp = { tag: i.tag, port: i.port, listen: i.listen, path: (ss.xhttpSettings?.path || '').replace(/^\//, '') };
       else if (i.protocol === 'hysteria' && !out.hy2)

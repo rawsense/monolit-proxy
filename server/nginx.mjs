@@ -8,6 +8,36 @@ import { join } from 'node:path';
 
 export const SOCK_H1 = '/dev/shm/monolit-h1.sock';
 export const SOCK_H2 = '/dev/shm/monolit-h2.sock';
+// Сюда Xray в режиме Reality отдаёт всех, кто пришёл не по VPN: TLS принимает сам nginx, со своим сертификатом
+export const SOCK_TLS = '/dev/shm/monolit-tls.sock';
+
+// Сайт домена VPN для Reality: тот же сайт, что за сокетами H1/H2, но TLS здесь завершает nginx.
+// groups — [{ names: [домены], cert, key }]: у запасного домена сертификат свой, ему свой блок server
+export function realitySite(groups, { port, inc = '/etc/nginx/monolit.conf' }) {
+  return '# monolit proxy: сайт домена VPN для входа Reality. Xray пропускает сюда всё, что не VPN; сертификат отдаёт nginx\n'
+    + groups.map((g, i) => `server {
+    listen unix:${SOCK_TLS} ssl http2 proxy_protocol${i ? '' : ' default_server'};
+    server_name ${g.names.join(' ')};
+    ssl_certificate ${g.cert};
+    ssl_certificate_key ${g.key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    set_real_ip_from unix:;
+    real_ip_header proxy_protocol;
+    server_tokens off;
+    access_log off;
+    include ${inc};
+    location / { proxy_pass http://127.0.0.1:${port}; proxy_set_header Host $host; proxy_set_header X-Real-IP $remote_addr; client_max_body_size 64k; }
+}
+`).join('');
+}
+// Домены и сертификаты из настроек установки: основной домен и запасные («домен:сертификат:ключ,…»). Без сертификата — не берём
+export function realityGroups(domain, cert, key, alt = '') {
+  const out = [];
+  const add = (d, c, k) => { if (!d || !c || !k) return; const g = out.find((x) => x.cert === c); if (g) { if (!g.names.includes(d)) g.names.push(d) } else out.push({ names: [d], cert: c, key: k }) };
+  add(domain, cert, key);
+  for (const [d, c, k] of String(alt).split(/[,;]/).map((x) => x.split(/[:|]/))) if (d !== domain && /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(d || '')) add(d, c, k);
+  return out;
+}
 
 // Файлы, которые nginx реально читает для сайтов. install.sh передаёт точный список из «nginx -T» (MP_NGINX_FILES),
 // иначе — conf.d/*.conf и sites-enabled
@@ -55,7 +85,7 @@ const is443v6any = (addr) => addr === '[::]:443';
 export function scan(dir = '/etc/nginx') {
   const sites = [];
   for (const file of siteFiles(dir)) {
-    if (/[\\/]monolit-vpn\.conf$/.test(file)) continue;   // свой сайт домена VPN — не сайт пользователя
+    if (isVpnSite(file)) continue;   // свой сайт домена VPN — не сайт пользователя
     const text = readFileSync(file, 'utf8');
     for (const b of serverBlocks(text)) {
       const listens = [...b.body.matchAll(LISTEN)].map((m) => m[3].trim().split(/\s+/));
@@ -162,7 +192,7 @@ const namesOf = (body) => (body.match(/(?:^|[;{\s])server_name[ \t]+([^;]+);/)?.
 
 // ---------- смена способа из админки: вернуть сайты к обычному 443, потом перевести заново ----------
 const OUR_REAL_IP = '\n    set_real_ip_from unix:;\n    real_ip_header proxy_protocol;';
-const isVpnSite = (f) => /[\\/]monolit-vpn\.conf$/.test(f);
+function isVpnSite(f) { return /[\\/]monolit-(vpn|reality)\.conf$/.test(f) }   // свои сайты домена VPN: за Xray и для Reality
 const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // Переписать блоки server сайтов: fn(body) → новое тело

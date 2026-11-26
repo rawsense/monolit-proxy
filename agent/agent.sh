@@ -210,6 +210,24 @@ case "$cmd" in
     systemctl reload nginx 2>&1 || { back; fin 1; }
     grep -q '^MP_ENTRY=' "$f" && sed -i "s/^MP_ENTRY=.*/MP_ENTRY=$dom/" "$f" || echo "MP_ENTRY=$dom" >> "$f"
     echo "ok"; fin 0 ;;
+  tlssite)   # сайт nginx для входа Reality: TLS принимает nginx с сертификатом домена (на внутреннем сокете, пока Reality выключен — без дела)
+    [[ "${MP_MODE:-}" =~ ^(bare|ip2)$ ]] || { echo "Reality включается, когда на 443 только monolit"; fin 1; }
+    [ -n "${MP_CERT:-}" ] && [ -f "${MP_CERT:-}" ] && [ -f "${MP_KEY:-}" ] || { echo "Не нашёл сертификат домена (MP_CERT в /etc/monolit.env)"; fin 1; }
+    command -v nginx >/dev/null && [ -d /etc/nginx ] || { echo "nginx не найден"; fin 1; }
+    bk=/root/backups/nginx-$(date +%Y%m%d-%H%M%S)-before-reality.tgz; mkdir -p /root/backups
+    tar czf "$bk" -C / etc/nginx || { echo "не получилось сохранить копию nginx"; fin 1; }
+    new=1; [ -e /etc/nginx/conf.d/monolit-reality.conf ] && new=0
+    alt=${MP_ALT:-}; alt=${alt#\"}; alt=${alt%\"}
+    out=$(docker run --rm -v /etc/nginx:/etc/nginx monolit-proxy node /app/server/init.mjs tlssite --domain "$MP_DOMAIN" --port "${MP_LISTEN##*:}" --cert "$MP_CERT" --key "$MP_KEY" --alt "$alt" 2>&1) || { echo "$out" | tail -n 2; fin 1; }
+    back() { [ $new = 1 ] && rm -f /etc/nginx/conf.d/monolit-reality.conf; tar xzf "$bk" -C /; nginx -t >/dev/null 2>&1 && systemctl reload nginx; }
+    if ! t=$(nginx -t 2>&1); then back; echo "nginx не принял сайт для Reality: $(echo "$t" | grep -m1 emerg)"; fin 1; fi
+    systemctl reload nginx 2>&1 || { back; fin 1; }
+    # продлённый сертификат теперь нужен и nginx: Xray берёт его перезапуском, nginx — перечитыванием настроек
+    h=/etc/letsencrypt/renewal-hooks/deploy/monolit-xray.sh
+    [ -f "$h" ] && ! grep -q 'reload nginx' "$h" && echo 'systemctl reload nginx' >> "$h"
+    for i in $(seq 1 20); do [ -S /dev/shm/monolit-tls.sock ] && break; sleep 0.2; done
+    [ -S /dev/shm/monolit-tls.sock ] || { echo "nginx не открыл сокет для Reality"; fin 1; }
+    echo "$out" | tail -n 1; fin 0 ;;
   awg)   # awg on ПОРТ [IP выхода] | awg off | awg state — сервер AmneziaWG в отдельном контейнере monolit-awg
     NETN=monolit-awg; SUB=172.31.213.0/24; SRC=${MP_SRC:-/opt/monolit-src}/awg
     snat_drop() { iptables -t nat -S POSTROUTING 2>/dev/null | grep -- '--comment monolit-awg' | sed 's/^-A/-D/' | while read -r r; do eval "iptables -t nat $r" 2>/dev/null; done; }

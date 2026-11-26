@@ -4,7 +4,9 @@
 import { createConnection } from 'node:net';
 import { readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
 import { dirname, join, basename } from 'node:path';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { now, getSetting, setSetting } from './db.mjs';
+import { SOCK_TLS } from './nginx.mjs';
 import * as warpApi from './warp.mjs';
 
 const SOCK = process.env.MP_AGENT_SOCK || '/run/monolit/agent.sock';
@@ -101,8 +103,8 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
   const put = (k, v) => setSetting(db, k, JSON.stringify(v));
   // Всё, чем управляем, одним объектом: его же кладём в историю
   const snapshot = () => ({ routes: get('routes', []), warp: getSetting(db, 'warp_on', '0') === '1', warp_out: get('warp_out', null), warp_reg: get('warp_reg', null), warp_acc: getSetting(db, 'warp_acc', ''),
-    proto: get('proto', { hy2: true, xhttp: true }), stash: get('stash', {}), socks: get('socks', { on: false, port: 1080, user: '', pass: '' }), out_ip: getSetting(db, 'out_ip', '') });
-  const restore = (s) => { put('routes', s.routes); setSetting(db, 'warp_on', s.warp ? '1' : '0'); put('warp_out', s.warp_out); put('warp_reg', s.warp_reg); setSetting(db, 'warp_acc', s.warp_acc || ''); put('proto', s.proto); put('stash', s.stash); put('socks', s.socks); setSetting(db, 'out_ip', s.out_ip || '') };
+    proto: get('proto', { hy2: true, xhttp: true }), stash: get('stash', {}), socks: get('socks', { on: false, port: 1080, user: '', pass: '' }), out_ip: getSetting(db, 'out_ip', ''), reality: getSetting(db, 'reality_on', '0') === '1' });
+  const restore = (s) => { put('routes', s.routes); setSetting(db, 'warp_on', s.warp ? '1' : '0'); put('warp_out', s.warp_out); put('warp_reg', s.warp_reg); setSetting(db, 'warp_acc', s.warp_acc || ''); put('proto', s.proto); put('stash', s.stash); put('socks', s.socks); setSetting(db, 'out_ip', s.out_ip || ''); setSetting(db, 'reality_on', s.reality ? '1' : '0') };
 
   const tagsOf = (cfg) => ({
     direct: (cfg.outbounds || []).find((o) => o.protocol === 'freedom')?.tag || 'direct',
@@ -121,6 +123,9 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
       if (ib) { s.proto[k] = true; s.stash[k] = { ...ib, settings: { ...ib.settings, clients: [] } } }
       else if (!s.stash[k]) s.proto[k] = false;
     }
+    // Основной вход после установки — Vision с сертификатом: запоминаем его вид, чтобы вернуть из Reality.
+    // Включён ли Reality, решает админка, а не конфиг: установка всегда пишет Vision
+    const tls = tlsOf(cfg, d); if (tls) s.stash.tls = tls;
     // Исходящий IP: если в конфиге задан — он; нет (install.sh переписал конфиг) — оставляем выбранный, build вернёт
     const fr = (cfg.outbounds || []).find((o) => o.protocol === 'freedom' && o.tag === tagsOf(cfg).direct);
     if (fr?.sendThrough && IPV4.test(fr.sendThrough)) s.out_ip = fr.sendThrough;
@@ -133,6 +138,11 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
     restore(s); setSetting(db, 'managed', '1');
   }
   const nextId = (routes) => Math.max(0, ...routes.map((r) => r.id)) + 1;
+  // Имена, под которыми отвечает сайт Reality: домен и запасные домены, у которых есть сертификат
+  const realityNames = () => [getSetting(db, 'domain'), ...String(process.env.MP_ALT || '').replace(/^"|"$/g, '').split(/[,;]/).map((x) => x.split(/[:|]/)).filter(([d, c, k]) => d && c && k).map(([d]) => d)]
+    .filter((d, i, a) => d && a.indexOf(d) === i);
+  // Вид основного входа Vision, который надо вернуть при выключении Reality
+  const tlsOf = (cfg, d = xray.detect(cfg)) => { const i = d.vision && !d.vision.reality && cfg.inbounds.find((x) => x.tag === d.vision.tag); return i ? { streamSettings: structuredClone(i.streamSettings), fallbacks: structuredClone(i.settings?.fallbacks || []) } : null };
 
   // Собрать конфиг из текущего и состояния
   function build(cfg, s) {
@@ -144,6 +154,18 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
       const tag = d[k]?.tag;
       if (!s.proto[k] && tag) cfg.inbounds = cfg.inbounds.filter((i) => i.tag !== tag);
       if (s.proto[k] && !tag && s.stash[k]) cfg.inbounds.push(structuredClone(s.stash[k]));
+    }
+    // Основной вход: Vision (TLS принимает Xray) или Reality (TLS принимает nginx, Xray узнаёт своих по ключу)
+    const vi = d.vision && cfg.inbounds.find((i) => i.tag === d.vision.tag);
+    if (vi && REALITY_MODES.includes(MODE)) {
+      const keys = get('reality_keys', null);
+      if (s.reality && keys && !d.vision.reality) {
+        vi.streamSettings = { network: 'raw', security: 'reality', realitySettings: { dest: SOCK_TLS, xver: 1, serverNames: realityNames(), privateKey: keys.priv, shortIds: [keys.sid] } };
+        if (vi.settings) delete vi.settings.fallbacks;
+      } else if (!s.reality && d.vision.reality && s.stash.tls) {
+        vi.streamSettings = structuredClone(s.stash.tls.streamSettings);
+        vi.settings = { ...vi.settings, fallbacks: structuredClone(s.stash.tls.fallbacks) };
+      }
     }
     // SOCKS5
     cfg.inbounds = cfg.inbounds.filter((i) => !isSocks(i) && i.tag !== 'mp-probe');
@@ -236,7 +258,8 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
       mode: MODE, managed: MODE !== 'existing',
       routes: s.routes, targets: TARGETS,
       warp: { on: s.warp, registered: !!s.warp_out, plus: !!s.warp_reg, account: s.warp_acc || 'free' },
-      proto: { vision: true, hy2: s.proto.hy2, xhttp: s.proto.xhttp, hy2_known: !!(s.proto.hy2 || s.stash.hy2), xhttp_known: !!(s.proto.xhttp || s.stash.xhttp) },
+      proto: { vision: true, hy2: s.proto.hy2, xhttp: s.proto.xhttp, hy2_known: !!(s.proto.hy2 || s.stash.hy2), xhttp_known: !!(s.proto.xhttp || s.stash.xhttp),
+        reality: s.reality, reality_can: REALITY_MODES.includes(MODE) },
       out_ip: s.out_ip || '',
       socks: { on: s.socks.on, port: s.socks.port, user: s.socks.user, pass: s.socks.pass },
       mtg: process.env.MP_MTG_PORT ? { port: Number(process.env.MP_MTG_PORT), link: `tg://proxy?server=${getSetting(db, 'domain')}&port=${process.env.MP_MTG_PORT}&secret=${process.env.MP_MTG_SECRET || ''}` } : null,
@@ -319,7 +342,19 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
           const f = await agent('port-free ' + port); if (f.code === 1) return { ok: false, error: `Порт ${port} уже занят` + (/"([^"]+)"/.exec(f.out) ? `: ${/"([^"]+)"/.exec(f.out)[1]}` : '') };
         }
       }
-      const r = await apply('Протоколы', () => { put('proto', p); put('socks', so) });
+      // Reality: сайт nginx с TLS готовит помощник (сертификат домена), ключи — свои, один раз
+      let stash = s.stash;
+      if (b.reality !== undefined && !!b.reality !== s.reality) {
+        if (!REALITY_MODES.includes(MODE)) return { ok: false, error: 'Reality включается, когда на 443 только monolit: способы «Весь сервер под VPN» и «Второй IP»' };
+        if (b.reality) {
+          const t = await agent('tlssite', 60000);
+          if (t.code !== 0) return { ok: false, error: t.code === 2 && /нет такой команды/.test(t.out) ? 'Помощник на сервере старый: обновите monolit' : t.out.split('\n').filter(Boolean).pop() || 'nginx не принял сайт для Reality' };
+          if (!get('reality_keys', null)) put('reality_keys', realityKeys());
+          const tls = tlsOf(xray.read()); if (tls) stash = { ...stash, tls };
+        } else if (!s.stash.tls) return { ok: false, error: 'Не помню, каким был вход Vision: верните его переустановкой' };
+      }
+      const reality = b.reality !== undefined ? !!b.reality : s.reality;
+      const r = await apply(reality !== s.reality ? (reality ? 'Основной вход: Reality' : 'Основной вход: Vision') : 'Протоколы', () => { put('proto', p); put('socks', so); put('stash', stash); setSetting(db, 'reality_on', reality ? '1' : '0') });
       // Порт SOCKS в файрволе: открываем сами (если при установке не было --no-firewall) и сами же закрываем.
       // Закрываем только то, что открыли мы: правило, которое было до нас, не трогаем
       if (r.ok && process.env.MP_FIREWALL !== '0') {
@@ -410,7 +445,8 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
       const kept = J(getSetting(db, 'pre_reconf', ''), null);
       if (kept) { restore({ ...kept, stash: { ...kept.stash, ...snapshot().stash } }); setSetting(db, 'pre_reconf', ''); log('после смены адреса вернул маршруты, WARP и протоколы') }
       const cfg = xray.read(), want = build(cfg, snapshot());
-      if (JSON.stringify(want.routing) !== JSON.stringify(cfg.routing) || want.inbounds.length !== cfg.inbounds.length || JSON.stringify(want.outbounds) !== JSON.stringify(cfg.outbounds)) {
+      if (JSON.stringify(want.routing) !== JSON.stringify(cfg.routing) || want.inbounds.length !== cfg.inbounds.length || JSON.stringify(want.outbounds) !== JSON.stringify(cfg.outbounds)
+        || !!xray.detect(want).vision?.reality !== !!xray.detect(cfg).vision?.reality) {
         const r = await apply('Маршруты после переустановки', null, { history: false });
         if (!r.ok) log('маршруты после переустановки не применились:', r.error);
       }
@@ -419,7 +455,15 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
 
   // Перед сменой адреса: запомнить, что включено (start() вернёт это после переустановки)
   const keep = () => setSetting(db, 'pre_reconf', JSON.stringify(snapshot()));
-  return { stateForAdmin, routes, warp, proto, egress, inbound, history, server, start, apply, keep };
+  // Ключ и короткий id основного входа Reality для подписок и мостов; null — вход Vision
+  const reality = () => { const k = get('reality_keys', null); try { return k && xray.detect().vision?.reality ? { pub: k.pub, sid: k.sid } : null } catch { return null } };
+  return { stateForAdmin, routes, warp, proto, egress, inbound, reality, history, server, start, apply, keep };
+}
+
+const REALITY_MODES = ['bare', 'ip2'];   // на 443 только monolit: за Xray один сайт, его и показываем посторонним
+export function realityKeys() {
+  const { publicKey, privateKey } = generateKeyPairSync('x25519');
+  return { priv: privateKey.export({ format: 'jwk' }).d, pub: publicKey.export({ format: 'jwk' }).x, sid: randomBytes(8).toString('hex') };
 }
 
 // Адрес, на котором слушает вход Vision, если это конкретный IPv4 (способ «Второй IP»), иначе ''

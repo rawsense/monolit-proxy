@@ -185,7 +185,9 @@
   // ---------- подписки ----------
   let kitId = 0, tabsHtml = ''
   const kit = () => S().kits.find((k) => k.id === kitId) || S().kits[0]
-  const chain = (l) => `<span class="mp-chain"><span class="mp-hops">${l.via ? esc(nodeName(l.via)) + icon('arrow-right') + esc(nodeName(l.out)) : esc(nodeName(l.out))}</span><span class="badge badge-mono">${PROTO[l.proto] || l.proto}</span>${l.problem ? `<span class="badge badge-warning" data-tip="${esc(l.problem)}">не работает</span>` : ''}</span>`
+  // основной вход сервера переключён на Reality: подключение Vision этого сервера на деле Reality
+  const label = (l) => !l.via && !l.out && l.proto === 'vision' && S().main?.reality ? PROTO.reality : PROTO[l.proto] || l.proto
+  const chain = (l) => `<span class="mp-chain"><span class="mp-hops">${l.via ? esc(nodeName(l.via)) + icon('arrow-right') + esc(nodeName(l.out)) : esc(nodeName(l.out))}</span><span class="badge badge-mono">${label(l)}</span>${l.problem ? `<span class="badge badge-warning" data-tip="${esc(l.problem)}">не работает</span>` : ''}</span>`
   const lineRow = (l) => `<div class="alist-row mp-line${l.on ? '' : ' is-off'}" data-id="${l.id}">
       <button type="button" class="icon-btn icon-btn-sm mp-grip" aria-label="Переместить «${esc(l.name)}»">${icon('grip-vertical')}</button>
       <button type="button" class="mp-line-open"><b>${named(l.name)}</b>${chain(l)}</button>
@@ -245,7 +247,7 @@
   const lForm = $('ln-form'), lineOf = (id) => kit().lines.find((l) => l.id === Number(id))
   function fillProto(keep) {
     const e = Number(lForm.via.value) || Number(lForm.out.value), list = e ? ['reality', ...(node(e)?.domain ? ['vision', 'hy2'] : [])] : S().main.protos
-    setSelect(lForm.proto, list.map((p) => `<option value="${p}">${PROTO[p]}</option>`).join(''), list.includes(keep) ? keep : list[0])
+    setSelect(lForm.proto, list.map((p) => `<option value="${p}">${label({ proto: p, out: e, via: 0 })}</option>`).join(''), list.includes(keep) ? keep : list[0])
   }
   function fillVia(keep) {
     const out = Number(lForm.out.value), list = S().nodes.filter((n) => n.id !== out)

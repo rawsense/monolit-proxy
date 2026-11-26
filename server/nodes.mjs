@@ -20,6 +20,8 @@ const VISION_PORT = 8443;                                      // 443 на но�
 const SEEN = 100;                                              // секунд без отчёта — нода «не на связи»
 // Ключ человека на ноде — свой для каждого подключения: по нему нода понимает, куда его вести
 export const lineUuid = (uuid, lineId) => { const h = sha(`${uuid}:${lineId}`); return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}` };
+// Защита соединения клиента со входом Reality: k — { pub, sid } входа
+export const realityStream = (serverName, fingerprint, k) => ({ network: 'raw', security: 'reality', realitySettings: { serverName, fingerprint, publicKey: k.pub, shortId: k.sid } });
 const cleanHost = (v) => { const d = String(v || '').trim().toLowerCase().replace(/^[a-z]+:\/\//, '').replace(/[/:?#].*$/, ''); return /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(d) && d.length <= 253 ? d : '' };
 
 // Что видит посторонний, открывший домен ноды в браузере: обычная с виду страница входа
@@ -149,7 +151,9 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
       if (!e && l.proto === 'awg') { const ob = opts.awg && awg.outbound(u); if (ob) out.push(renderOne(parsed, 'awg', { user: u, server: srv }, { remark: l.name, ob })); continue }
       const kind = !e ? l.proto : l.proto === 'hy2' ? 'hy2' : 'vision';
       if (!parsed.outbounds[kind]) continue;
-      out.push(renderOne(parsed, kind, { user: lineUser(u, l), server: srv }, { remark: l.name, outbound: !e ? null : (ob) => {
+      // основной вход этого сервера в режиме Reality: тот же ключ человека, другая защита соединения
+      const mainReality = !e && l.proto === 'vision' && srv.reality ? (ob) => { ob.streamSettings = realityStream(srv.domain, srv.fp || 'firefox', srv.reality) } : null;
+      out.push(renderOne(parsed, kind, { user: lineUser(u, l), server: srv }, { remark: l.name, outbound: !e ? mainReality : (ob) => {
         if (l.proto === 'hy2') {
           Object.assign(ob.settings, { address: n.domain, port: 443 });
           ob.streamSettings.tlsSettings.serverName = n.domain; ob.streamSettings.hysteriaSettings.auth = lineUuid(u.hy2, l.id);
@@ -158,13 +162,13 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
         const v = ob.settings.vnext[0]; v.users[0].id = lineUuid(u.uuid, l.id);
         if (l.proto === 'vision') { v.address = n.domain; v.port = VISION_PORT; ob.streamSettings.tlsSettings.serverName = n.domain; return }
         v.address = n.addr; v.port = 443;
-        ob.streamSettings = { network: 'raw', security: 'reality', realitySettings: { serverName: sni(n), fingerprint: srv.fp || 'firefox', publicKey: n.pub, shortId: n.sid } };
+        ob.streamSettings = realityStream(sni(n), srv.fp || 'firefox', n);
       } }));
     }
     return out;
   }
   function linkList(u, srv) {
-    const fp = srv.fp || 'firefox', d = srv.domain, out = [], push = (l, url) => out.push({ name: l.name, proto: PROTO[l.proto], url });
+    const fp = srv.fp || 'firefox', d = srv.domain, out = [], push = (l, url) => out.push({ name: l.name, proto: !entry(l) && l.proto === 'vision' && srv.reality ? PROTO.reality : PROTO[l.proto], url });
     for (const l of forUser(u)) {
       const e = entry(l), n = e && byId(e), name = encodeURIComponent(l.name), lu = lineUser(u, l);
       // AmneziaWG: ссылка vpn:// для приложения AmneziaVPN. В общий список ссылок подписки она не идёт: другие приложения её не понимают
@@ -172,6 +176,7 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
       if (e && l.proto === 'hy2') push(l, `hysteria2://${encodeURIComponent(lineUuid(u.hy2, l.id))}@${n.domain}:443?sni=${n.domain}&alpn=h3#${name}`);
       else if (e && l.proto === 'vision') push(l, `vless://${lineUuid(u.uuid, l.id)}@${n.domain}:${VISION_PORT}?encryption=none&security=tls&type=tcp&flow=xtls-rprx-vision&sni=${n.domain}&fp=${fp}#${name}`);
       else if (e) push(l, `vless://${lineUuid(u.uuid, l.id)}@${n.addr}:443?encryption=none&security=reality&type=tcp&flow=xtls-rprx-vision&sni=${sni(n)}&fp=${fp}&pbk=${n.pub}&sid=${n.sid}#${name}`);
+      else if (l.proto === 'vision' && srv.reality) push(l, `vless://${lu.uuid}@${d}:${srv.ports.vision}?encryption=none&security=reality&type=tcp&flow=xtls-rprx-vision&sni=${d}&fp=${fp}&pbk=${srv.reality.pub}&sid=${srv.reality.sid}#${name}`);
       else if (l.proto === 'vision') push(l, `vless://${lu.uuid}@${d}:${srv.ports.vision}?encryption=none&security=tls&type=tcp&flow=xtls-rprx-vision&sni=${d}&fp=${fp}#${name}`);
       else if (l.proto === 'xhttp' && srv.xhttpPath) push(l, `vless://${lu.uuid}@${d}:443?encryption=none&security=tls&type=xhttp&mode=stream-up&path=%2F${encodeURIComponent(srv.xhttpPath)}&sni=${d}&fp=${fp}&alpn=h2#${name}`);
       else if (l.proto === 'hy2') push(l, `hysteria2://${encodeURIComponent(lu.hy2)}@${d}:${srv.ports.hy2}?sni=${d}&alpn=h3#${name}`);
@@ -218,7 +223,8 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
       const user = { id: linkUser(n, k).id, flow: 'xtls-rprx-vision', encryption: 'none' };
       outbounds.push(b
         ? { tag, protocol: 'vless', settings: { vnext: [{ address: b.addr, port: 443, users: [user] }] }, streamSettings: { network: 'raw', security: 'reality', realitySettings: { serverName: sni(b), fingerprint: fp, publicKey: b.pub, shortId: b.sid } } }
-        : { tag, protocol: 'vless', settings: { vnext: [{ address: srv.domain, port: srv.ports.vision || 443, users: [user] }] }, streamSettings: { network: 'raw', security: 'tls', tlsSettings: { serverName: srv.domain, fingerprint: fp } } });
+        : { tag, protocol: 'vless', settings: { vnext: [{ address: srv.domain, port: srv.ports.vision || 443, users: [user] }] },
+          streamSettings: srv.reality ? realityStream(srv.domain, fp, srv.reality) : { network: 'raw', security: 'tls', tlsSettings: { serverName: srv.domain, fingerprint: fp } } });
       rules.push({ user: emails, outboundTag: tag });
     }
     return exits.parts({
@@ -305,7 +311,7 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
     const t = now(), d = detect(), o = onlineMap();
     const count = db.prepare('SELECT kit_id, COUNT(*) AS n FROM users GROUP BY kit_id').all(), def = defKit();
     return {
-      main: { day: Number(db.prepare('SELECT SUM(up + down) AS s FROM traffic_daily WHERE day = ?').get(dayOf(t))?.s || 0), protos: LOCAL.filter((k) => d[k]) },
+      main: { day: Number(db.prepare('SELECT SUM(up + down) AS s FROM traffic_daily WHERE day = ?').get(dayOf(t))?.s || 0), protos: LOCAL.filter((k) => d[k]), reality: !!d.vision?.reality },
       nodes: all().map((n) => { const i = J(n.info, {}), on = online.get(n.id);
         return { id: n.id, name: n.name, addr: n.addr, mask: n.mask, domain: n.domain, ru_direct: !!n.ru_direct, tls: tls(n), cert_err: n.domain && !tls(n) ? i.cert_err || '' : '', old_agent: joined(n) && !!n.seen_at && !!i.xray && !(i.v >= 2), joined: joined(n), waiting: !!n.join_hash, seen: n.seen_at, up: joined(n) && t - n.seen_at < SEEN, xray: i.xray || '', load: i.load || '', xray_ok: i.active !== false, err: i.err || '',
           online: on && t - on.at < SEEN ? Object.keys(on.ips).length : 0, day: dayBytes(n.id) } }),
