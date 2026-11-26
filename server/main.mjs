@@ -194,8 +194,8 @@ async function sync({ full = false } = {}) {
 let syncing = Promise.resolve();
 const queue = fn => { const p = syncing.then(fn); syncing = p.catch(() => {}); return p; };
 const queueSync = opts => queue(() => sync(opts));
-const watch = createWatch({ db, log, server: () => getSetting(db, 'server_name', 'monolit'), adminUrl: () => `https://${getSetting(db, 'domain')}${ADMIN}/` });
-const mgr = createManager({ db, xray, queue, log, activeUsers: () => users().filter(u => userState(u) === 'active'), onRestart: () => { queueSync({ full: true }); } });
+const watch = createWatch({ db, log, server: () => getSetting(db, 'server_name', 'monolit'), adminUrl: () => [`https://${getSetting(db, 'domain')}${ADMIN}/`, ...entries().map((e) => `Запасной вход: ${e.url}`)].join('\n') });
+const mgr = createManager({ db, xray, queue, log, activeUsers: () => users().filter(u => userState(u) === 'active'), onRestart: () => { queueSync({ full: true }); syncIpEnv().catch(() => {}); } });
 
 // ---------- HTTP ----------
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json' };
@@ -259,16 +259,67 @@ const cleanDomain = v => { const d = String(v || '').trim().toLowerCase().replac
 const resolve = resolve4;
 // Адреса, которыми пользуется monolit: входящий (способ «Второй IP») и исходящий. Помощник проверяет, записаны ли они
 // в настройках сети и нет ли там старых адресов, которых на сервере уже нет (agent/netsave.sh)
+// Входящий IP: что стоит в конфиге Xray (его меняют из админки без переустановки), иначе — из установки
+const ip2 = () => env('MP_MODE', '') === 'ip2' ? mgr.inbound.current() || env('MP_IP2', '') : '';
 async function netsave(op) {
-  const ips = [...new Set([env('MP_MODE', '') === 'ip2' ? env('MP_IP2', '') : '', getSetting(db, 'out_ip', '')].filter(Boolean))];
+  const ips = [...new Set([ip2(), getSetting(db, 'out_ip', '')].filter(Boolean))];
   const r = await agent(['netsave', op, ...ips].join(' '), 30000);
   const lines = r.out.split('\n').filter(Boolean);
   let state = null; try { state = JSON.parse(lines.at(-1)) } catch {}
   return { code: r.code, state: r.code === 2 ? null : state, text: lines.filter((l) => !l.startsWith('{')).at(-1) || '' };
 }
+// Запасные входы: админка и подписки по адресам, которые не блокируются вместе с адресом VPN.
+// Сайт nginx на основном адресе (способ «Второй IP», выбирают в «Адрес») и ноды с доменом: их страница пересылает запросы сюда
+const entryHost = () => env('MP_MODE', '') === 'ip2' ? getSetting(db, 'entry', env('MP_ENTRY', '')) : '';
+const entries = () => [...(entryHost() ? [{ kind: 'site', name: '', host: entryHost() }] : []), ...nodes.mirrors().map((m) => ({ kind: 'node', ...m }))]
+  .map((e) => ({ ...e, url: `https://${e.host}${ADMIN}/` }));
+
+// Новые адреса сервера: хостер добавил IP — админка предложит перевести на него VPN. Помощник отвечает быстро, спрашиваем раз в 5 минут
+let netNow = null;
+async function netLook() {
+  const r = await agent('ips', 15000);
+  try { if (r.code === 0) netNow = JSON.parse(r.out.split('\n').pop() || 'null') } catch {}
+  // когда адрес увидели впервые: те, что были при первом взгляде, новыми не считаются
+  if (netNow?.ips) {
+    const had = getSetting(db, 'ips_seen', ''), seen = had ? JSON.parse(had) : null, next = { ...(seen || {}) };
+    for (const a of netNow.ips) if (!(a in next)) next[a] = seen ? now() : 0;
+    if (JSON.stringify(next) !== had) setSetting(db, 'ips_seen', JSON.stringify(next));
+  }
+  return netNow;
+}
+// на главную — только адрес, который появился недавно: давно лежащий свободный адрес не напоминание
+const newIps = () => { let seen = {}; try { seen = JSON.parse(getSetting(db, 'ips_seen', '') || '{}') } catch {} return freshIps().filter((a) => seen[a] > 0 && now() - seen[a] < 3 * 86400) };
+const PRIVATE = /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/;   // внутренние сети: снаружи на такой адрес не подключиться
+const freshIps = () => env('MP_MODE', '') !== 'ip2' || !netNow ? [] : (netNow.ips || []).filter((a) => !PRIVATE.test(a) && a !== netNow.ip1 && a !== ip2() && a !== getSetting(db, 'out_ip', '') && a !== (netNow.fwd || '').split('>')[0]);
+
+// Перевод VPN на другой адрес сервера без переустановки. Xray перезапускается в фоне; когда поднялся —
+// адрес в настройки установки и сети, пересылка со старого адреса (пока расходится DNS), проверка из России, Telegram
+async function syncIpEnv() {
+  const live = ip2(), known = getSetting(db, 'ip2_known', '') || env('MP_IP2', '');
+  if (!live || live === known) return;
+  const r = await agent('ipmove env ' + live, 15000);
+  if (r.code !== 0) return log('адрес в настройках установки не записался:', r.out);
+  setSetting(db, 'ip2_known', live);
+  const sig = r.out.split('\n').filter(Boolean).pop() || '';
+  if (sig.startsWith('ip2|')) setSetting(db, 'apply_sig', sig);   // иначе запуск после обновления принял бы это за новую установку
+}
+async function afterMove(jobId, from, to) {
+  for (let i = 0; i < 100; i++) { await new Promise((r) => setTimeout(r, 1500)); const j = mgr.server.job(); if (j.id !== jobId || !j.running) break }
+  const j = mgr.server.job();
+  if (j.id !== jobId || j.running || !j.ok) { watch.notify(`перевести VPN на ${to} не получилось, работает прежний адрес ${from}`); return }
+  await syncIpEnv();
+  const f = await agent(`ipmove fwd ${from} ${to}`, 15000);
+  log('входящий адрес:', from, '→', to, f.code === 0 ? 'старый пересылается на новый' : 'старый отключён: ' + f.out.trim());
+  await netsave('fix').then((r) => log('настройки сети после смены адреса:', r.state?.manual || r.text)).catch((e) => log('настройки сети:', e.message));
+  await netLook();
+  const domain = getSetting(db, 'domain'), dns = await resolve(domain);
+  await watch.notify(`VPN принимает подключения на ${to}.` + (dns.includes(to) ? '' : ` Поменяйте A-запись ${domain} на ${to}`));
+  setTimeout(() => watch.check(false, to), 20_000);   // открывается ли новый адрес из России — придёт отдельным сообщением, если нет
+}
+
 function addrState() {
   let job = null; try { job = JSON.parse(readFileSync(join(DATA, 'reconf.json'), 'utf8')) } catch {}
-  return { mode: env('MP_MODE', ''), domain: getSetting(db, 'domain'), ip2: env('MP_IP2', ''), out_ip: mgr.stateForAdmin().out_ip, alt: env('MP_ALT', '').replace(/^"|"$/g, '').split(/[,;]/).map(x => x.split(/[:|]/)[0]).filter(x => cleanDomain(x)), admin: ADMIN, job, watch: watch.state() };
+  return { mode: env('MP_MODE', ''), domain: getSetting(db, 'domain'), ip2: ip2(), entry: entryHost(), entries: entries(), out_ip: mgr.stateForAdmin().out_ip, alt: env('MP_ALT', '').replace(/^"|"$/g, '').split(/[,;]/).map(x => x.split(/[:|]/)[0]).filter(x => cleanDomain(x)), admin: ADMIN, job, watch: watch.state() };
 }
 
 function stateForAdmin() {
@@ -276,6 +327,7 @@ function stateForAdmin() {
   return {
     update: updateState(),
     watch: watch.state(),
+    addr_new: newIps(),
     ...nodes.state(),
     exits: exits.state(),
     awg: awg.stateForAdmin(),
@@ -476,7 +528,8 @@ async function adminApi(req, res, path) {
   if (path === '/api/addr' && M === 'GET') {
     const net = await agent('netinfo', 30000);
     let info = null; try { info = net.code === 0 ? JSON.parse(net.out.split('\n').pop() || '{}') : null } catch {}
-    return json(res, 200, { ...addrState(), net: info, net_error: info ? '' : net.out || 'Помощник не ответил', dns: await resolve(getSetting(db, 'domain')), netsave: (await netsave('check')).state });
+    if (info) netNow = { ips: info.ips, ip1: info.ip1, fwd: info.fwd || '' };
+    return json(res, 200, { ...addrState(), fresh: freshIps(), fwd: netNow?.fwd || '', net: info, net_error: info ? '' : net.out || 'Помощник не ответил', dns: await resolve(getSetting(db, 'domain')), netsave: (await netsave('check')).state });
   }
   if (path === '/api/addr/netsave' && M === 'POST') {
     const r = await netsave('fix');
@@ -504,6 +557,28 @@ async function adminApi(req, res, path) {
     return json(res, r.code < 0 ? 503 : 400, { error: r.code === 2 && /нет такой команды/.test(r.out) ? 'Помощник на сервере старый: обновите monolit' : r.out || 'Не запустилось' });
   }
   if (path === '/api/addr/job' && M === 'GET') return json(res, 200, addrState());
+  // Перевести VPN на другой адрес сервера (хостер добавил новый IP): без переустановки, сайты и админка не перезапускаются
+  if (path === '/api/addr/ip' && M === 'POST') {
+    if (!managed()) return;
+    const to = String((await readBody(req)).ip || '').trim(), from = ip2();
+    if (env('MP_MODE', '') !== 'ip2' || !from) return json(res, 409, { error: 'Адрес так меняется только при способе «Второй IP»' });
+    if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(to)) return json(res, 400, { error: 'Выберите адрес из списка' });
+    const c = await agent('ipmove check ' + to, 15000);
+    if (c.code !== 0) return json(res, c.code < 0 ? 503 : 400, { error: c.code === 2 && /нет такой команды/.test(c.out) ? 'Помощник на сервере старый: обновите monolit' : { 3: `Адреса ${to} на сервере нет`, 4: `${to} — основной адрес, на нём сайты`, 5: c.out.trim() }[c.code] || c.out.trim() || 'Не получилось' });
+    const r = await mgr.inbound.set(to);
+    if (r.ok && r.pending) afterMove(r.job, from, to).catch((e) => log('смена входящего адреса:', e.message));
+    return done(r);
+  }
+  if (path === '/api/addr/unfwd' && M === 'POST') { const r = await agent('ipmove unfwd', 15000); await netLook(); return r.code === 0 ? json(res, 200, { ok: true, fwd: netNow?.fwd || '' }) : json(res, 400, { error: r.out.trim() || 'Не получилось' }) }
+  // Запасной вход в сайте nginx на основном адресе: домен сайта или пусто — убрать
+  if (path === '/api/addr/entry' && M === 'POST') {
+    const b = await readBody(req), d = b.domain ? cleanDomain(b.domain) : '';
+    if (b.domain && !d) return json(res, 400, { error: 'Выберите сайт из списка' });
+    const r = await agent(d ? 'entry set ' + d : 'entry drop', 60000);
+    if (r.code !== 0) return json(res, r.code < 0 ? 503 : 400, { error: r.code === 2 && /нет такой команды/.test(r.out) ? 'Помощник на сервере старый: обновите monolit' : r.out.split('\n').filter(Boolean).pop() || 'Не получилось' });
+    setSetting(db, 'entry', d); log('запасной вход:', d || 'убран');
+    return json(res, 200, { ok: true, entry: d, entries: entries() });
+  }
   if (path === '/api/egress' && M === 'POST') { if (!managed()) return; return done(await mgr.egress.set((await readBody(req)).ip)) }
   if (path === '/api/watch' && M === 'POST') {
     const b = await readBody(req);
@@ -618,6 +693,7 @@ http.listen(Number(PORT), HOST, async () => {
   setInterval(() => db.prepare('DELETE FROM traffic_daily WHERE day < ?').run(dayOf(now() - 400 * 86400)), 24 * 3600_000);
   setTimeout(() => checkUpdate(), 30_000);
   watch.start();
+  if (env('MP_MODE', '') === 'ip2') { netLook().catch(() => {}); setInterval(() => netLook().catch(() => {}), 5 * 60_000) }
   // Адрес меняли из админки: после перезапуска сообщить итог в Telegram и проверить новый адрес
   const job = addrState().job;
   if (job && job.state !== 'running' && String(job.at) !== getSetting(db, 'reconf_seen', '')) {

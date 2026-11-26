@@ -3343,6 +3343,8 @@ button.alist-row { width: 100%; border: 0; background: none; font: inherit; colo
 #mp-addr-dot { background: var(--danger) }
 .mp-kv dd.mp-warn, .hint.mp-warn { color: var(--warning-text) }
 .mp-alert div.mp-alert-act { display: flex; margin-top: var(--sp-2) }
+.mp-alert .mp-alert-cf { margin-top: var(--sp-2) }
+#mp-a-new:not([hidden]) { display: grid }
 #mp-a-alt .alist-row.mp-alt { grid-template-columns: var(--al-ic) 1fr auto }
 
 /* Вход: Caps Lock — подсказка в подписи поля, появляется прозрачностью, место под неё не прыгает */

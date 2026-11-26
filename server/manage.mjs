@@ -356,6 +356,25 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
     },
   };
 
+  // Входящий IP (способ «Второй IP»): адрес, на котором Xray принимает Vision и Hysteria2. Истина — сам конфиг Xray.
+  // Меняется без переустановки: в конфиге и в описании выключенного Hysteria2 старый адрес заменяется новым
+  const inbound = {
+    current: () => { try { return listenOf(xray.read(), xray) } catch { return '' } },
+    async set(ip) {
+      ip = String(ip || '').trim();
+      if (MODE !== 'ip2') return { ok: false, error: 'Входящий IP меняется только при способе «Второй IP»' };
+      if (!IPV4.test(ip)) return { ok: false, error: 'Выберите IP из списка' };
+      const cfg = xray.read(), from = listenOf(cfg, xray);
+      if (!from) return { ok: false, error: 'В конфиге Xray не нашёлся входящий адрес' };
+      if (from === ip) return { ok: true, same: true };
+      return apply('Входящий IP ' + ip, () => {
+        const st = get('stash', {});
+        for (const k of Object.keys(st)) if (st[k]?.listen === from) st[k].listen = ip;
+        put('stash', st);
+      }, { body: JSON.stringify(moveListen(cfg, from, ip)) });
+    },
+  };
+
   const history = {
     async rollback(id) {
       const h = db.prepare('SELECT * FROM config_history WHERE id = ?').get(id);
@@ -400,7 +419,19 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
 
   // Перед сменой адреса: запомнить, что включено (start() вернёт это после переустановки)
   const keep = () => setSetting(db, 'pre_reconf', JSON.stringify(snapshot()));
-  return { stateForAdmin, routes, warp, proto, egress, history, server, start, apply, keep };
+  return { stateForAdmin, routes, warp, proto, egress, inbound, history, server, start, apply, keep };
+}
+
+// Адрес, на котором слушает вход Vision, если это конкретный IPv4 (способ «Второй IP»), иначе ''
+export function listenOf(cfg, xray) {
+  const l = xray.detect(cfg).vision?.listen || '';
+  return /^(\d{1,3}\.){3}\d{1,3}$/.test(l) && l !== '0.0.0.0' && !l.startsWith('127.') ? l : '';
+}
+// Конфиг, где все входы с адреса from слушают на to
+export function moveListen(cfg, from, to) {
+  cfg = structuredClone(cfg);
+  for (const i of cfg.inbounds || []) if (i.listen === from) i.listen = to;
+  return cfg;
 }
 
 // Готовые наборы. Ничего не включено само: человек добавляет набор и видит, что в нём

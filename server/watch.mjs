@@ -57,6 +57,15 @@ async function tcp(host, list) {
   return out;
 }
 
+// Итог по точкам. Блокировку включают у операторов по очереди: не открыла хотя бы одна исправная точка в России —
+// адрес уже режут, остальные сети на подходе (26.11.2026: Москва открывала, Петербург нет, а у людей VPN уже не работал)
+export function verdict(ru, abroad) {
+  const healthy = ru.filter((x) => x.healthy);
+  if (abroad.length && !abroad.some((x) => x.ok)) return 'down';
+  if (!healthy.length) return 'unknown';
+  return healthy.some((x) => !x.ok) ? 'blocked' : 'ok';
+}
+
 // ---------- Telegram ----------
 const tgApi = async (token, method, body) => {
   if (!/^\d{5,}:[\w-]{20,}$/.test(token || '')) throw new Error('Токен бота выглядит так: 123456789:AA…');
@@ -92,8 +101,9 @@ export function createWatch({ db, log, server, adminUrl }) {
     return { ip: a[0] || process.env.MP_IP2 || '', domain };
   }
 
-  async function measure() {
-    const { ip, domain } = await target();
+  // only — проверить этот адрес, а не тот, на который смотрит домен (новый адрес до смены DNS)
+  async function measure(only) {
+    const { ip, domain } = only ? { ip: only, domain: getSetting(db, 'domain', '') } : await target();
     if (!ip) return { state: 'unknown', at: now(), ip: '', domain, error: `Не нашёл IP домена ${domain}` };
     const all = await nodeList();
     const ru = Object.keys(all).filter((n) => all[n][0] === 'ru');
@@ -105,8 +115,7 @@ export function createWatch({ db, log, server, adminUrl }) {
     const row = (n) => ({ node: n.split('.')[0], city: all[n][1], ok: !!main[n]?.ok, ms: main[n]?.ms || 0, answered: !!main[n],
       healthy: !!main[n] && (main[n].ok || !!ctl[n]?.ok) });
     const R = ru.map(row), A = abroad.map(row).filter((x) => x.answered);
-    const healthy = R.filter((x) => x.healthy);
-    const st = A.length && !A.some((x) => x.ok) ? 'down' : !healthy.length ? 'unknown' : healthy.every((x) => !x.ok) ? 'blocked' : 'ok';
+    const st = verdict(R, A);
     return { state: st, at: now(), ip, domain, ru: R, abroad: A, error: st === 'unknown' ? 'Точки check-host в России сейчас сами ничего не открывают, проверить не получилось' : '' };
   }
 
@@ -134,10 +143,10 @@ export function createWatch({ db, log, server, adminUrl }) {
     return out;
   }
 
-  async function check(manual = false) {
+  async function check(manual = false, only = '') {
     if (running) return running;
     running = (async () => {
-      try { return await commit(await measure(), manual) }
+      try { return await commit(await measure(only), manual) }
       catch (e) {
         log('доступность:', e.message);
         const prev = state() || { state: 'unknown' };

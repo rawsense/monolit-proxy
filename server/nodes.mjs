@@ -256,7 +256,7 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
     for (const [email, v] of Object.entries(b.ips || {})) { const m = /^mp-(\d+)(?:-\d+)?$/.exec(email); if (m) Object.assign(ips[m[1]] ||= {}, v?.ips || {}) }
     online.set(n.id, { at: t, ips });
     const un = (v) => v ? Buffer.from(String(v), 'base64').toString('utf8').slice(0, 400) : '';
-    db.prepare('UPDATE nodes SET seen_at = ?, info = ? WHERE id = ?').run(t, JSON.stringify({ xray: String(b.xray || '').slice(0, 20), load: String(b.load || '').slice(0, 8), active: b.active === 'active', err: un(b.err), cert: cleanHost(b.cert), cert_err: un(b.cert_err), v: Number(b.v) || 1 }), n.id);
+    db.prepare('UPDATE nodes SET seen_at = ?, info = ? WHERE id = ?').run(t, JSON.stringify({ xray: String(b.xray || '').slice(0, 20), load: String(b.load || '').slice(0, 8), active: b.active === 'active', err: un(b.err), cert: cleanHost(b.cert), cert_err: un(b.cert_err), v: Number(b.v) || 1, mirror: Number(b.mirror) === 1 }), n.id);
   }
   // Кто сейчас подключён через ноды: добавляется к тем, кого видит Xray этого сервера
   function onlineMap() {
@@ -273,6 +273,7 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
     const text = (code, body) => h.send(res, code, body, { 'content-type': 'text/plain; charset=utf-8' });
     if (sub === 'install.sh' && req.method === 'GET') return text(200, script('./node-install.sh').replaceAll('__URL__', base()));
     if (sub === 'agent.sh' && req.method === 'GET') return text(200, script('./node-agent.sh'));
+    if (sub === 'mirror.py' && req.method === 'GET') return text(200, script('./node-mirror.py'));
     if (sub === 'page.html' && req.method === 'GET') return h.send(res, 200, PAGE, { 'content-type': 'text/html; charset=utf-8' });
     if (sub === 'join' && req.method === 'POST') {
       const tok = (await h.readRaw(req, 200)).trim();
@@ -313,6 +314,8 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
       online: o,
     };
   }
+  // Ноды, по домену которых открываются админка и подписки этого сервера (страница ноды пересылает запросы сюда)
+  const mirrors = () => all().filter((n) => joined(n) && tls(n) && J(n.info, {}).mirror && now() - n.seen_at < SEEN).map((n) => ({ name: n.name, host: n.domain }));
   const cleanName = (v, max) => String(v ?? '').trim().slice(0, max);
   function cleanLine(b, old) {
     const out = b.out !== undefined ? Number(b.out) || 0 : old?.out || 0, via = b.via !== undefined ? Number(b.via) || 0 : old?.via || 0;
@@ -414,5 +417,5 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
     return bad('Нет такого действия', 404);
   }
 
-  return { kindsOn, linkClients, exitGroups, userKeys, ensureLinks, render, links, linkList, onlineMap, http, api, state, kitOf, defKit, pickKit, nodeConfig, usable, wantsAwg };
+  return { kindsOn, linkClients, exitGroups, userKeys, ensureLinks, render, links, linkList, onlineMap, http, api, state, kitOf, defKit, pickKit, nodeConfig, usable, wantsAwg, mirrors };
 }

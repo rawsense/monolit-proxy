@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>MonolitProxy</title>
 <link rel="icon" href="_/mark-admin.svg" type="image/svg+xml">
-<link rel="stylesheet" href="_/admin.css?v=0055808d06">
+<link rel="stylesheet" href="_/admin.css?v=4c25fe4f17">
 <script>/* Тема: предпочтение light | dark | system.
    Подключать в <head> БЕЗ defer — тема ставится до первой отрисовки, без мигания чужой темы.
    Переключатели: любые кнопки с data-theme-v="light|dark|system" (aria-checked ставится сам).
@@ -129,7 +129,7 @@ const DS_KEY = (k) => (document.documentElement.dataset.store ? document.documen
 })();
 </script>
 <script>document.documentElement.classList.add('js')</script>
-<script src="_/admin.js?v=33d809d988" defer></script>
+<script src="_/admin.js?v=ae284a96fb" defer></script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="mp-mark" viewBox="0 0 24 24"><path d="M4.5 19 V10.5 Q4.5 6 8.25 6 Q12 6 12 10.5 V19 M12 10.5 Q12 6 15.75 6 Q19.5 6 19.5 10.5 V19" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></symbol></svg>
@@ -459,6 +459,12 @@ const DS_KEY = (k) => (document.documentElement.dataset.store ? document.documen
         <p class="mp-note" id="mp-w-tg"></p>
         <div class="btn-row"><button class="btn btn-secondary" type="button" id="mp-w-check"><i data-lucide="refresh-cw"></i><span>Проверить сейчас</span></button></div>
       </div>
+      <div class="mp-section" id="mp-e-sec" hidden>
+        <span class="t-label">Запасные входы</span>
+        <p class="mp-note" id="mp-e-note">Здесь открываются админка и ссылки подписок, когда адрес VPN заблокирован</p>
+        <div class="mp-links" id="mp-e-list"></div>
+        <label class="field" id="mp-e-site-f" hidden><span class="label">Сайт на основном адресе</span><select class="select" id="mp-e-site"></select><span class="hint">Админка и подписки откроются по домену этого сайта</span></label>
+      </div>
     </div>
     <div class="mp-col">
       <div class="mp-section">
@@ -466,6 +472,9 @@ const DS_KEY = (k) => (document.documentElement.dataset.store ? document.documen
         <div class="alert alert-danger" id="mp-a-fail" hidden><i data-lucide="circle-alert"></i><div><b>Сменить не получилось</b><span id="mp-a-fail-t"></span></div></div>
         <div class="alert alert-info" id="mp-a-run" hidden><i data-lucide="refresh-cw"></i><div><b>Меняем адрес</b><span id="mp-a-run-t">VPN и сайты прервутся примерно на минуту</span></div></div>
         <div class="alert alert-warning" id="mp-a-foreign" hidden><i data-lucide="triangle-alert"></i><div><b>Xray настроен через autoXRAY</b><span>Адрес меняется переустановкой: bash install.sh --reconfigure --replace-autoxray</span></div></div>
+        <div id="mp-a-new" hidden></div>
+        <div class="alert alert-warning mp-alert" id="mp-a-rec" hidden><i data-lucide="triangle-alert"></i><div><b>Поменяйте A-запись домена</b><span id="mp-a-rec-t"></span>
+          <span class="copy-field mp-alert-cf"><input class="input" readonly id="mp-a-rec-ip" aria-label="Адрес для A-записи"><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать адрес" id="mp-a-rec-copy" data-copy=""></button></span></div></div>
         <dl class="mp-kv" id="mp-a-kv"></dl>
         <dl class="mp-kv" id="mp-o-kv" hidden></dl>
         <div class="alert alert-warning mp-alert" id="mp-a-boot" hidden><i data-lucide="triangle-alert"></i><div><b id="mp-a-boot-t">После перезагрузки адрес пропадёт</b><span id="mp-a-boot-p"></span>

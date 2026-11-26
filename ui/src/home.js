@@ -26,6 +26,7 @@
     const w = S.watch || {}
     if (w.on && w.state === 'blocked') out.push(row('circle-alert', 'bad', `IP ${w.ip} не открывается из России`, 'Приложения в России не подключатся', btn('data-go="addr"', 'Сменить адрес')))
     if (w.on && w.state === 'down') out.push(row('circle-alert', 'bad', 'Сервер не отвечает ни из России, ни из-за границы', 'Посмотрите, работает ли он у хостера', btn('data-go="addr"', 'Подробнее')))
+    for (const ip of S.addr_new || []) out.push(row('map-pin', '', `На сервере новый адрес ${ip}`, 'VPN можно перевести на него', btn('data-go="addr"', 'Перевести')))
     for (const n of S.nodes || []) if (n.joined && (!n.up || n.err || !n.xray_ok))
       out.push(row('triangle-alert', 'warn', n.up ? `Нода ${n.name}: ${n.err ? 'ошибка настроек' : 'Xray не запущен'}` : `Нода ${n.name} не на связи`, n.up ? '' : since(n.seen), btn('data-go="nodes"', 'Открыть')))
     const u = S.update

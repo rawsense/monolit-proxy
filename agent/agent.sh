@@ -5,7 +5,7 @@
 # Запрос — одна строка «команда арг…». Ответ — вывод команды и последняя строка «__EXIT код».
 set -u
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LC_ALL=C
-[ -f /etc/monolit.env ] && . /etc/monolit.env
+[ -f "${MP_ENVF:-/etc/monolit.env}" ] && . "${MP_ENVF:-/etc/monolit.env}"
 XRAY_BIN=$(command -v xray || echo /usr/local/bin/xray)
 CFG=${MP_XRAY_CONFIG:-/usr/local/etc/xray/config.json}; CFGDIR=$(dirname "$CFG")
 INSTALLER=https://github.com/XTLS/Xray-install/raw/main/install-release.sh
@@ -18,6 +18,18 @@ num() { [[ "$1" =~ ^[0-9]{1,5}$ ]] && [ "$1" -ge 1 ] && [ "$1" -le 65535 ]; }
 active() { systemctl is-active "$1" 2>/dev/null | head -1; }
 # после перезапуска: «activating» ждём до 60 с (ExecStartPost вроде маршрутов Amnezia)
 xray_wait() { local i st; for i in $(seq 1 60); do st=$(active xray); [ "$st" = activating ] || break; sleep 1; done; echo "$st"; }
+
+# адреса сервера: без мостов (docker, Amnezia), veth и туннелей — это внутренние сети. Вывод: "a","b",
+server_ips() {
+  ip -4 -o addr show scope global 2>/dev/null | while read -r _ dev _ addr _; do dev=${dev%%@*}
+    { [ -e "/sys/class/net/$dev/bridge" ] || [ -e "/sys/class/net/$dev/brport" ]; } && continue
+    case "$dev" in docker*|br-*|veth*) continue ;; esac
+    ip -o link show "$dev" | grep -q POINTOPOINT && continue
+    printf '"%s",' "${addr%/*}"; done
+}
+# Пересылка со старого входящего адреса на новый (ipmove fwd): правила живут до перезагрузки, этого хватает на смену DNS
+fwd_state() { iptables -t nat -S PREROUTING 2>/dev/null | grep -- '--comment monolit-ipfwd' | grep -m1 -- '-p tcp' | sed -nE 's/.*-d ([0-9.]+)\/32 .*--to-destination ([0-9.]+):443.*/\1>\2/p'; }
+fwd_drop() { iptables -t nat -S PREROUTING 2>/dev/null | grep -- '--comment monolit-ipfwd' | sed 's/^-A/-D/' | while read -r r; do eval "iptables -t nat $r" 2>/dev/null; done; }
 
 cert_end() {   # дата окончания первого сертификата из конфига Xray (или MP_CERT)
   local c=${MP_CERT:-}
@@ -109,18 +121,14 @@ case "$cmd" in
     [[ "$seen" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || { echo "нет выхода"; fin 1; }
     echo "$seen"; fin 0 ;;
   netinfo)   # адреса сервера, основной IP, сайты nginx на 443 — для смены домена, IP и способа
-    ips=$(ip -4 -o addr show scope global 2>/dev/null | while read -r _ dev _ addr _; do dev=${dev%%@*}
-      { [ -e "/sys/class/net/$dev/bridge" ] || [ -e "/sys/class/net/$dev/brport" ]; } && continue
-      case "$dev" in docker*|br-*|veth*) continue ;; esac
-      ip -o link show "$dev" | grep -q POINTOPOINT && continue
-      printf '"%s",' "${addr%/*}"; done)
+    ips=$(server_ips)
     ip1=$(ip -4 route get 1.1.1.1 2>/dev/null | grep -oE 'src [0-9.]+' | cut -d' ' -f2)
     sites='[]'
     if command -v nginx >/dev/null && [ -d /etc/nginx ]; then
       files=$(nginx -T 2>/dev/null | sed -n 's/^# configuration file \(.*\):$/\1/p' | sort -u | tr '\n' ':')
       sites=$(docker run --rm -v /etc/nginx:/etc/nginx:ro -e MP_NGINX_FILES="$files" monolit-proxy node /app/server/init.mjs scan 2>/dev/null || echo '[]')
     fi
-    printf '{"ips":[%s],"ip1":"%s","sites":%s}\n' "${ips%,}" "$ip1" "$sites"
+    printf '{"ips":[%s],"ip1":"%s","sites":%s,"fwd":"%s"}\n' "${ips%,}" "$ip1" "$sites" "$(fwd_state)"
     fin 0 ;;
   reconf)   # reconf СПОСОБ ДОМЕН IP2|- KEEP SKIPDNS DROP|- — сменить домен, IP или способ (install.sh отдельной службой)
     read -r _ mode domain ip2 keep skip drop _ <<<"$line"
@@ -144,6 +152,64 @@ case "$cmd" in
     # shellcheck disable=SC2086
     /usr/local/lib/monolit/netsave.sh "$op" $ips 2>&1
     fin $? ;;
+  ips)   # адреса сервера без сайтов nginx: быстро, для слежки за новым адресом. fwd — «старый>новый», если старый ещё пересылается
+    ips=$(server_ips)
+    ip1=$(ip -4 route get 1.1.1.1 2>/dev/null | grep -oE 'src [0-9.]+' | cut -d' ' -f2)
+    printf '{"ips":[%s],"ip1":"%s","fwd":"%s"}\n' "${ips%,}" "$ip1" "$(fwd_state)"
+    fin 0 ;;
+  ipmove)   # перевод Xray на другой адрес сервера (способ «Второй IP») без переустановки
+    # ipmove check IP        — адрес есть на сервере, не основной, 443 на нём свободен
+    # ipmove env IP          — записать адрес в /etc/monolit.env (MP_IP2 и подпись установки); печатает новую подпись
+    # ipmove fwd СТАРЫЙ НОВЫЙ — пока DNS расходится, подключения на старый адрес пересылаются на новый
+    # ipmove unfwd           — перестать пересылать
+    ipre='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
+    has_ip() { ip -4 -o addr show 2>/dev/null | grep -q " inet $1/"; }
+    case "$a1" in
+      check)
+        [[ "$a2" =~ $ipre ]] || { echo "плохой адрес"; fin 2; }
+        has_ip "$a2" || { echo "адреса нет на сервере"; fin 3; }
+        [ "$a2" != "$(ip -4 route get 1.1.1.1 2>/dev/null | grep -oE 'src [0-9.]+' | cut -d' ' -f2)" ] || { echo "это основной адрес"; fin 4; }
+        h=$(ss -Hlntup "sport = :443" 2>/dev/null | awk -v a="$a2:443" '$5 == a' | grep -oE 'users:\(\("[^"]+"' | cut -d'"' -f2 | sort -u | grep -vx xray | tr '\n' ' ')
+        [ -z "$h" ] || { echo "443 на этом адресе занят: $h"; fin 5; }
+        fin 0 ;;
+      env)
+        [[ "$a2" =~ $ipre ]] || { echo "плохой адрес"; fin 2; }
+        f=${MP_ENVF:-/etc/monolit.env}
+        [ "${MP_MODE:-}" = ip2 ] || { echo "способ не «Второй IP»"; fin 1; }
+        cp -p "$f" "$f.before-ipmove" || fin 1
+        # подпись установки: способ|домен|IP|… — третье поле; с прежней подписью обновление пересобрало бы конфиг заново
+        sed -i -E "s/^MP_IP2=.*/MP_IP2=$a2/; s/^(MP_APPLY_SIG=\"?ip2\|[^|]*\|)[^|]*/\1$a2/" "$f" || fin 1
+        sed -n 's/^MP_APPLY_SIG=//p' "$f" | sed 's/^"//; s/"$//'
+        fin 0 ;;
+      fwd)
+        [[ "$a2" =~ $ipre ]] && [[ "$rest" =~ $ipre ]] && [ "$a2" != "$rest" ] || { echo "плохой адрес"; fin 2; }
+        command -v iptables >/dev/null || { echo "нет iptables"; fin 1; }
+        fwd_drop
+        has_ip "$a2" && has_ip "$rest" || { echo "старого адреса на сервере уже нет"; fin 3; }
+        for p in tcp udp; do iptables -t nat -I PREROUTING -d "$a2/32" -p $p --dport 443 -m comment --comment monolit-ipfwd -j DNAT --to-destination "$rest:443" 2>&1 || { fwd_drop; fin 1; }; done
+        fwd_state; fin 0 ;;
+      unfwd) fwd_drop; fin 0 ;;
+      *) fin 2 ;;
+    esac ;;
+  entry)   # entry set ДОМЕН | entry drop — запасной вход: админка и подписки в сайте nginx на основном адресе (способ «Второй IP»)
+    f=${MP_ENVF:-/etc/monolit.env}
+    [ "${MP_MODE:-}" = ip2 ] || { echo "Запасной вход на сайте есть только при способе «Второй IP»"; fin 1; }
+    case "$a1" in
+      set) [[ "$a2" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || { echo "плохой домен"; fin 2; }; dom=$a2 ;;
+      drop) dom="" ;;
+      *) fin 2 ;;
+    esac
+    command -v nginx >/dev/null && [ -d /etc/nginx ] || { echo "nginx не найден"; fin 1; }
+    bk=/root/backups/nginx-$(date +%Y%m%d-%H%M%S)-before-entry.tgz; mkdir -p /root/backups
+    tar czf "$bk" -C / etc/nginx || { echo "не получилось сохранить копию nginx"; fin 1; }
+    files=$(nginx -T 2>/dev/null | sed -n 's/^# configuration file \(.*\):$/\1/p' | sort -u | tr '\n' ':')
+    out=$(docker run --rm -v /etc/nginx:/etc/nginx -e MP_NGINX_FILES="$files" monolit-proxy node /app/server/init.mjs entry --domain "$dom" 2>&1); r=$?
+    back() { tar xzf "$bk" -C /; nginx -t >/dev/null 2>&1 && systemctl reload nginx; }
+    [ $r = 0 ] || { back; [ $r = 4 ] && echo "В nginx нет сайта $dom на 443" || echo "$out" | tail -n 2; fin 1; }
+    if ! t=$(nginx -t 2>&1); then back; echo "nginx не принял правку (в сайте уже есть свой путь /s/?): $(echo "$t" | grep -m1 emerg)"; fin 1; fi
+    systemctl reload nginx 2>&1 || { back; fin 1; }
+    grep -q '^MP_ENTRY=' "$f" && sed -i "s/^MP_ENTRY=.*/MP_ENTRY=$dom/" "$f" || echo "MP_ENTRY=$dom" >> "$f"
+    echo "ok"; fin 0 ;;
   awg)   # awg on ПОРТ [IP выхода] | awg off | awg state — сервер AmneziaWG в отдельном контейнере monolit-awg
     NETN=monolit-awg; SUB=172.31.213.0/24; SRC=${MP_SRC:-/opt/monolit-src}/awg
     snat_drop() { iptables -t nat -S POSTROUTING 2>/dev/null | grep -- '--comment monolit-awg' | sed 's/^-A/-D/' | while read -r r; do eval "iptables -t nat $r" 2>/dev/null; done; }

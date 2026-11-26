@@ -47,6 +47,16 @@ if (cmd === 'include') {
   console.log(JSON.stringify(r)); process.exit(0);
 }
 
+// Запасной вход (способ «Второй IP»): админка и подписки ещё и в сайте nginx на основном адресе.
+// Локации уже лежат в monolit.conf; здесь только include в блок сайта. Пустой домен — убрать
+if (cmd === 'entry') {
+  const domain = arg('domain');
+  if (!existsSync(INC)) fail('Нет файла локаций monolit: ' + INC);
+  excludeFrom(NGINX, domain ? [domain] : [], INC);
+  if (domain && !includeIn(NGINX, domain, INC)) fail(`В nginx нет сайта ${domain} на 443`, 4);
+  console.log('ok'); process.exit(0);
+}
+
 if (cmd === 'warp') {
   const { outbound, reg } = await register().catch((e) => fail(e.message, 5));
   const file = arg('out'); mkdirSync(dirname(file), { recursive: true });
@@ -127,7 +137,9 @@ if (mode === 'ip2') moved = toIp(NGINX, arg('ip1'));
 // остальным доменам — свой сайт за Xray. Из прочих сайтов локации убираем (домен сменили)
 writeFileSync(INC, incText({ port, admin, xhttpPath: xhttpPort ? xhttpPath : '', xhttpPort }));
 const inSites = mode === 'front' ? names.filter((n) => sites.some((s) => s.names.includes(n)) && includeIn(NGINX, n, INC)) : [];
-if (existsSync(NGINX)) excludeFrom(NGINX, inSites, INC);
+// запасной вход в сайте на основном адресе (ip2) переживает пересборку
+const entry = mode === 'ip2' && arg('entry') && includeIn(NGINX, arg('entry'), INC) ? [arg('entry')] : [];
+if (existsSync(NGINX)) excludeFrom(NGINX, [...inSites, ...entry], INC);
 const own = names.filter((n) => !inSites.includes(n));
 let vpnSite = inSites.length ? 'существующий' : '';
 if (own.length) {

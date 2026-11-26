@@ -445,7 +445,7 @@ if [ "$NEED_APPLY" = 1 ]; then
   BEFORE=$(site_codes)
   OUT=$(node_in -v "$CFGDIR:$CFGDIR" -v "$DATA:$DATA" $(has_nginx && echo "-v /etc/nginx:/etc/nginx") -e MP_XRAY_CONFIG="$XRAY_CONFIG" -e MP_NGINX_FILES="$NGX_FILES" monolit-proxy \
     node /app/server/init.mjs apply --mode "$MODE" --domain "$DOMAIN" --port "$PORT" --admin-path "$MP_ADMIN_PATH" --ip2 "$IP2" --ip1 "$IP1" \
-    --cert "$CERT" --key "$KEY" --xhttp-port "${XPORT:-0}" --xhttp-path "$XPATH" --socks "$SOCKS_FULL" --warp "$WARPF" --from-mode "$FROM_MODE" --alt "$ALT" 2>>"$LOG") || rollback "Не получилось собрать конфиг"
+    --cert "$CERT" --key "$KEY" --xhttp-port "${XPORT:-0}" --xhttp-path "$XPATH" --socks "$SOCKS_FULL" --warp "$WARPF" --from-mode "$FROM_MODE" --alt "$ALT" --entry "${MP_ENTRY:-}" 2>>"$LOG") || rollback "Не получилось собрать конфиг"
   echo "$OUT" >>"$LOG"
   "$XRAY_BIN" run -test -c "$XRAY_CONFIG" >>"$LOG" 2>&1 || rollback "Xray не принял новый конфиг"
   nginx -t >>"$LOG" 2>&1 || rollback "nginx не принял правку"
@@ -520,6 +520,7 @@ MP_SERVER_NAME=${MP_SERVER_NAME:-$(hostname -s | cut -c1-24)}
 MP_MODE=$MODE
 MP_IP2=$IP2
 MP_ALT=$ALT
+MP_ENTRY=$([ "$MODE" = ip2 ] && echo "${MP_ENTRY:-}")
 MP_CERT=$CERT
 MP_KEY=$KEY
 MP_XHTTP=$XHTTP

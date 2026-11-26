@@ -4333,6 +4333,7 @@ var qrcode = function() {
       update: { current: '1.1.0', latest: { tag: 'v1.2.0', name: 'v1.2.0', notes: 'Несколько серверов в одной админке. График трафика по часам', published: t - 2 * d, url: '#' }, available: true, checked: t - 3 * 3600, error: '', status: null, repo: 'rawsense/monolit-proxy' },
       settings: { server_name: 'aeza', domain: 'vpn.example.ru', fp: 'firefox', kinds: 'vision,hy2', autoupdate: true, support_url: '', update_hours: 12, login: 'admin', tg_token: '', tg_chat: '' },
       watch: { state: 'blocked', at: t - 600, since: t - 4000, ip: '203.0.113.7', on: true, every: 60 },
+      addr_new: ['203.0.113.9'],
       xray: { ok: true, error: '', last_sync: t - 20, inbounds: { vision: { tag: 'vision', port: 443 }, hy2: { tag: 'hy2', port: 443 }, xhttp: null } },
       template: { version: '162', hash: '47ffac58afcb3992', source: 'github', since: t - 3 * d, checked: t - 2 * 3600, rollback: true, pending: null, rejected: null }
     }
@@ -5326,8 +5327,9 @@ var qrcode = function() {
   // ---------- демо ----------
   const demo = {
     mode: 'ip2', domain: 'vpn.example.ru', ip2: '203.0.113.8', out_ip: '', alt: ['old.example.ru'], admin: '/adm', job: null, dns: ['203.0.113.8'],
+    fresh: ['203.0.113.9'], fwd: '', entry: '', entries: [{ kind: 'node', name: 'Moscow', host: 'msk.example.ru', url: 'https://msk.example.ru/adm/' }],
     netsave: { tool: 'ifupdown', dev: 'ens3', file: '/etc/network/interfaces', missing: ['203.0.113.8'], stale: ['198.51.100.4'], manual: '' },
-    net: { ips: ['203.0.113.7', '203.0.113.8'], ip1: '203.0.113.7', sites: [{ names: ['example.ru', 'www.example.ru'] }] },
+    net: { ips: ['203.0.113.7', '203.0.113.8', '203.0.113.9'], ip1: '203.0.113.7', sites: [{ names: ['example.ru', 'www.example.ru'] }] },
     watch: { state: 'blocked', at: now() - 600, since: now() - 4000, ip: '203.0.113.7', on: true, every: 60, error: '',
       ru: [{ node: 'ru1', city: 'Moscow', ok: false, healthy: false, answered: true }, { node: 'ru2', city: 'Moscow', ok: false, healthy: true, answered: true }],
       abroad: [{ node: 'de1', city: 'Nuremberg', ok: true, ms: 38 }, { node: 'de2', city: 'Langen', ok: true, ms: 27 }, { node: 'de4', city: 'Frankfurt', ok: true, ms: 31 }] },
@@ -5347,6 +5349,9 @@ var qrcode = function() {
       return structuredClone(demo)
     }
     if (path === 'api/addr/netsave') { await sleep(800); demo.netsave = { ...demo.netsave, missing: [], stale: [] }; return { ok: true, text: 'заменил 198.51.100.4 на 203.0.113.8', netsave: demo.netsave } }
+    if (path === 'api/addr/ip') { demo.fwd = `${demo.ip2}>${body.ip}`; demo.ip2 = body.ip; demo.fresh = []; return { ok: true } }
+    if (path === 'api/addr/unfwd') { demo.fwd = ''; return { ok: true, fwd: '' } }
+    if (path === 'api/addr/entry') { demo.entry = body.domain; demo.entries = [...(body.domain ? [{ kind: 'site', name: '', host: body.domain, url: `https://${body.domain}/adm/` }] : []), ...demo.entries.filter((e) => e.kind === 'node')]; return { ok: true, entry: demo.entry, entries: demo.entries } }
     if (path === 'api/egress') { await sleep(1000); demo.out_ip = body.ip; return { ok: true, seen: body.ip || demo.net.ip1 } }
     if (path === 'api/watch') { if ('on' in body) demo.watch.on = body.on; if ('every' in body) demo.watch.every = Number(body.every); return { watch: demo.watch } }
     if (path === 'api/watch/check') { await sleep(1500); Object.assign(demo.watch, { state: 'ok', at: now(), since: now(), ru: demo.watch.ru.map((x) => ({ ...x, ok: x.healthy, ms: 41 })) }); return { watch: demo.watch } }
@@ -5387,9 +5392,10 @@ var qrcode = function() {
     $('mp-a-fail').hidden = !failed || running
     if (failed) $('mp-a-fail-t').textContent = job.text + '. Настройки остались прежними'
     const on = ips(), dnsOk = !D.dns?.length ? null : D.dns.some((a) => (D.mode === 'ip2' ? [D.ip2] : on).includes(a))
+    paintMove(running, on)
     $('mp-a-kv').innerHTML = kv([
       ['Домен', D.domain],
-      ['Смотрит на', D.dns?.length ? D.dns.join(', ') + (dnsOk === false && on.length ? ', это не этот сервер' : '') : 'никуда', dnsOk === false ? 'mp-warn' : ''],
+      ['Смотрит на', D.dns?.length ? D.dns.join(', ') + (dnsOk === false && on.length ? (D.dns.some((a) => on.includes(a)) ? ', это не входящий адрес' : ', это не этот сервер') : '') : 'никуда', dnsOk === false ? 'mp-warn' : ''],
       MODES[D.mode] ? ['Способ', MODES[D.mode][0]] : null,
       D.mode === 'ip2' ? ['Входящий IP', D.ip2] : null,
       on.length ? [on.length > 1 ? 'Адреса сервера' : 'Адрес сервера', on.join(', ')] : null,
@@ -5397,9 +5403,10 @@ var qrcode = function() {
       bootOk() ? ['После перезагрузки', 'адреса сохранятся'] : null,
     ])
     paintBoot(running)
-    const alt = D.alt || []
-    $('mp-a-alt').hidden = !alt.length
-    $('mp-a-alt').innerHTML = alt.map((d) => `<div class="alist-row mp-alt"><span class="alist-ic"><i data-lucide="link"></i></span><span class="alist-tx"><b>${esc(d)}</b><span>Запасной: старые ссылки подписок работают</span></span>
+    const alt = D.alt || [], old = (D.fwd || '').split('>')[0]
+    $('mp-a-alt').hidden = !alt.length && !old
+    $('mp-a-alt').innerHTML = (old ? `<div class="alist-row mp-alt"><span class="alist-ic"><i data-lucide="route"></i></span><span class="alist-tx"><b>${esc(old)}</b><span>Старый адрес: подключения на него идут на новый</span></span>
+      <button class="icon-btn icon-btn-sm" type="button" data-unfwd aria-label="Отключить ${esc(old)}" data-tip="Отключить"${running ? ' disabled' : ''}><i data-lucide="trash-2"></i></button></div>` : '') + alt.map((d) => `<div class="alist-row mp-alt"><span class="alist-ic"><i data-lucide="link"></i></span><span class="alist-tx"><b>${esc(d)}</b><span>Запасной: старые ссылки подписок работают</span></span>
       <button class="icon-btn icon-btn-sm" type="button" data-drop="${esc(d)}" aria-label="Убрать ${esc(d)}" data-tip="Убрать"${running ? ' disabled' : ''}><i data-lucide="trash-2"></i></button></div>`).join('')
     window.lucide?.createIcons()
     $('mp-a-edit').disabled = foreign || running || !D.net
@@ -5409,6 +5416,54 @@ var qrcode = function() {
     $('mp-o-kv').innerHTML = kv([['Исходящий IP', D.out_ip || 'как решает сервер' + (D.net?.ip1 ? `, ${D.net.ip1}` : '')]])
     $('mp-o-edit').disabled = foreign || running || !D.net
   }
+  // ---------- свободный адрес сервера: перевести на него VPN одной кнопкой ----------
+  // Хостер добавил IP: Xray переезжает на него без переустановки, старый адрес пересылает на новый, пока расходится DNS
+  function paintMove(running, on) {
+    const fresh = D.mode === 'ip2' ? D.fresh || [] : [], box = $('mp-a-new')
+    box.hidden = !fresh.length
+    box.innerHTML = fresh.map((ip) => `<div class="alert alert-info mp-alert"><i data-lucide="map-pin"></i><div><b>На сервере свободный адрес ${esc(ip)}</b><span>VPN переедет на него без переустановки</span>
+      <div class="btn-row mp-alert-act"><button class="btn btn-secondary btn-sm" type="button" data-ipmove="${esc(ip)}"${running ? ' disabled' : ''}><span>Перевести VPN</span></button></div></div></div>`).join('')
+    // домен ещё смотрит на прежний адрес: что именно поменять в DNS
+    const need = D.mode === 'ip2' && D.ip2 && D.dns?.length && on.length && !D.dns.includes(D.ip2)
+    $('mp-a-rec').hidden = !need
+    if (need) { $('mp-a-rec-t').textContent = `${D.domain} смотрит на ${D.dns.join(', ')}, а VPN работает на этом адресе`; $('mp-a-rec-ip').value = D.ip2; $('mp-a-rec-copy').dataset.copy = D.ip2 }
+  }
+  $('mp-a-new').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-ipmove]'); if (!b) return
+    const ip = b.dataset.ipmove
+    if (!await A().confirm(`Перевести VPN на ${ip}?`, `Xray перезапустится, подключения оборвутся на несколько секунд. ${D.ip2} продолжит принимать подключения, пока вы меняете DNS`, 'Перевести')) return
+    await busy(b, async () => {
+      try {
+        await waitJob(await api('POST', 'api/addr/ip', { ip }))
+        await load()
+        toast({ type: 'success', title: 'VPN переведён на ' + ip, text: D.dns?.includes(ip) ? 'Домен уже смотрит на этот адрес' : `Поменяйте A-запись ${D.domain} на ${ip}` })
+        A().refresh?.()
+      } catch (err) { fail(err); load().catch(() => {}) }
+    })
+  })
+
+  // ---------- запасные входы ----------
+  function paintEntries() {
+    const list = D.entries || [], names = D.mode === 'ip2' ? sites().filter((n) => !n.includes('*')) : []
+    $('mp-e-sec').hidden = !list.length && !names.length
+    const box = $('mp-e-list')
+    box.hidden = !list.length
+    box.innerHTML = list.map((e) => `<div class="field"><span class="label"><span>${esc(e.kind === 'node' ? e.name : e.host)}</span><span class="opt">${e.kind === 'node' ? 'нода' : 'сайт'}</span></span><span class="copy-field"><input class="input" readonly value="${esc(e.url)}" aria-label="Запасной вход: ${esc(e.host)}"><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать адрес" data-copy="${esc(e.url)}"></button></span></div>`).join('')
+    window.initInputs?.(box)
+    $('mp-e-site-f').hidden = !names.length
+    const sel = $('mp-e-site'), want = D.entry || ''
+    if (names.length && (sel.dataset.for !== names.join() || sel.value !== want)) { sel.dataset.for = names.join(); setSelect(sel, [['', 'Не использовать'], ...names.map((n) => [n, n])], want) }
+  }
+  $('mp-e-site').addEventListener('change', async (e) => {
+    const d = e.target.value
+    if (!D || d === (D.entry || '')) return
+    try {
+      const r = await api('POST', 'api/addr/entry', { domain: d })
+      D.entry = r.entry; D.entries = r.entries; paintEntries()
+      toast({ type: 'success', title: d ? 'Запасной вход добавлен' : 'Запасной вход убран', text: d ? `Админка открывается на ${d}` : '' })
+    } catch (err) { fail(err); paintEntries() }
+  })
+
   // ---------- переживут ли адреса перезагрузку ----------
   // Хостер меняет IP на лету и не всегда записывает его в настройки сети; старый там тоже остаётся
   const ns = () => D.netsave
@@ -5436,7 +5491,7 @@ var qrcode = function() {
     })
   })
 
-  const paint = () => { paintWatch(); paintAddr() }
+  const paint = () => { paintWatch(); paintAddr(); paintEntries() }
 
   async function load() { D = await api('GET', 'api/addr'); paint(); if (D.job?.state === 'running' && now() - D.job.at < 900) follow() }
   // страница «Адрес» открылась — свежие данные
@@ -5559,6 +5614,13 @@ var qrcode = function() {
   })
 
   $('mp-a-alt').addEventListener('click', async (e) => {
+    const u = e.target.closest('[data-unfwd]')
+    if (u) {
+      const old = (D.fwd || '').split('>')[0]
+      if (!await A().confirm(`Отключить ${old}?`, `Подключения на ${old} перестанут приниматься. Приложения и ноды, у которых домен уже смотрит на новый адрес, ничего не заметят`, 'Отключить')) return
+      await busy(u, async () => { try { const r = await api('POST', 'api/addr/unfwd'); D.fwd = r.fwd; paintAddr() } catch (err) { fail(err) } })
+      return
+    }
     const b = e.target.closest('[data-drop]'); if (!b) return
     const d = b.dataset.drop
     if (!await A().confirm(`Убрать ${d}?`, `Ссылки подписок на ${d} перестанут открываться. Приложения, которые уже обновили подписку, подключаются к ${D.domain} и ничего не заметят. Админка перезапустится`, 'Убрать')) return
@@ -6124,6 +6186,7 @@ var qrcode = function() {
     const w = S.watch || {}
     if (w.on && w.state === 'blocked') out.push(row('circle-alert', 'bad', `IP ${w.ip} не открывается из России`, 'Приложения в России не подключатся', btn('data-go="addr"', 'Сменить адрес')))
     if (w.on && w.state === 'down') out.push(row('circle-alert', 'bad', 'Сервер не отвечает ни из России, ни из-за границы', 'Посмотрите, работает ли он у хостера', btn('data-go="addr"', 'Подробнее')))
+    for (const ip of S.addr_new || []) out.push(row('map-pin', '', `На сервере новый адрес ${ip}`, 'VPN можно перевести на него', btn('data-go="addr"', 'Перевести')))
     for (const n of S.nodes || []) if (n.joined && (!n.up || n.err || !n.xray_ok))
       out.push(row('triangle-alert', 'warn', n.up ? `Нода ${n.name}: ${n.err ? 'ошибка настроек' : 'Xray не запущен'}` : `Нода ${n.name} не на связи`, n.up ? '' : since(n.seen), btn('data-go="nodes"', 'Открыть')))
     const u = S.update

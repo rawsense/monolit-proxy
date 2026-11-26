@@ -35,19 +35,24 @@ cert() {
   return 1
 }
 
-# Страница, которую видит посторонний, открывший домен ноды в браузере
+# Страница домена ноды: всё, что пришло не по VPN, пересылается на основной сервер — админка и подписки открываются
+# по адресу ноды, когда адрес основного заблокирован. Основной не ответил — обычная с виду страница входа
+MIRROR=0
 page() {
-  [ -f /etc/systemd/system/monolit-node-page.service ] && return 0
+  local u=/etc/systemd/system/monolit-node-page.service
   command -v python3 >/dev/null || return 0
   mkdir -p "$LIB/www"
-  curl -fsS -m 20 "$MN_URL/page.html" -o "$LIB/www/index.html" || return 0
-  cat > /etc/systemd/system/monolit-node-page.service <<UNIT
+  [ -s "$LIB/www/index.html" ] || curl -fsS -m 20 "$MN_URL/page.html" -o "$LIB/www/index.html" || return 0
+  if [ ! -s "$LIB/mirror.py" ] || ! grep -qs mirror.py "$u"; then
+    curl -fsS -m 20 "$MN_URL/mirror.py" -o "$DIR/mirror.new" && python3 -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$DIR/mirror.new" 2>/dev/null || return 0
+    install -m 644 "$DIR/mirror.new" "$LIB/mirror.py"
+    cat > "$u" <<UNIT
 [Unit]
 Description=monolit proxy node page
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/env python3 -m http.server 8081 --bind 127.0.0.1 --directory $LIB/www
+ExecStart=/usr/bin/env python3 $LIB/mirror.py ${MN_URL%/s/_n} $LIB/www/index.html 8081
 Restart=always
 RestartSec=5
 User=nobody
@@ -55,7 +60,9 @@ User=nobody
 [Install]
 WantedBy=multi-user.target
 UNIT
-  systemctl daemon-reload; systemctl enable --now monolit-node-page >/dev/null 2>&1
+    systemctl daemon-reload; systemctl enable monolit-node-page >/dev/null 2>&1; systemctl restart monolit-node-page >/dev/null 2>&1
+  fi
+  [ "$(systemctl is-active monolit-node-page 2>/dev/null)" = active ] && MIRROR=1 || MIRROR=0
 }
 
 # Базы «какие сайты и адреса российские» нужны, когда нода выпускает российское напрямую. Раз в неделю берём свежие,
@@ -104,7 +111,7 @@ while true; do
   ACTIVE=$(systemctl is-active xray 2>/dev/null)
   CERT=""
   if [ "$DOM" != "-" ]; then cert "$DOM" && { CERT=$DOM; page; }; fi
-  BODY="{\"v\":2,\"sig\":\"$SIG\",\"xray\":\"$VER\",\"load\":\"$LOAD\",\"active\":\"$ACTIVE\",\"err\":\"$(printf %s "$ERR" | base64 -w0)\",\"cert\":\"$CERT\",\"cert_err\":\"$(printf %s "$CERR" | base64 -w0)\",\"stats\":[$STATS],\"ips\":{$IPS}}"
+  BODY="{\"v\":3,\"mirror\":$MIRROR,\"sig\":\"$SIG\",\"xray\":\"$VER\",\"load\":\"$LOAD\",\"active\":\"$ACTIVE\",\"err\":\"$(printf %s "$ERR" | base64 -w0)\",\"cert\":\"$CERT\",\"cert_err\":\"$(printf %s "$CERR" | base64 -w0)\",\"stats\":[$STATS],\"ips\":{$IPS}}"
   if printf %s "$BODY" | curl -fsS -m 25 -X POST -H "x-node-key: $MN_KEY" -H 'content-type: application/json' --data-binary @- "$MN_URL/sync" -o "$DIR/resp" 2>"$DIR/curl.err"; then
     : > "$DIR/spool"
     read -r NEW NDOM ASIG < <(head -n 1 "$DIR/resp" | tr -d '\r')
