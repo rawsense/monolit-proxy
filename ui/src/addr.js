@@ -45,6 +45,7 @@
       return structuredClone(demo)
     }
     if (path === 'api/addr/netsave') { await sleep(800); demo.netsave = { ...demo.netsave, missing: [], stale: [] }; return { ok: true, text: 'заменил 198.51.100.4 на 203.0.113.8', netsave: demo.netsave } }
+    if (path === 'api/addr/ip' && body.probe) { await sleep(1200); return { probe: body.ip.endsWith('.9') ? { state: 'blocked', ok: 0, of: 2, error: '' } : { state: 'ok', ok: 2, of: 2, error: '' } } }
     if (path === 'api/addr/ip') { demo.fwd = `${demo.ip2}>${body.ip}`; demo.ip2 = body.ip; demo.fresh = []; if (demo.cf.on) demo.cf.ip = body.ip; return { ok: true } }
     if (path === 'api/addr/cf') { if (body.token && body.token.length < 20) throw new Error('Cloudflare не принял токен: проверьте, что он скопирован целиком'); demo.cf = body.token ? { on: true, zone: 'example.ru', ip: demo.dns.join(', '), proxied: false, many: false, error: '' } : { on: false }; return { cf: demo.cf } }
     if (path === 'api/addr/cf/sync') { demo.dns = [demo.ip2]; demo.cf.ip = demo.ip2; return { cf: demo.cf, ip: demo.ip2 } }
@@ -133,12 +134,18 @@
   $('mp-a-new').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-ipmove]'); if (!b) return
     const ip = b.dataset.ipmove
-    if (!await A().confirm(`Перевести VPN на ${ip}?`, `Xray перезапустится, подключения оборвутся на несколько секунд. ${D.ip2} продолжит принимать подключения, пока вы меняете DNS`, 'Перевести')) return
+    // сначала проверяем адрес из России: переводить VPN на уже заблокированный адрес незачем
+    let p = null
+    await busy(b, async () => { try { p = (await api('POST', 'api/addr/ip', { ip, probe: true })).probe } catch (err) { p = { state: 'unknown', error: err.message } } })
+    const blocked = p?.state === 'blocked', seen = p?.of ? `открылся с ${p.ok} из ${p.of} точек` : ''
+    const about = seen && p.state !== 'unknown' ? `Проверка из России: ${seen}. ` : 'Проверить его из России не получилось. '
+    if (!await A().confirm(blocked ? `${ip} из России не открывается` : `Перевести VPN на ${ip}?`, `${about}Xray перезапустится, подключения оборвутся на несколько секунд. ${D.ip2} продолжит принимать подключения, пока меняется DNS`, blocked ? 'Всё равно перевести' : 'Перевести')) return
     await busy(b, async () => {
       try {
         await waitJob(await api('POST', 'api/addr/ip', { ip }))
         await load()
-        if (D.cf?.on) for (const ms of [5000, 20000, 60000]) setTimeout(() => load().catch(() => {}), ms)
+        // пересылка, настройки сети и запись DNS доезжают за несколько секунд после перезапуска Xray
+        for (const ms of [5000, 20000, 60000]) setTimeout(() => load().catch(() => {}), ms)
         toast({ type: 'success', title: 'VPN переведён на ' + ip, text: D.dns?.includes(ip) ? 'Домен уже смотрит на этот адрес' : D.cf?.on ? 'A-запись в Cloudflare меняется сама, это до минуты' : `Поменяйте A-запись ${D.domain} на ${ip}` })
         A().refresh?.()
       } catch (err) { fail(err); load().catch(() => {}) }

@@ -3,7 +3,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:net';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -62,9 +62,9 @@ const TLS_IN = () => ({ tag: 'vsRAWtlsVISION', listen: '0.0.0.0', port: 443, pro
   streamSettings: { network: 'raw', security: 'tls', tlsSettings: { minVersion: '1.2', alpn: ['h2', 'http/1.1'], certificates: [{ certificateFile: '/c/main.pem', keyFile: '/c/main.key' }] } },
   sniffing: { enabled: true, destOverride: ['http', 'tls', 'quic'] } });
 
-async function manager(mode) {
+async function manager(mode, listen = '0.0.0.0') {
   const dir = mkdtempSync(join(tmpdir(), 'mp-mg-')), cfgFile = join(dir, 'config.json');
-  writeFileSync(cfgFile, JSON.stringify({ inbounds: [TLS_IN(), { tag: 'Hysteria2', listen: '0.0.0.0', port: 443, protocol: 'hysteria', settings: { version: 2, clients: [] }, streamSettings: { network: 'hysteria' } }],
+  writeFileSync(cfgFile, JSON.stringify({ inbounds: [{ ...TLS_IN(), listen }, { tag: 'Hysteria2', listen, port: 443, protocol: 'hysteria', settings: { version: 2, clients: [] }, streamSettings: { network: 'hysteria' } }],
     outbounds: [{ tag: 'direct', protocol: 'freedom' }, { tag: 'block', protocol: 'blackhole' }], routing: { rules: [] } }, null, 2));
   process.env.MP_AGENT_SOCK = PIPE; process.env.MP_MODE = mode; process.env.MP_ALT = '';
   const { createManager } = await import('../server/manage.mjs?' + mode);   // путь к помощнику читается при загрузке модуля
@@ -74,7 +74,7 @@ async function manager(mode) {
   const queue = (fn) => { const p = syncing.then(fn); syncing = p.catch(() => {}); return p };
   const mgr = createManager({ db, xray, queue, log: () => {}, activeUsers: () => [{ id: 1, uuid: '11111111-1111-4111-8111-111111111111', hy2: 'h' }] });
   const wait = async (r) => { if (r.pending) for (let i = 0; i < 100 && mgr.server.job().running; i++) await new Promise((x) => setTimeout(x, 50)); return r };
-  return { mgr, db, xray, wait, read: () => JSON.parse(readFileSync(cfgFile, 'utf8')) };
+  return { mgr, db, xray, wait, cfgFile, createManager, queue, read: () => JSON.parse(readFileSync(cfgFile, 'utf8')) };
 }
 
 test('переключатель: Vision → Reality → Vision, вход возвращается таким же, люди на месте', async () => {
@@ -188,4 +188,59 @@ test('мост ноды на основной сервер при Reality ход
   assert.equal(viaTls.streamSettings.security, 'tls');
   assert.deepEqual(viaReality.streamSettings, { network: 'raw', security: 'reality', realitySettings: { serverName: 'vpn.example.ru', fingerprint: 'firefox', publicKey: 'PUBKEY', shortId: 'abcd1234' } });
   assert.deepEqual(viaReality.settings, viaTls.settings);
+});
+
+// ---------- то, что 26.11.2026 уронило VPN или могло уронить ----------
+test('применение конфига: ошибка посреди дела отвечает ошибкой, а не вешает запрос и очередь', async () => {
+  const m = await manager('bare');
+  rmSync(m.cfgFile);   // конфиг пропал: раньше обещание не выполнялось никогда, и всё, что стояло в очереди следом, ждало вечно
+  const r = await Promise.race([m.mgr.proto.set({ hy2: false }), new Promise((ok) => setTimeout(() => ok('висит'), 3000))]);
+  assert.notEqual(r, 'висит');
+  assert.equal(r.ok, false);
+  assert.match(r.error, /Не получилось применить/);
+  assert.equal(m.mgr.stateForAdmin().proto.hy2, true);   // состояние вернулось
+  // очередь свободна: следующее действие проходит
+  assert.equal(await Promise.race([m.queue(async () => 'свободна'), new Promise((ok) => setTimeout(() => ok('занята'), 2000))]), 'свободна');
+});
+
+test('откат в «Истории» возвращает настройки, но не прежний входящий адрес', async () => {
+  const m = await manager('ip2', '203.0.113.8');
+  await m.wait(await m.mgr.proto.set({ hy2: false }));                       // запись истории с адресом .8 и включённым Hysteria2
+  const moved = await m.mgr.inbound.set('203.0.113.9');
+  assert.deepEqual(await m.mgr.server.wait(moved.job), { ok: true, error: '' });   // дождаться своей задачи по номеру
+  assert.equal(m.mgr.inbound.current(), '203.0.113.9');
+  const first = m.mgr.stateForAdmin().history.at(-1).id;
+  await m.wait(await m.mgr.history.rollback(first));
+  const cfg = m.read();
+  assert.deepEqual(cfg.inbounds.map((i) => [i.tag, i.listen]), [['vsRAWtlsVISION', '203.0.113.9'], ['Hysteria2', '203.0.113.9']]);   // Hysteria2 вернулся, адрес нынешний
+  assert.equal(m.mgr.stateForAdmin().proto.hy2, true);
+});
+
+test('подпись установки сравнивается без кавычек, снимок настроек живёт час', async () => {
+  const { unquote, freshKeep } = await import('../server/manage.mjs');
+  assert.equal(unquote('"ip2|d|1.2.3.4|c"'), 'ip2|d|1.2.3.4|c');
+  assert.equal(unquote('ip2|d|1.2.3.4|c'), 'ip2|d|1.2.3.4|c');
+  assert.equal(unquote(undefined), '');
+  const snap = { routes: [] };
+  assert.equal(freshKeep({ at: 1000, s: snap }, 1500), snap);
+  assert.equal(freshKeep({ at: 1000, s: snap }, 1000 + 3601), null);   // от смены адреса, которая не дошла до конца
+  assert.equal(freshKeep({ routes: [] }, 1500), null);                 // снимок старого вида, без времени
+  assert.equal(freshKeep(null, 1500), null);
+});
+
+test('запуск после перевода адреса кнопкой: установка не считается новой, история цела, залежавшийся снимок не применяется', async () => {
+  const m = await manager('ip2', '203.0.113.8');
+  await m.wait(await m.mgr.proto.set({ hy2: false }));
+  const hist = m.mgr.stateForAdmin().history.length;
+  // помощник записал подпись без кавычек, а контейнер получает её из env-файла с кавычками
+  setSetting(m.db, 'apply_sig', 'ip2|vpn.example.ru|203.0.113.9|c'); setSetting(m.db, 'managed', '1');
+  process.env.MP_APPLY_SIG = '"ip2|vpn.example.ru|203.0.113.9|c"';
+  // снимок от давней неудачной смены адреса: в нём Hysteria2 ещё включён
+  setSetting(m.db, 'pre_reconf', JSON.stringify({ at: Math.floor(Date.now() / 1000) - 86400, s: { ...JSON.parse('{"routes":[],"proto":{"hy2":true,"xhttp":true},"stash":{}}') } }));
+  const again = m.createManager({ db: m.db, xray: m.xray, queue: m.queue, log: () => {}, activeUsers: () => [] });
+  await again.start();
+  assert.equal(again.stateForAdmin().history.length, hist);    // история не стёрта
+  assert.equal(again.stateForAdmin().proto.hy2, false);        // выключенное осталось выключенным
+  assert.equal(getSetting(m.db, 'pre_reconf', ''), '');        // снимок использован или выброшен, не лежит до следующего раза
+  delete process.env.MP_APPLY_SIG;
 });

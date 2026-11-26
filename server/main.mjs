@@ -199,8 +199,8 @@ async function sync({ full = false } = {}) {
 let syncing = Promise.resolve();
 const queue = fn => { const p = syncing.then(fn); syncing = p.catch(() => {}); return p; };
 const queueSync = opts => queue(() => sync(opts));
-const watch = createWatch({ db, log, server: () => getSetting(db, 'server_name', 'monolit'), adminUrl: () => [`https://${getSetting(db, 'domain')}${ADMIN}/`, ...entries().map((e) => `Запасной вход: ${e.url}`)].join('\n') });
-const mgr = createManager({ db, xray, queue, log, activeUsers: () => users().filter(u => userState(u) === 'active'), onRestart: () => { queueSync({ full: true }); syncIpEnv().catch(() => {}); } });
+const watch = createWatch({ db, log, server: () => getSetting(db, 'server_name', 'monolit'), listen: () => ip2(), adminUrl: () => [`https://${getSetting(db, 'domain')}${ADMIN}/`, ...entries().map((e) => `Запасной вход: ${e.url}`)].join('\n') });
+const mgr = createManager({ db, xray, queue, log, activeUsers: () => users().filter(u => userState(u) === 'active'), onRestart: () => { queueSync({ full: true }); reconcile(); } });
 
 // ---------- HTTP ----------
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json' };
@@ -266,28 +266,39 @@ const resolve = resolve4;
 // в настройках сети и нет ли там старых адресов, которых на сервере уже нет (agent/netsave.sh)
 // Входящий IP: что стоит в конфиге Xray (его меняют из админки без переустановки), иначе — из установки
 const ip2 = () => env('MP_MODE', '') === 'ip2' ? mgr.inbound.current() || env('MP_IP2', '') : '';
-async function netsave(op) {
+async function netsaveRaw(op) {
   const ips = [...new Set([ip2(), getSetting(db, 'out_ip', '')].filter(Boolean))];
   const r = await agent(['netsave', op, ...ips].join(' '), 30000);
   const lines = r.out.split('\n').filter(Boolean);
   let state = null; try { state = JSON.parse(lines.at(-1)) } catch {}
   return { code: r.code, state: r.code === 2 ? null : state, text: lines.filter((l) => !l.startsWith('{')).at(-1) || '' };
 }
+// Проверки и правки настроек сети идут по одной: страница, таймер и перевод адреса раньше могли править файл
+// одновременно и задваивать в нём строки
+let nsChain = Promise.resolve();
+const nsSerial = (fn) => { const p = nsChain.then(fn, fn); nsChain = p.catch(() => {}); return p };
+const netsave = (op) => nsSerial(() => netsaveRaw(op));
 // Настройки сети админка правит сама: рабочий адрес, которого в них нет, дописывает сразу; адрес, которого на сервере
 // уже нет, убирает, если его нет и через 5 минут (хостер мог снять адрес на время работ). Кнопка «Исправить» остаётся
 // для случая, когда сама не смогла
-async function netsaveAuto() {
-  const c = await netsave('check'), st = c.state;
+const netsaveAuto = () => nsSerial(async () => {
+  const c = await netsaveRaw('check'), st = c.state;
   const due = netsaveDue(st, Number(getSetting(db, 'netsave_stale_at', '')) || 0, now());
-  if (due === 'none') { setSetting(db, 'netsave_stale_at', ''); return st }
+  if (due === 'none') { setSetting(db, 'netsave_stale_at', ''); setSetting(db, 'netsave_failed', ''); return st }
   if (due === 'mark') { setSetting(db, 'netsave_stale_at', String(now())); return st }
   if (due === 'wait') return st;
-  const r = await netsave('fix');
+  // не получилось в прошлый раз, и с тех пор ничего не изменилось — не повторяем каждые 5 минут
+  const sig = JSON.stringify([st.missing, st.stale]);
+  if (getSetting(db, 'netsave_failed', '') === sig) return st;
+  const r = await netsaveRaw('fix');
   setSetting(db, 'netsave_stale_at', '');
-  if (r.code === 0) { log('настройки сети исправлены:', r.text); return r.state }
-  log('настройки сети сами не исправились:', r.state?.manual || r.text);
+  if (r.code === 0) { setSetting(db, 'netsave_failed', ''); log('настройки сети исправлены:', r.text); return r.state }
+  setSetting(db, 'netsave_failed', sig);
+  const why = r.state?.manual || r.text || 'помощник не ответил';
+  log('настройки сети сами не исправились:', why);
+  watch.notify(`настройки сети не исправились сами: ${why}. После перезагрузки сервера адрес VPN может пропасть, откройте «Адрес»`);
   return r.state || st;
-}
+});
 
 // Запасные входы: админка и подписки по адресам, которые не блокируются вместе с адресом VPN.
 // Сайт nginx на основном адресе (способ «Второй IP», выбирают в «Адрес») и ноды с доменом: их страница пересылает запросы сюда
@@ -321,8 +332,13 @@ const newIps = () => { let seen = {}; try { seen = JSON.parse(getSetting(db, 'ip
 const PRIVATE = /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/;   // внутренние сети: снаружи на такой адрес не подключиться
 const freshIps = () => env('MP_MODE', '') !== 'ip2' || !netNow ? [] : (netNow.ips || []).filter((a) => !PRIVATE.test(a) && a !== netNow.ip1 && a !== ip2() && a !== getSetting(db, 'out_ip', ''));
 
-// Перевод VPN на другой адрес сервера без переустановки. Xray перезапускается в фоне; когда поднялся —
-// адрес в настройки установки и сети, пересылка со старого адреса (пока расходится DNS), проверка из России, Telegram
+// ---------- сверка адреса ----------
+// Адрес VPN записан в пяти местах: конфиг Xray, настройки установки, пересылка со старого адреса, настройки сети,
+// A-запись в Cloudflare; от него же зависят исходящий адрес и проверка доступности. Истина одна — адрес, на котором
+// слушает Xray. Всё остальное приводится к нему здесь, одной функцией: после каждого перезапуска Xray, на старте и раз
+// в 5 минут. Раньше каждое место обновлял свой код, и путь, который о нём не знал, оставлял его прежним (26.11.2026:
+// пересылка на адрес без слушателя после возврата адреса окном «Изменить адрес»)
+const reconfRunning = () => { const j = addrState().job; return j?.state === 'running' && now() - j.at < 900 };
 async function syncIpEnv() {
   const live = ip2(), known = getSetting(db, 'ip2_known', '') || env('MP_IP2', '');
   if (!live || live === known) return;
@@ -332,23 +348,88 @@ async function syncIpEnv() {
   const sig = r.out.split('\n').filter(Boolean).pop() || '';
   if (sig.startsWith('ip2|')) setSetting(db, 'apply_sig', sig);   // иначе запуск после обновления принял бы это за новую установку
 }
+// Адрес пропал с сервера (хостер забрал). Ждём 5 минут: его могли снять на время работ
+const goneFor = (key, gone) => {
+  if (!gone) { setSetting(db, key, ''); return false }
+  const at = Number(getSetting(db, key, '')) || 0;
+  if (!at) { setSetting(db, key, String(now())); return false }
+  return now() - at >= 300;
+};
+async function lostAddrs() {
+  const ips = netNow?.ips; if (!ips?.length) return;
+  // исходящий: без адреса на сервере Xray не может выйти в интернет — люди подключены, а сайты не открываются
+  const out = getSetting(db, 'out_ip', '');
+  if (goneFor('out_gone_at', !!out && !ips.includes(out))) {
+    setSetting(db, 'out_gone_at', '');
+    const r = await mgr.egress.set('');
+    log('исходящий адрес', out, 'пропал с сервера:', r.ok ? 'выход переведён на основной адрес' : r.error);
+    watch.notify(r.ok ? `исходящий адрес ${out} пропал с сервера, выход в интернет переведён на основной адрес` : `исходящий адрес ${out} пропал с сервера, а сменить его не получилось: ${r.error}. Откройте «Адрес»`);
+  }
+  // входящий: Xray работает до первого перезапуска, потом не поднимется. Свободный адрес один — переводим сами
+  const live = ip2();
+  if (goneFor('in_gone_at', !!live && !ips.includes(live))) {
+    setSetting(db, 'in_gone_at', '');
+    const free = freshIps();
+    if (free.length === 1) {
+      const r = await mgr.inbound.set(free[0]);
+      if (r.ok && r.pending) { watch.notify(`адрес VPN ${live} пропал с сервера, перевожу VPN на ${free[0]}`); afterMove(r.job, live, free[0]).catch((e) => log('смена входящего адреса:', e.message)); return }
+      log('входящий адрес пропал, перевести не получилось:', r.error || '');
+    }
+    if (getSetting(db, 'in_gone_told', '') !== live) {
+      setSetting(db, 'in_gone_told', live);
+      watch.notify(`адрес VPN ${live} пропал с сервера. ${free.length ? 'Свободные адреса: ' + free.join(', ') : 'Свободных адресов нет'}. Откройте «Адрес»\n${entries().map((e) => e.url).join('\n')}`.trim());
+    }
+  }
+}
+// A-запись в Cloudflare — на адрес, где слушает Xray. Закрывает и сбой переустановки (запись уже сменили, а адрес
+// остался прежним), и откат в «Истории»
+async function cfSync() {
+  const want = ip2(), domain = getSetting(db, 'domain');
+  if (!cf.on() || !want || !domain) return;
+  const st = await cf.state(domain);
+  if (st.error || st.proxied || st.many || st.ip === want) return;
+  try {
+    await cf.setA(domain, want);
+    if (!moving) watch.notify(`A-запись ${domain} в Cloudflare приведена к адресу VPN: ${st.ip || 'не было'} → ${want}`);   // при переводе итог придёт одним сообщением
+  } catch (e) { log('Cloudflare:', e.message) }
+}
+let moving = 0;   // идёт перевод адреса кнопкой
+let reconciling = null;
+function reconcile() {
+  if (reconciling) return reconciling;
+  reconciling = (async () => {
+    const mode = env('MP_MODE', '');
+    if (!mode || mode === 'existing' || reconfRunning()) return;   // идёт переустановка: она сама всё расставит
+    if (mode === 'ip2') { await netLook(); await syncIpEnv(); await lostAddrs(); await cfSync() }
+    await netsaveAuto();
+  })().catch((e) => log('сверка адреса:', e.message)).finally(() => { reconciling = null });
+  return reconciling;
+}
+
+// Перевод VPN на другой адрес сервера без переустановки. Xray перезапускается в фоне; когда поднялся — старый адрес
+// пересылается на новый (пока расходится DNS), остальное делает сверка. Итог с проверкой из России — в Telegram
 async function afterMove(jobId, from, to) {
-  for (let i = 0; i < 100; i++) { await new Promise((r) => setTimeout(r, 1500)); const j = mgr.server.job(); if (j.id !== jobId || !j.running) break }
-  const j = mgr.server.job();
-  if (j.id !== jobId || j.running || !j.ok) { watch.notify(`перевести VPN на ${to} не получилось, работает прежний адрес ${from}`); return }
+  const j = await mgr.server.wait(jobId);
+  if (!j.ok) { watch.notify(`перевести VPN на ${to} не получилось, работает прежний адрес ${from}: ${j.error}`); return }
+  moving++;
+  try { await afterMoved(from, to) } finally { moving-- }
+}
+async function afterMoved(from, to) {
   await syncIpEnv();
   const f = await agent(`ipmove fwd ${from} ${to}`, 15000);
+  const fwd = f.code === 0 ? `${from} пока пересылается на новый адрес` : `${from} подключения больше не принимает`;
   log('входящий адрес:', from, '→', to, f.code === 0 ? 'старый пересылается на новый' : 'старый отключён: ' + f.out.trim());
-  await netsave('fix').then((r) => log('настройки сети после смены адреса:', r.state?.manual || r.text)).catch((e) => log('настройки сети:', e.message));
-  await netLook();
+  await reconcile(); await reconcile();   // вторая — если первая уже шла и начала раньше перезапуска
   const domain = getSetting(db, 'domain'), dns = await resolve(domain);
-  let rec = dns.includes(to) ? '' : ` Поменяйте A-запись ${domain} на ${to}`;
-  if (cf.on()) {
-    try { await cf.setA(domain, to); rec = ` A-запись ${domain} в Cloudflare изменена` }
-    catch (e) { log('Cloudflare:', e.message); rec = ` A-запись в Cloudflare не изменилась: ${e.message}. Поменяйте её на ${to} сами` }
-  }
-  await watch.notify(`VPN принимает подключения на ${to}.` + rec);
-  setTimeout(() => watch.check(false, to), 20_000);   // открывается ли новый адрес из России — придёт отдельным сообщением, если нет
+  const rec = cf.on() ? ((await cf.state(domain)).ip === to ? ` A-запись ${domain} в Cloudflare изменена.` : ` A-запись в Cloudflare не изменилась: поменяйте её на ${to} сами.`)
+    : dns.includes(to) ? '' : ` Поменяйте A-запись ${domain} на ${to}.`;
+  // открывается ли новый адрес из России — сразу в том же сообщении: молчание не должно значить «всё хорошо»
+  await new Promise((r) => setTimeout(r, 15_000));
+  const w = await watch.check(true).catch(() => null);
+  const ru = (w?.ru || []).filter((x) => x.healthy), seen = w?.ip === to && ru.length
+    ? (w.state === 'blocked' ? ` Из России он НЕ открывается: ${ru.filter((x) => x.ok).length} из ${ru.length} точек.` : ` Из России открывается: ${ru.filter((x) => x.ok).length} из ${ru.length} точек.`)
+    : ' Проверить его из России не получилось.';
+  await watch.notify(`VPN принимает подключения на ${to}.${seen}${rec} ${fwd}.`);
 }
 
 function addrState() {
@@ -563,7 +644,7 @@ async function adminApi(req, res, path) {
     const net = await agent('netinfo', 30000);
     let info = null; try { info = net.code === 0 ? JSON.parse(net.out.split('\n').pop() || '{}') : null } catch {}
     if (info) netNow = { ips: info.ips, ip1: info.ip1, fwd: info.fwd || '' };
-    return json(res, 200, { ...addrState(), cf: await cf.state(getSetting(db, 'domain')), fresh: freshIps(), fwd: netNow?.fwd || '', net: info, net_error: info ? '' : net.out || 'Помощник не ответил', dns: await resolve(getSetting(db, 'domain')), netsave: await netsaveAuto() });
+    return json(res, 200, { ...addrState(), cf: await cf.state(getSetting(db, 'domain')), fresh: freshIps(), fwd: netNow?.fwd || '', net: info, net_error: info ? '' : net.out || 'Помощник не ответил', dns: await resolve(getSetting(db, 'domain')), netsave: await netsaveAuto(), netsave_failed: !!getSetting(db, 'netsave_failed', '') });
   }
   if (path === '/api/addr/netsave' && M === 'POST') {
     const r = await netsave('fix');
@@ -587,9 +668,9 @@ async function adminApi(req, res, path) {
     // Cloudflare подключён: A-запись домена ставим сами до переустановки (сертификат выпускается по ней).
     // Сервер ещё может помнить старый ответ DNS, поэтому установщику говорим проверку DNS пропустить
     let force = !!b.force;
-    if (cf.on() && !b.drop) {
-      const want = mode === 'ip2' ? ip2 : (await netLook())?.ip1 || '';
-      try { if (want) { await cf.setA(domain, want); force = true } }
+    const zone = getSetting(db, 'cf_zone', '');
+    if (cf.on() && !b.drop && zone && (domain === zone || domain.endsWith('.' + zone)) && mode === 'ip2') {
+      try { await cf.setA(domain, ip2); force = true }   // переустановка не прошла — запись вернёт сверка адреса
       catch (e) { if (!b.force) return json(res, 400, { error: e.message }) }
     }
     mgr.keep();
@@ -598,15 +679,24 @@ async function adminApi(req, res, path) {
     setSetting(db, 'pre_reconf', '');
     return json(res, r.code < 0 ? 503 : 400, { error: r.code === 2 && /нет такой команды/.test(r.out) ? 'Помощник на сервере старый: обновите monolit' : r.out || 'Не запустилось' });
   }
-  if (path === '/api/addr/job' && M === 'GET') return json(res, 200, addrState());
+  if (path === '/api/addr/job' && M === 'GET') { const a = addrState(); if (a.job?.state === 'failed') reconcile(); return json(res, 200, a) }
   // Перевести VPN на другой адрес сервера (хостер добавил новый IP): без переустановки, сайты и админка не перезапускаются
   if (path === '/api/addr/ip' && M === 'POST') {
     if (!managed()) return;
-    const to = String((await readBody(req)).ip || '').trim(), from = ip2();
+    const b0 = await readBody(req), to = String(b0.ip || '').trim(), from = ip2();
     if (env('MP_MODE', '') !== 'ip2' || !from) return json(res, 409, { error: 'Адрес так меняется только при способе «Второй IP»' });
     if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(to)) return json(res, 400, { error: 'Выберите адрес из списка' });
     const c = await agent('ipmove check ' + to, 15000);
     if (c.code !== 0) return json(res, c.code < 0 ? 503 : 400, { error: c.code === 2 && /нет такой команды/.test(c.out) ? 'Помощник на сервере старый: обновите monolit' : { 3: `Адреса ${to} на сервере нет`, 4: `${to} — основной адрес, на нём сайты`, 5: c.out.trim() }[c.code] || c.out.trim() || 'Не получилось' });
+    // проверить из России до перевода: на минуту принимаем подключения на новом адресе пересылкой на текущий
+    if (b0.probe) {
+      const p = await agent(`ipmove probe ${to} ${from}`, 15000);
+      if (p.code !== 0) return json(res, 200, { probe: { state: 'unknown', error: p.out.trim() || 'не получилось' } });
+      let w = null; try { w = await watch.probe(to) } catch (e) { w = { state: 'unknown', error: e.message } } finally { await agent('ipmove unprobe', 15000) }
+      const ru = (w.ru || []).filter((x) => x.healthy);
+      return json(res, 200, { probe: { state: w.state, ok: ru.filter((x) => x.ok).length, of: ru.length, error: w.error || '' } });
+    }
+    await agent('ipmove unprobe', 15000);
     const r = await mgr.inbound.set(to);
     if (r.ok && r.pending) afterMove(r.job, from, to).catch((e) => log('смена входящего адреса:', e.message));
     return done(r);
@@ -737,8 +827,11 @@ http.listen(Number(PORT), HOST, async () => {
   log(`monolit proxy слушает ${HOST}:${PORT}, админка ${ADMIN}/`);
   if (!activeTpl()) await checkTemplate();
   await queueSync({ full: true });
+  // таймеры ставим до разбора установки: если он споткнётся, сверка и проверки всё равно пойдут
+  setInterval(() => reconcile(), 5 * 60_000);
   await mgr.start().catch(e => log('manage:', e.message));
-  syncIpEnv().catch(() => {});   // адрес сменили переустановкой: запомнить его как текущий
+  agent('ipmove unprobe', 15000).catch(() => {});   // пробная пересылка могла остаться от прерванной проверки
+  reconcile();
   setInterval(() => queueSync(), 60_000);
   setInterval(() => queueSync({ full: true }), 10 * 60_000);    // если Xray перезапускали — вернуть пользователей
   setInterval(() => exits.checkAll().catch(e => log('выходы:', e.message)), 5 * 60_000);   // прокси отвечает? IP, страна, UDP
@@ -747,8 +840,6 @@ http.listen(Number(PORT), HOST, async () => {
   setInterval(() => db.prepare('DELETE FROM traffic_daily WHERE day < ?').run(dayOf(now() - 400 * 86400)), 24 * 3600_000);
   setTimeout(() => checkUpdate(), 30_000);
   watch.start();
-  if (env('MP_MODE', '') === 'ip2') { netLook().catch(() => {}); setInterval(() => netLook().catch(() => {}), 5 * 60_000) }
-  if (env('MP_MODE', '') && env('MP_MODE', '') !== 'existing') { setTimeout(() => netsaveAuto().catch(() => {}), 60_000); setInterval(() => netsaveAuto().catch(() => {}), 5 * 60_000) }
   // Адрес меняли из админки: после перезапуска сообщить итог в Telegram и проверить новый адрес
   const job = addrState().job;
   if (job && job.state !== 'running' && String(job.at) !== getSetting(db, 'reconf_seen', '')) {
@@ -756,9 +847,7 @@ http.listen(Number(PORT), HOST, async () => {
     if (now() - job.at < 3600) {
       watch.notify(job.state === 'done' ? `адрес сервера сменён, домен ${getSetting(db, 'domain')}` : `сменить адрес не получилось: ${job.text}`);
       if (job.state === 'done') {
-        setTimeout(() => watch.check(true), 60_000);
-        // новый адрес — в настройки сети, старый оттуда убрать: иначе после перезагрузки сервер останется без VPN
-        netsave('fix').then((r) => log('настройки сети после смены адреса:', r.state?.manual || r.text)).catch((e) => log('настройки сети:', e.message));
+        setTimeout(() => watch.check(true), 60_000);   // настройки сети, пересылку и запись DNS приводит сверка адреса
       }
     }
   }

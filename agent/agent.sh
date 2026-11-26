@@ -29,7 +29,9 @@ server_ips() {
 }
 # Пересылка со старого входящего адреса на новый (ipmove fwd): правила живут до перезагрузки, этого хватает на смену DNS
 fwd_state() { iptables -t nat -S PREROUTING 2>/dev/null | grep -- '--comment monolit-ipfwd' | grep -m1 -- '-p tcp' | sed -nE 's/.*-d ([0-9.]+)\/32 .*--to-destination ([0-9.]+):443.*/\1>\2/p'; }
-fwd_drop() { iptables -t nat -S PREROUTING 2>/dev/null | grep -- '--comment monolit-ipfwd' | sed 's/^-A/-D/' | while read -r r; do eval "iptables -t nat $r" 2>/dev/null; done; }
+fwd_drop() { probe_drop; iptables -t nat -S PREROUTING 2>/dev/null | grep -- '--comment monolit-ipfwd' | sed 's/^-A/-D/' | while read -r r; do eval "iptables -t nat $r" 2>/dev/null; done; }
+# Проверка свободного адреса до перевода (ipmove probe): правило живёт минуту; снимается и при любой смене пересылки
+probe_drop() { iptables -t nat -S PREROUTING 2>/dev/null | grep -- '--comment monolit-ipprobe' | sed 's/^-A/-D/' | while read -r r; do eval "iptables -t nat $r" 2>/dev/null; done; }
 
 cert_end() {   # дата окончания первого сертификата из конфига Xray (или MP_CERT)
   local c=${MP_CERT:-}
@@ -162,6 +164,8 @@ case "$cmd" in
     # ipmove env IP          — записать адрес в /etc/monolit.env (MP_IP2 и подпись установки); печатает новую подпись
     # ipmove fwd СТАРЫЙ НОВЫЙ — пока DNS расходится, подключения на старый адрес пересылаются на новый
     # ipmove unfwd           — перестать пересылать
+    # ipmove probe НОВЫЙ ТЕКУЩИЙ — на минуту принять подключения на свободном адресе (пересылкой на текущий),
+    #                          чтобы проверить его из России до перевода; ipmove unprobe — убрать
     ipre='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
     has_ip() { ip -4 -o addr show 2>/dev/null | grep -q " inet $1/"; }
     case "$a1" in
@@ -189,6 +193,14 @@ case "$cmd" in
         for p in tcp udp; do iptables -t nat -I PREROUTING -d "$a2/32" -p $p --dport 443 -m comment --comment monolit-ipfwd -j DNAT --to-destination "$rest:443" 2>&1 || { fwd_drop; fin 1; }; done
         fwd_state; fin 0 ;;
       unfwd) fwd_drop; fin 0 ;;
+      probe)
+        [[ "$a2" =~ $ipre ]] && [[ "$rest" =~ $ipre ]] && [ "$a2" != "$rest" ] || { echo "плохой адрес"; fin 2; }
+        command -v iptables >/dev/null || { echo "нет iptables"; fin 1; }
+        probe_drop
+        has_ip "$a2" && has_ip "$rest" || { echo "адреса нет на сервере"; fin 3; }
+        iptables -t nat -I PREROUTING -d "$a2/32" -p tcp --dport 443 -m comment --comment monolit-ipprobe -j DNAT --to-destination "$rest:443" 2>&1 || { probe_drop; fin 1; }
+        fin 0 ;;
+      unprobe) probe_drop; fin 0 ;;
       *) fin 2 ;;
     esac ;;
   entry)   # entry set ДОМЕН | entry drop — запасной вход: админка и подписки в сайте nginx на основном адресе (способ «Второй IP»)

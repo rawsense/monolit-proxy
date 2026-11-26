@@ -200,38 +200,61 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
   let job = { id: 0, running: false, ok: true, error: '', note: '', text: '', log: '', at: 0 };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const startJob = (note) => { job = { id: job.id + 1, running: true, ok: null, error: '', note, text: '', log: '', at: now() }; return job.id };
-  const endJob = (id, r) => { if (job.id === id) Object.assign(job, { running: false, ok: !!r.ok, error: r.error || '', text: r.text || '', log: r.log || '' }); onRestart?.() };
+  // Итоги задач по номеру: кто-то ждёт конца своей задачи (перевод адреса), а общая job к тому времени уже про другую
+  const results = new Map(), waiters = new Map();
+  const endJob = (id, r) => {
+    if (job.id === id) Object.assign(job, { running: false, ok: !!r.ok, error: r.error || '', text: r.text || '', log: r.log || '' });
+    const res = { ok: !!r.ok, error: r.error || '' };
+    results.set(id, res); if (results.size > 30) results.delete(results.keys().next().value);
+    for (const w of waiters.get(id) || []) w(res);
+    waiters.delete(id);
+    onRestart?.();
+  };
+  // Дождаться конца задачи id (её вернул apply в поле job): { ok, error }
+  const waitJob = (id, ms = 180000) => results.has(id) ? Promise.resolve(results.get(id)) : new Promise((ok) => {
+    const done = (r) => { clearTimeout(t); ok(r) }, t = setTimeout(() => done({ ok: false, error: 'не дождался перезапуска Xray' }), ms);
+    waiters.set(id, [...(waiters.get(id) || []), done]);
+  });
 
   // Применить: проверить, заменить, перезапустить, при сбое вернуть. mutate меняет состояние; history=false — без записи в историю.
   // Промис отвечает сразу после проверки (или ошибки); перезапуск идёт дальше в очереди
   function apply(note, mutate, { body: forcedBody, history = true } = {}) {
     return new Promise((answer) => queue(async () => {
-      const before = snapshot(), prevBody = readFileSync(CFG, 'utf8');
-      try { mutate?.() } catch (e) { restore(before); return answer({ ok: false, error: e.message }) }
-      const next = forcedBody ? xray.fillUsers(JSON.parse(forcedBody), activeUsers()) : build(JSON.parse(prevBody), snapshot());
-      const text = JSON.stringify(next, null, 2);
-      if (text === JSON.stringify(JSON.parse(prevBody), null, 2)) return answer({ ok: true, same: true });
-      writeFileSync(CAND, text, { mode: 0o600 });
-      const t = await agent('xray-test ' + basename(CAND));
-      if (t.code !== 0) { restore(before); return answer({ ok: false, error: t.code < 0 ? t.out : 'Xray не принял конфиг: ' + lastLines(t.out), stage: 'test' }) }
-      if (history) {
-        db.prepare('INSERT INTO config_history (at, note, body, state) VALUES (?, ?, ?, ?)').run(now(), note, prevBody, JSON.stringify(before));
-        db.prepare('DELETE FROM config_history WHERE id NOT IN (SELECT id FROM config_history ORDER BY id DESC LIMIT ?)').run(KEEP);
+      // Любая ошибка до перезапуска (диск полон, конфиг не читается, база занята) — ответ с ошибкой и прежнее состояние.
+      // Без этого запрос висел бы вечно, а на старте админка не доходила до своих таймеров (та же форма, что 26.11.2026)
+      let before = null, prevBody = '', id = 0, swapped = false;
+      try {
+        before = snapshot(); prevBody = readFileSync(CFG, 'utf8');
+        mutate?.();
+        const next = forcedBody ? xray.fillUsers(JSON.parse(forcedBody), activeUsers()) : build(JSON.parse(prevBody), snapshot());
+        const text = JSON.stringify(next, null, 2);
+        if (text === JSON.stringify(JSON.parse(prevBody), null, 2)) return answer({ ok: true, same: true });
+        writeFileSync(CAND, text, { mode: 0o600 });
+        const t = await agent('xray-test ' + basename(CAND));
+        if (t.code !== 0) { restore(before); return answer({ ok: false, error: t.code < 0 ? t.out : 'Xray не принял конфиг: ' + lastLines(t.out), stage: 'test' }) }
+        if (history) {
+          db.prepare('INSERT INTO config_history (at, note, body, state) VALUES (?, ?, ?, ?)').run(now(), note, prevBody, JSON.stringify(before));
+          db.prepare('DELETE FROM config_history WHERE id NOT IN (SELECT id FROM config_history ORDER BY id DESC LIMIT ?)').run(KEEP);
+        }
+        renameSync(CAND, CFG); swapped = true;
+        id = startJob(note);
+        answer({ ok: true, pending: true, job: id });
+        await sleep(400);   // ответ успевает уйти до перезапуска
+        const r = await agent('xray-restart', 90000);
+        if (r.code !== 0) {
+          writeFileSync(CFG, prevBody); restore(before);
+          await agent('xray-restart', 90000);
+          if (history) db.prepare('DELETE FROM config_history WHERE id = (SELECT MAX(id) FROM config_history)').run();
+          const j = await agent('journal 15');
+          return endJob(id, { ok: false, error: 'Xray не запустился с новым конфигом, вернули как было', log: j.out.split('\n').slice(-6).join('\n') });
+        }
+        log('конфиг Xray:', note);
+        endJob(id, { ok: true });
+      } catch (e) {
+        log('конфиг Xray не применился:', note, '—', e.message);
+        try { if (swapped && prevBody) writeFileSync(CFG, prevBody); if (before) restore(before) } catch {}
+        if (id) endJob(id, { ok: false, error: e.message }); else answer({ ok: false, error: 'Не получилось применить: ' + e.message });
       }
-      renameSync(CAND, CFG);
-      const id = startJob(note);
-      answer({ ok: true, pending: true, job: id });
-      await sleep(400);   // ответ успевает уйти до перезапуска
-      const r = await agent('xray-restart', 90000);
-      if (r.code !== 0) {
-        writeFileSync(CFG, prevBody); restore(before);
-        await agent('xray-restart', 90000);
-        if (history) db.prepare('DELETE FROM config_history WHERE id = (SELECT MAX(id) FROM config_history)').run();
-        const j = await agent('journal 15');
-        return endJob(id, { ok: false, error: 'Xray не запустился с новым конфигом, вернули как было', log: j.out.split('\n').slice(-6).join('\n') });
-      }
-      log('конфиг Xray:', note);
-      endJob(id, { ok: true });
     }));
   }
   // Команда помощнику, после которой Xray перезапускается (обновление, базы, сертификат): тоже фоном
@@ -414,7 +437,17 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
     async rollback(id) {
       const h = db.prepare('SELECT * FROM config_history WHERE id = ?').get(id);
       if (!h) return { ok: false, error: 'Нет такой версии' };
-      return apply('Возврат к версии от ' + new Date(h.at * 1000).toLocaleString('ru-RU', { timeZone: process.env.TZ || 'Europe/Moscow' }), () => restore(J(h.state, snapshot())), { body: h.body });
+      // Версия записана с адресом, на котором Xray слушал тогда. Возвращаем маршруты и протоколы, а входящий адрес
+      // оставляем нынешний: иначе Xray встал бы на прежний адрес, пока домен смотрит на новый
+      let body = h.body, state = J(h.state, snapshot());
+      try {
+        const old = JSON.parse(h.body), was = listenOf(old, xray), cur = listenOf(xray.read(), xray);
+        if (was && cur && was !== cur) {
+          body = JSON.stringify(moveListen(old, was, cur));
+          for (const k of Object.keys(state.stash || {})) if (state.stash[k]?.listen === was) state.stash[k].listen = cur;
+        }
+      } catch {}
+      return apply('Возврат к версии от ' + new Date(h.at * 1000).toLocaleString('ru-RU', { timeZone: process.env.TZ || 'Europe/Moscow' }), () => restore(state), { body });
     },
     show: (id) => db.prepare('SELECT body FROM config_history WHERE id = ?').get(id)?.body || null,
   };
@@ -423,6 +456,7 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
   const server = {
     status,
     job: () => job,
+    wait: waitJob,
     restart: () => background('Перезапуск Xray', 'xray-restart', 90000, 'Xray перезапущен'),
     update: () => background('Обновление Xray', 'xray-update', 240000, 'Xray обновлён'),
     geo: () => background('Обновление баз адресов', 'geo-update', 240000, 'Базы адресов обновлены'),
@@ -434,16 +468,18 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
   // Запуск: первый раз или после переустановки (install.sh переписал конфиг) — взять состояние из конфига и вернуть свои маршруты
   async function start() {
     if (MODE === 'existing') return;
-    const sig = process.env.MP_APPLY_SIG || '';
-    if (getSetting(db, 'managed') !== '1' || getSetting(db, 'apply_sig') !== sig) {
+    // docker --env-file кавычки не снимает, а помощник (ipmove env) отдаёт подпись без них: сравниваем без кавычек,
+    // иначе первый же перезапуск после перевода адреса стирал историю и заново разбирал конфиг
+    const sig = unquote(process.env.MP_APPLY_SIG), kept = freshKeep(J(getSetting(db, 'pre_reconf', ''), null), now());
+    setSetting(db, 'pre_reconf', '');   // снимок годится только этому запуску: залежавшийся вернул бы давно изменённое
+    if (getSetting(db, 'managed') !== '1' || unquote(getSetting(db, 'apply_sig')) !== sig) {
       // Установка другая (способ, домен, сертификат, порты, путь XHTTP): старые версии конфига к ней не подходят,
       // откат к ним сломал бы Xray или XHTTP — историю начинаем заново
-      const prev = getSetting(db, 'apply_sig', '');
+      const prev = unquote(getSetting(db, 'apply_sig', ''));
       if (prev && prev !== sig) { db.prepare('DELETE FROM config_history').run(); log('установка изменилась, история конфигов очищена') }
       importFromConfig(); setSetting(db, 'apply_sig', sig);
       // Адрес меняли из админки: install.sh собрал входы по флагам установки, а включённое и выключенное здесь — главнее
-      const kept = J(getSetting(db, 'pre_reconf', ''), null);
-      if (kept) { restore({ ...kept, stash: { ...kept.stash, ...snapshot().stash } }); setSetting(db, 'pre_reconf', ''); log('после смены адреса вернул маршруты, WARP и протоколы') }
+      if (kept) { restore({ ...kept, stash: { ...kept.stash, ...snapshot().stash } }); log('после смены адреса вернул маршруты, WARP и протоколы') }
       const cfg = xray.read(), want = build(cfg, snapshot());
       if (JSON.stringify(want.routing) !== JSON.stringify(cfg.routing) || want.inbounds.length !== cfg.inbounds.length || JSON.stringify(want.outbounds) !== JSON.stringify(cfg.outbounds)
         || !!xray.detect(want).vision?.reality !== !!xray.detect(cfg).vision?.reality) {
@@ -454,7 +490,7 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
   }
 
   // Перед сменой адреса: запомнить, что включено (start() вернёт это после переустановки)
-  const keep = () => setSetting(db, 'pre_reconf', JSON.stringify(snapshot()));
+  const keep = () => setSetting(db, 'pre_reconf', JSON.stringify({ at: now(), s: snapshot() }));
   // Ключ и короткий id основного входа Reality для подписок и мостов; null — вход Vision
   const reality = () => { const k = get('reality_keys', null); try { return k && xray.detect().vision?.reality ? { pub: k.pub, sid: k.sid } : null } catch { return null } };
   return { stateForAdmin, routes, warp, proto, egress, inbound, reality, history, server, start, apply, keep };
@@ -471,6 +507,11 @@ export function listenOf(cfg, xray) {
   const l = xray.detect(cfg).vision?.listen || '';
   return /^(\d{1,3}\.){3}\d{1,3}$/.test(l) && l !== '0.0.0.0' && !l.startsWith('127.') ? l : '';
 }
+export const unquote = (v) => String(v || '').replace(/^"|"$/g, '');
+// Снимок настроек, сделанный перед сменой адреса: годится час. Переустановка идёт минуты; снимок старше — от смены,
+// которая не дошла до конца, и вернул бы давно изменённые маршруты и протоколы
+export const freshKeep = (k, t, ttl = 3600) => k && k.s && k.at && t - k.at < ttl ? k.s : null;
+
 // Что делать с настройками сети по итогу проверки (agent/netsave.sh check): none — всё в порядке или сами не можем,
 // fix — править сейчас, mark — лишний адрес увидели впервые, wait — ждём, не вернётся ли он. since — когда увидели
 export function netsaveDue(st, since, t, wait = 300) {

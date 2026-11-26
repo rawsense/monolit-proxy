@@ -84,7 +84,7 @@ export async function tgFindChat(token) {
   return m ? String(m.chat.id) : '';
 }
 
-export function createWatch({ db, log, server, adminUrl }) {
+export function createWatch({ db, log, server, adminUrl, listen = () => '' }) {
   const state = () => J(getSetting(db, 'watch_state', ''), null);
   let timer = null, running = null;
 
@@ -94,9 +94,12 @@ export function createWatch({ db, log, server, adminUrl }) {
     try { await tgSend(token, chat, `monolit, ${server()}: ${text}`); return true } catch (e) { log('telegram:', e.message); return false }
   }
 
-  // Куда подключаются приложения: адрес, на который смотрит домен
+  // Что проверяем: адрес, на котором Xray принимает подключения (способ «Второй IP»), иначе тот, на который смотрит
+  // домен. Раньше всегда брали адрес из DNS: пока запись не сменили, после перевода проверялся прежний адрес,
+  // и про блокировку нового никто не узнавал (26.11.2026)
   async function target() {
     const domain = getSetting(db, 'domain', '');
+    if (listen()) return { ip: listen(), domain };
     const a = await resolve4(domain);
     return { ip: a[0] || process.env.MP_IP2 || '', domain };
   }
@@ -169,6 +172,7 @@ export function createWatch({ db, log, server, adminUrl }) {
 
   return {
     check, plan, notify,
+    probe: (ip) => measure(ip),   // проверить адрес, ничего не записывая и никому не сообщая (до перевода VPN на него)
     state: () => ({ ...(state() || { state: 'none' }), on: on(), every: every() / 60, pending: getSetting(db, 'watch_pending', ''), running: !!running }),
     start: () => plan(on() && !state() ? 120 : undefined),
   };
