@@ -51,11 +51,22 @@ class Handler(BaseHTTPRequestHandler):
         headers = {k: v for k, v in self.headers.items() if k.lower() not in HOP}
         headers['Host'] = UP.hostname
         try:
-            c = http.client.HTTPSConnection(UP.hostname, UP.port or 443, timeout=25, context=CTX)
+            c = http.client.HTTPSConnection(UP.hostname, UP.port or 443, timeout=120, context=CTX)   # проверка доступности идёт до минуты
             c.request(self.command, self.path, body=body, headers=headers)
             r = c.getresponse()
             data = r.read()
         except Exception:
+            # основной сервер не ответил. Браузеру — страница входа; запросу админки — честная ошибка, а не страница
+            # с кодом 200, которую интерфейс пытался бы разобрать как ответ
+            if self.command not in ('GET', 'HEAD') or 'json' in (self.headers.get('Accept') or '') or '/api/' in self.path:
+                self.send_response(502)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                body = '{"error":"Основной сервер не отвечает"}'.encode()
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                if self.command != 'HEAD':
+                    self.wfile.write(body)
+                return
             self.page()
             return
         self.send_response(r.status)

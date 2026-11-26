@@ -72,8 +72,8 @@ test('включение: помощник, ключи сервера, наст�
   assert.deepEqual(await awg.set({ on: true, port: 80 }), { error: 'Порт от 1024 до 65535' });
   assert.deepEqual(await awg.set({ on: true, port: 46200 }), { ok: true });
   await tick();
-  assert.deepEqual(calls, ['port-free 46200', 'awg on 46200']);
-  assert.deepEqual(awg.stateForAdmin(), { on: true, port: 46200, state: 'on', error: '' });
+  assert.deepEqual(calls, ['port-free 46200', 'awg on 46200 - -']);
+  assert.deepEqual(awg.stateForAdmin(), { on: true, port: 46200, ip: '', state: 'on', error: '' });
   const r = await awg.sync(users());
   assert.deepEqual(r, { traffic: {}, online: {} });
   const c = awg.conf();
@@ -182,7 +182,27 @@ test('сменили выходной адрес — при полной све�
   await awg.sync(users());
   assert.equal(calls.length, 0);
   await awg.sync(users(), { full: true });
-  assert.deepEqual(calls, ['awg on 46200 198.51.100.9']);
+  assert.deepEqual(calls, ['awg on 46200 198.51.100.9 -']);
+});
+
+test('свой адрес: помощник получает его, приложения подключаются к нему цифрами, а не к домену', async () => {
+  calls.length = 0;
+  assert.deepEqual(await awg.set({ ip: 'vpn.example.com' }), { error: 'Выберите адрес из списка' });
+  assert.deepEqual(await awg.set({ ip: '203.0.113.8' }), { ok: true });
+  await tick();
+  assert.deepEqual(calls, ['awg on 46200 198.51.100.9 203.0.113.8']);
+  assert.equal(awg.stateForAdmin().ip, '203.0.113.8');
+  const u = users()[1];
+  assert.equal(awg.outbound(u).settings.peers[0].endpoint, '203.0.113.8:46200');
+  assert.ok(awg.confText(u, 'x').includes('Endpoint = 203.0.113.8:46200\n'));
+  calls.length = 0;
+  assert.deepEqual(await awg.set({ ip: '203.0.113.8' }), { ok: true });   // тот же адрес — ничего не перезапускаем
+  await tick();
+  assert.equal(calls.length, 0);
+  assert.deepEqual(await awg.set({ ip: '' }), { ok: true });
+  await tick();
+  assert.deepEqual(calls, ['awg on 46200 198.51.100.9 -']);
+  assert.equal(awg.outbound(u).settings.peers[0].endpoint, 'vpn.example.com:46200');
 });
 
 test('включение и сверка одновременно — помощник вызывается один раз', async () => {
@@ -193,7 +213,7 @@ test('включение и сверка одновременно — помощ
   const s1 = a2.sync(users(), { full: true });
   await tick(); release();
   await s1;
-  assert.deepEqual(calls.filter((c) => c.startsWith('awg on')), ['awg on 46200']);
+  assert.deepEqual(calls.filter((c) => c.startsWith('awg on')), ['awg on 46200 - -']);
   assert.equal(a2.stateForAdmin().state, 'on');
   assert.equal(dev.peers.size, 3);
 });
@@ -206,7 +226,7 @@ test('выключение', async () => {
   assert.deepEqual(calls, ['awg off']);
   assert.equal(awg.ready(), false);
   assert.equal(awg.outbound(users()[0]), null);
-  assert.deepEqual(awg.stateForAdmin(), { on: false, port: 46200, state: 'off', error: '' });
+  assert.deepEqual(awg.stateForAdmin(), { on: false, port: 46200, ip: '', state: 'off', error: '' });
 });
 
 test('разбор ответа устройства', () => {

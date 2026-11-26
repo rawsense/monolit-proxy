@@ -4,9 +4,9 @@ import { readFileSync, writeFileSync, existsSync, statSync, renameSync, rmSync }
 import { join, extname, normalize } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { openDb, now, token, newUuid, getSetting, setSetting, hashPassword, checkPassword, userState, nextReset } from './db.mjs';
-import { Xray } from './xray.mjs';
+import { Xray, H3_MARK } from './xray.mjs';
 import { AUTOXRAY_URL, parseAutoXray, hashOf, renderAll } from './template.mjs';
-import { createManager, PRESETS, agent, staleFwd, netsaveDue } from './manage.mjs';
+import { createManager, PRESETS, agent, staleFwd, netsaveDue, alertPlan } from './manage.mjs';
 import { createWatch, tgSend, tgFindChat, resolve4 } from './watch.mjs';
 import { createNodes } from './nodes.mjs';
 import { createAwg } from './awg.mjs';
@@ -204,17 +204,21 @@ const mgr = createManager({ db, xray, queue, log, activeUsers: () => users().fil
 
 // ---------- HTTP ----------
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json' };
-const send = (res, code, body, headers = {}) => { res.writeHead(code, { 'cache-control': 'no-store', ...headers }); res.end(body); };
+const send = (res, code, body, headers = {}) => { res.writeHead(code, { 'cache-control': 'no-store', server: 'nginx', ...headers }); res.end(body); };
+// страница 404 слово в слово как у nginx с server_tokens off
+const NOT_FOUND = '<html>\r\n<head><title>404 Not Found</title></head>\r\n<body>\r\n<center><h1>404 Not Found</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n';
 const json = (res, code, obj) => send(res, code, JSON.stringify(obj), { 'content-type': 'application/json; charset=utf-8' });
 const readRaw = (req, max) => new Promise((ok, bad) => { const parts = []; let n = 0; req.on('data', c => { n += c.length; if (n > max) { bad(new Error('Файл слишком большой')); req.destroy(); } else parts.push(c); }); req.on('end', () => ok(Buffer.concat(parts).toString('utf8'))); req.on('error', bad); });
 const readBody = req => new Promise((ok, bad) => { let s = ''; req.on('data', c => { s += c; if (s.length > 1e5) req.destroy(); }); req.on('end', () => { try { ok(s ? JSON.parse(s) : {}); } catch { bad(new Error('bad json')); } }); });
 const cookie = req => Object.fromEntries((req.headers.cookie || '').split(';').map(s => s.trim().split('=')).filter(p => p[0]));
 // Перед monolit всегда nginx на 127.0.0.1: он кладёт адрес посетителя в X-Real-IP (сам заголовок клиента затирает)
-const ipOf = req => req.headers['x-real-ip'] || req.socket.remoteAddress;
+// Запрос от маскировки Hysteria2 (req.h3) пришёл мимо nginx: X-Real-IP в нём пишет сам посетитель, верить нельзя.
+// Настоящего адреса там нет — все такие запросы считаются одним посетителем (защита от перебора пароля общая на всех)
+const ipOf = req => req.h3 ? 'h3' : req.headers['x-real-ip'] || req.socket.remoteAddress;
 
 function staticFile(res, rel) {
   const p = normalize(join(UI, rel));
-  if (!p.startsWith(normalize(UI)) || !existsSync(p) || !statSync(p).isFile()) return send(res, 404, 'not found');
+  if (!p.startsWith(normalize(UI)) || !existsSync(p) || !statSync(p).isFile()) return send(res, 404, NOT_FOUND, { 'content-type': 'text/html' });
   send(res, 200, readFileSync(p), { 'content-type': MIME[extname(p)] || 'application/octet-stream', 'cache-control': rel.endsWith('.html') ? 'no-store' : 'public, max-age=86400' });
 }
 
@@ -331,6 +335,50 @@ async function netLook() {
 const newIps = () => { let seen = {}; try { seen = JSON.parse(getSetting(db, 'ips_seen', '') || '{}') } catch {} return freshIps().filter((a) => seen[a] > 0 && now() - seen[a] < 3 * 86400) };
 const PRIVATE = /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/;   // внутренние сети: снаружи на такой адрес не подключиться
 const freshIps = () => env('MP_MODE', '') !== 'ip2' || !netNow ? [] : (netNow.ips || []).filter((a) => !PRIVATE.test(a) && a !== netNow.ip1 && a !== ip2() && a !== getSetting(db, 'out_ip', ''));
+
+// ---------- тихие сбои ----------
+// То, что раньше было видно только на странице админки: Xray не отвечает, нода пропала, выход-прокси умер, AmneziaWG
+// не поднялся, обновление не встало, сертификат кончается. Теперь об этом приходит сообщение в Telegram: один раз,
+// когда беда держится дольше порога, и ещё раз — когда прошла. Состояние переживает перезапуск админки
+function troubles(cert) {
+  const t = now(), out = {};
+  if (!xrayOk && lastSync && t - lastSync > 60) out.xray = ['Xray не отвечает: люди не подключаются, изменения не применяются', 'Xray снова отвечает'];
+  for (const n of nodes.all()) {
+    if (!nodes.joined(n)) continue;
+    if (t - n.seen_at >= 100) out['node:' + n.id] = [`нода «${n.name}» не на связи`, `нода «${n.name}» снова на связи`];
+    else if (n.info.err) out['nodecfg:' + n.id] = [`нода «${n.name}» не приняла настройки: ${String(n.info.err).slice(0, 160)}`, `нода «${n.name}» в порядке`];
+    else if (n.info.active === false) out['nodecfg:' + n.id] = [`на ноде «${n.name}» не запущен Xray`, `нода «${n.name}» в порядке`];
+    else if (n.domain && n.info.cert !== n.domain && n.info.cert_err) out['nodecfg:' + n.id] = [`нода «${n.name}» не выпустила сертификат: ${String(n.info.cert_err).slice(0, 160)}`, `нода «${n.name}» в порядке`];
+  }
+  for (const x of exits.state()) if (x.ok === 0 && x.checked) out['exit:' + x.id] = [`выход «${x.name}» не отвечает`, `выход «${x.name}» снова отвечает`];
+  const a = awg.stateForAdmin();
+  if (a.on && a.state === 'error') out.awg = ['AmneziaWG не запустился: ' + String(a.error || '').slice(0, 160), 'AmneziaWG запустился'];
+  const u = updateState().status;
+  if (u?.state === 'failed' && t - u.at < 86400) out['update:' + u.at] = ['обновление не встало: ' + String(u.text || '').slice(0, 200), ''];
+  if (cert?.left != null && cert.left < 10 * 86400) out.cert = [cert.left <= 0 ? 'сертификат домена истёк: сайт, подписки и Hysteria2 не работают' : `сертификат домена кончается через ${Math.max(1, Math.round(cert.left / 86400))} дн., продлить не получается`, 'сертификат домена продлён'];
+  return out;
+}
+let certInfo = null, certTried = 0;
+async function certLook() {
+  if (env('MP_MODE', '') === 'existing' || !env('MP_MODE', '')) return;
+  const st = await mgr.server.status();
+  if (!st.cert_end) return;
+  certInfo = { left: st.cert_end - now() };
+  // меньше 20 дней — продлеваем сами, не чаще раза в сутки (certbot и acme.sh продлевают за 30, значит у них не вышло)
+  if (certInfo.left < 20 * 86400 && now() - certTried > 86400) {
+    certTried = now(); log('сертификат кончается через', Math.round(certInfo.left / 86400), 'дн., продлеваю');
+    const r = await agent('cert-renew', 240000);
+    const again = await mgr.server.status();
+    if (again.cert_end) certInfo = { left: again.cert_end - now() };
+    if (r.code !== 0) log('сертификат не продлился:', r.out.split('\n').filter(Boolean).slice(-2).join(' '));
+  }
+}
+async function alerts() {
+  let seen = {}; try { seen = JSON.parse(getSetting(db, 'alerts', '') || '{}') } catch {}
+  const { next, tell } = alertPlan(seen, troubles(certInfo), now());
+  if (JSON.stringify(next) !== JSON.stringify(seen)) setSetting(db, 'alerts', JSON.stringify(next));
+  for (const text of tell) await watch.notify(text);
+}
 
 // ---------- сверка адреса ----------
 // Адрес VPN записан в пяти местах: конфиг Xray, настройки установки, пересылка со старого адреса, настройки сети,
@@ -665,6 +713,12 @@ async function adminApi(req, res, path) {
     if (mode === 'ip2' && !/^(\d{1,3}\.){3}\d{1,3}$/.test(ip2)) return json(res, 400, { error: 'Выберите второй IP для Xray' });
     const drop = b.drop ? cleanDomain(b.drop) : '-';
     if (b.drop && !drop) return json(res, 400, { error: 'Нет такого запасного домена' });
+    // Ноды ходят сюда по домену. Меняем домен — сначала говорим им будущий адрес и ждём, пока те, что на связи,
+    // его заберут (до 45 с): иначе после смены они остались бы на прежнем адресе без связи
+    if (domain !== cur.domain && !b.drop) {
+      const since = now(); setSetting(db, 'next_domain', domain);
+      for (let i = 0; i < 45 && !nodes.announced(since); i++) await new Promise((r) => setTimeout(r, 1000));
+    }
     // Cloudflare подключён: A-запись домена ставим сами до переустановки (сертификат выпускается по ней).
     // Сервер ещё может помнить старый ответ DNS, поэтому установщику говорим проверку DNS пропустить
     let force = !!b.force;
@@ -739,7 +793,8 @@ async function adminApi(req, res, path) {
       return json(res, 200, { ok: true, chat });
     } catch (e) { return json(res, 400, { error: e.message }) }
   }
-  if (path === '/api/server' && M === 'GET') return json(res, 200, { manage: mgr.stateForAdmin(), status: await mgr.server.status(), presets: Object.entries(PRESETS).map(([id, p]) => ({ id, ...p })) });
+  if (path === '/api/proto/soft-end' && M === 'POST') { if (!managed()) return; return done(await mgr.soft.end('кнопкой в админке')) }
+  if (path === '/api/server' && M === 'GET') return json(res, 200, { ips: (netNow || await netLook().catch(() => null))?.ips || [], manage: mgr.stateForAdmin(), status: await mgr.server.status(), presets: Object.entries(PRESETS).map(([id, p]) => ({ id, ...p })) });
   if (path === '/api/server/reload' && M === 'POST') return agentDone(await mgr.server.reload(), 'nginx перечитал настройки');
   if ((mm = /^\/api\/server\/(restart|update|geo|cert)$/.exec(path)) && M === 'POST') return json(res, 200, await mgr.server[mm[1]]());
   if (path === '/api/job' && M === 'GET') return json(res, 200, { job: mgr.server.job(), manage: mgr.stateForAdmin() });
@@ -804,6 +859,7 @@ function subscription(req, res, tok, mode) {
 
 const http = createServer(async (req, res) => {
   try {
+    if (req.url === H3_MARK || req.url.startsWith(H3_MARK + '/') || req.url.startsWith(H3_MARK + '?')) { req.h3 = true; req.url = req.url.slice(H3_MARK.length) || '/'; if (req.url[0] !== '/') req.url = '/' + req.url }
     const url = new URL(req.url, 'http://x'), p = decodeURIComponent(url.pathname);
     let m;
     if ((m = /^\/s\/([A-Za-z0-9_-]{10,40})(?:\/(json|links))?$/.exec(p)) && req.method === 'GET') return subscription(req, res, m[1], m[2] || 'auto');
@@ -814,13 +870,18 @@ const http = createServer(async (req, res) => {
     if (p.startsWith(ADMIN + '/_/')) return staticFile(res, p.slice(ADMIN.length + 3));
     if (p.startsWith(ADMIN + '/api/')) return await adminApi(req, res, p.slice(ADMIN.length));
     if (p === '/healthz') return json(res, 200, { ok: true, xray: xrayOk });
-    // Посторонний на домене VPN видит обычную с виду страницу входа (nginx отдаёт сюда всё, что не сайт). Вход всегда «неверный»
+    // Посторонний на домене VPN видит обычную с виду страницу входа (nginx отдаёт сюда всё, что не сайт). Вход всегда «неверный».
+    // Страница есть только на главной: на всё остальное сайт отвечает 404, как настоящий (раньше любой путь, хоть
+    // /wp-login.php, отдавал страницу входа с кодом 200 — по этому сервер и узнавался). Сюда же приходит HTTP/3 от
+    // маскировки Hysteria2, поэтому ответы и заголовок Server — как у nginx
     if (p === '/api/v1/authenticate' && req.method === 'POST') { req.resume(); return json(res, 401, { success: false, code: 'ERR_INVALID_CREDENTIALS', message: 'Неверный логин или пароль' }); }
     if (req.method === 'GET' || req.method === 'HEAD') {
-      if (/^\/_\/(gate\.(css|js)|manrope-[a-z-]+\.woff2)$/.test(p)) return staticFile(res, p.slice(3));
-      return staticFile(res, 'gate.html');
+      if (/^\/_\/(gate\.(css|js)|(manrope-[a-z-]+|flags|geologica-600)\.woff2)$/.test(p)) return staticFile(res, p.slice(3));
+      if (p === '/' || p === '/index.html') return staticFile(res, 'gate.html');
+      if (p === '/robots.txt') return send(res, 200, 'User-agent: *\nDisallow: /\n', { 'content-type': 'text/plain', 'cache-control': 'public, max-age=86400' });
     }
-    send(res, 404, 'not found');
+    req.resume();
+    send(res, 404, NOT_FOUND, { 'content-type': 'text/html' });
   } catch (e) { log('http', e.message); if (!res.headersSent) json(res, 500, { error: 'Ошибка сервера' }); }
 });
 http.listen(Number(PORT), HOST, async () => {
@@ -829,6 +890,11 @@ http.listen(Number(PORT), HOST, async () => {
   await queueSync({ full: true });
   // таймеры ставим до разбора установки: если он споткнётся, сверка и проверки всё равно пойдут
   setInterval(() => reconcile(), 5 * 60_000);
+  setInterval(() => alerts().catch((e) => log('уведомления:', e.message)), 60_000);
+  setTimeout(() => certLook().catch(() => {}), 90_000); setInterval(() => certLook().catch((e) => log('сертификат:', e.message)), 6 * 3600_000);
+  // мягкий переход на Reality: закончить, когда все активные люди взяли подписку после включения, или вышел срок
+  setInterval(() => { const since = mgr.soft.since(), t = now(); const act = users().filter((u) => userState(u, t) === 'active');
+    mgr.soft.tick(since > 0 && act.length > 0 && act.every((u) => u.last_sub > since)).catch((e) => log('переход на Reality:', e.message)) }, 5 * 60_000);
   await mgr.start().catch(e => log('manage:', e.message));
   agent('ipmove unprobe', 15000).catch(() => {});   // пробная пересылка могла остаться от прерванной проверки
   reconcile();
@@ -842,6 +908,7 @@ http.listen(Number(PORT), HOST, async () => {
   watch.start();
   // Адрес меняли из админки: после перезапуска сообщить итог в Telegram и проверить новый адрес
   const job = addrState().job;
+  if (job?.state !== 'running') setSetting(db, 'next_domain', '');   // смена домена закончилась: будущего адреса больше нет
   if (job && job.state !== 'running' && String(job.at) !== getSetting(db, 'reconf_seen', '')) {
     setSetting(db, 'reconf_seen', String(job.at));
     if (now() - job.at < 3600) {

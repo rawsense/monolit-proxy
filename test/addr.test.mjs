@@ -143,3 +143,26 @@ test('настройки сети правятся сами: рабочий ад
   assert.equal(netsaveDue(st({ manual: 'поправьте сами', stale: ['203.0.113.8'] }), 0, 1000), 'none');
   assert.equal(netsaveDue(null, 0, 1000), 'none');
 });
+
+test('уведомления о тихих сбоях: один раз после порога и один раз, когда прошло', async () => {
+  const { alertPlan } = await import('../server/manage.mjs');
+  const node = { 'node:2': ['нода «Москва» не на связи', 'нода «Москва» снова на связи'] };
+  let r = alertPlan({}, node, 1000);
+  assert.deepEqual(r.tell, []);                                  // только что пропала — ждём
+  r = alertPlan(r.next, node, 1200);
+  assert.deepEqual(r.tell, []);
+  r = alertPlan(r.next, node, 1300);
+  assert.deepEqual(r.tell, ['нода «Москва» не на связи']);       // пять минут нет — пишем
+  r = alertPlan(r.next, node, 5000);
+  assert.deepEqual(r.tell, []);                                  // второй раз о том же не пишем
+  r = alertPlan(r.next, {}, 5060);
+  assert.deepEqual(r.tell, ['нода «Москва» снова на связи']);
+  assert.deepEqual(r.next, {});
+  // моргнула и вернулась раньше порога — тишина
+  r = alertPlan({}, node, 1000); r = alertPlan(r.next, {}, 1060);
+  assert.deepEqual(r.tell, []);
+  // сбой обновления — сразу, без «прошло»
+  r = alertPlan({}, { 'update:77': ['обновление не встало: x', ''] }, 10);
+  assert.deepEqual(r.tell, ['обновление не встало: x']);
+  assert.deepEqual(alertPlan(r.next, {}, 20).tell, []);
+});

@@ -237,6 +237,12 @@ case "$cmd" in
     # продлённый сертификат теперь нужен и nginx: Xray берёт его перезапуском, nginx — перечитыванием настроек
     h=/etc/letsencrypt/renewal-hooks/deploy/monolit-xray.sh
     [ -f "$h" ] && ! grep -q 'reload nginx' "$h" && echo 'systemctl reload nginx' >> "$h"
+    # то же у acme.sh: в установках до 1.7.0 команда после продления перезапускала только Xray
+    ac=~/.acme.sh/${MP_DOMAIN}_ecc/${MP_DOMAIN}.conf
+    if [ -x ~/.acme.sh/acme.sh ] && [ -f "$ac" ] && [ "$MP_CERT" = /etc/monolit/cert/fullchain.pem ]; then
+      rc=$(sed -n "s/^Le_ReloadCmd='\(.*\)'$/\1/p" "$ac"); case "$rc" in __ACME_BASE64__START_*) rc=$(printf %s "$rc" | sed 's/^__ACME_BASE64__START_//; s/__ACME_BASE64__END_$//' | base64 -d 2>/dev/null) ;; esac
+      case "$rc" in *"reload nginx"*) ;; *) ~/.acme.sh/acme.sh --install-cert -d "$MP_DOMAIN" --ecc --fullchain-file "$MP_CERT" --key-file "$MP_KEY" --reloadcmd "systemctl restart xray; systemctl reload nginx" >/dev/null 2>&1 ;; esac
+    fi
     for i in $(seq 1 20); do [ -S /dev/shm/monolit-tls.sock ] && break; sleep 0.2; done
     [ -S /dev/shm/monolit-tls.sock ] || { echo "nginx не открыл сокет для Reality"; fin 1; }
     echo "$out" | tail -n 1; fin 0 ;;
@@ -246,7 +252,11 @@ case "$cmd" in
     case "$a1" in
       on)
         num "$a2" || fin 2
+        # awg on ПОРТ [ВЫХОД|-] [АДРЕС|-]: второе слово — на каком адресе сервера слушать (нет или «-» — на всех)
+        read -r rest bind _ <<<"$rest"; [ "$rest" = - ] && rest=""; [ "${bind:-}" = - ] && bind=""
         [ -z "$rest" ] || [[ "$rest" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || { echo "плохой адрес выхода"; fin 2; }
+        [ -z "${bind:-}" ] || [[ "$bind" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || { echo "плохой адрес"; fin 2; }
+        [ -z "${bind:-}" ] || ip -4 -o addr show 2>/dev/null | grep -q " inet $bind/" || { echo "адреса $bind на сервере нет"; fin 1; }
         [ -f "$SRC/Dockerfile" ] || { echo "нет файлов сборки AmneziaWG: $SRC"; fin 1; }
         tag=$(sed -n 's/^ARG AWG_TAG=//p' "$SRC/Dockerfile" | head -1); [[ "$tag" =~ ^v[0-9.]+$ ]] || { echo "не найдена версия AmneziaWG"; fin 1; }
         img="monolit-awg:$tag-$(cat "$SRC/Dockerfile" "$SRC/start.sh" | sha256sum | cut -c1-8)"
@@ -254,12 +264,12 @@ case "$cmd" in
           docker build -t "$img" "$SRC" > /tmp/monolit-awg-build.log 2>&1 || { tail -n 12 /tmp/monolit-awg-build.log; fin 1; }
         fi
         docker network inspect "$NETN" >/dev/null 2>&1 || docker network create --subnet "$SUB" "$NETN" >/dev/null 2>&1 || { echo "не создалась сеть $NETN ($SUB)"; fin 1; }
-        cur=$(docker inspect monolit-awg --format '{{.Config.Image}} {{range $p, $_ := .HostConfig.PortBindings}}{{$p}}{{end}}' 2>/dev/null)
-        if [ "$cur" != "$img $a2/udp" ]; then
+        cur=$(docker inspect monolit-awg --format '{{.Config.Image}} {{range $p, $b := .HostConfig.PortBindings}}{{$p}}{{range $b}}@{{.HostIp}}{{end}}{{end}}' 2>/dev/null)
+        if [ "$cur" != "$img $a2/udp@${bind:-}" ]; then
           docker rm -f monolit-awg >/dev/null 2>&1
           docker run -d --name monolit-awg --restart unless-stopped --network "$NETN" --cap-add NET_ADMIN --device /dev/net/tun \
             --sysctl net.ipv4.ip_forward=1 --sysctl net.ipv4.conf.all.src_valid_mark=1 \
-            -p "$a2:$a2/udp" -v /run/monolit/awg:/var/run/amneziawg "$img" >/dev/null 2>/tmp/monolit-awg-run.log || { tail -n 4 /tmp/monolit-awg-run.log; fin 1; }
+            -p "${bind:+$bind:}$a2:$a2/udp" -v /run/monolit/awg:/var/run/amneziawg "$img" >/dev/null 2>/tmp/monolit-awg-run.log || { tail -n 4 /tmp/monolit-awg-run.log; fin 1; }
         else
           docker update --restart unless-stopped monolit-awg >/dev/null 2>&1; docker start monolit-awg >/dev/null 2>&1
         fi

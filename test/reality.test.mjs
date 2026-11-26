@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { realityGroups, realitySite, SOCK_TLS, scan } from '../server/nginx.mjs';
-import { Xray } from '../server/xray.mjs';
+import { Xray, OLD_TAG, OLD_SOCK } from '../server/xray.mjs';
 import { openDb, setSetting, getSetting } from '../server/db.mjs';
 import { createExits } from '../server/exits.mjs';
 import { createNodes } from '../server/nodes.mjs';
@@ -85,8 +85,27 @@ test('переключатель: Vision → Reality → Vision, вход воз
   assert.deepEqual(asked.filter((c) => !c.startsWith('journal')), ['tlssite', 'xray-test config.monolit-candidate.json', 'xray-restart']);   // сначала сайт nginx, потом Xray
   const keys = JSON.parse(getSetting(m.db, 'reality_keys'));
   let vi = m.read().inbounds[0];
-  assert.deepEqual(vi.streamSettings, { network: 'raw', security: 'reality', realitySettings: { dest: SOCK_TLS, xver: 1, serverNames: ['vpn.example.ru'], privateKey: keys.priv, shortIds: [keys.sid] } });
+  // мягкий переход: неделю Reality отдаёт «не своих» прежнему Vision на внутреннем сокете — старые ключи работают
+  assert.deepEqual(vi.streamSettings, { network: 'raw', security: 'reality', realitySettings: { dest: OLD_SOCK, xver: 1, serverNames: ['vpn.example.ru'], privateKey: keys.priv, shortIds: [keys.sid] } });
   assert.equal(vi.settings.fallbacks, undefined);
+  let old = m.read().inbounds.find((i) => i.tag === OLD_TAG);
+  assert.equal(old.listen, OLD_SOCK + ',0666');
+  assert.deepEqual(old.streamSettings, { ...was.streamSettings, rawSettings: { acceptProxyProtocol: true } });   // тот же сертификат, адрес посетителя — строкой PROXY
+  assert.deepEqual(old.settings.fallbacks, was.settings.fallbacks);                                               // сайт и XHTTP идут в nginx как раньше
+  assert.deepEqual(old.settings.clients.map((c) => c.email), ['mp-1']);                                           // старый ключ человека принят
+  assert.ok(m.mgr.stateForAdmin().proto.reality_soft > Date.now() / 1000 + 6 * 86400);
+  assert.equal(m.xray.detect().vision.tag, 'vsRAWtlsVISION');   // переходный вход основным не считается
+  assert.equal(m.xray.detect().visionOld, true);
+  // не все обновили подписку — переход продолжается; все обновили — заканчивается сам
+  await m.mgr.soft.tick(false);
+  assert.equal(m.read().inbounds.some((i) => i.tag === OLD_TAG), true);
+  await m.mgr.soft.tick(true);
+  for (let i = 0; i < 100 && m.mgr.server.job().running; i++) await new Promise((x) => setTimeout(x, 50));
+  vi = m.read().inbounds[0];
+  assert.equal(vi.streamSettings.realitySettings.dest, SOCK_TLS);   // посторонним снова отвечает nginx
+  assert.equal(m.read().inbounds.some((i) => i.tag === OLD_TAG), false);
+  assert.equal(m.mgr.stateForAdmin().proto.reality_soft, 0);
+  assert.equal(m.xray.detect().visionOld, false);
   assert.deepEqual(vi.settings.clients.map((c) => [c.email, c.flow]), [['mp-1', 'xtls-rprx-vision']]);
   assert.equal(vi.tag, 'vsRAWtlsVISION');
   assert.deepEqual(m.mgr.reality(), { pub: keys.pub, sid: keys.sid });
@@ -243,4 +262,68 @@ test('запуск после перевода адреса кнопкой: ус
   assert.equal(again.stateForAdmin().proto.hy2, false);        // выключенное осталось выключенным
   assert.equal(getSetting(m.db, 'pre_reconf', ''), '');        // снимок использован или выброшен, не лежит до следующего раза
   delete process.env.MP_APPLY_SIG;
+});
+
+test('обновление: Hysteria2 без маскировки получает её при сборке конфига, заданную не трогаем', async () => {
+  const m = await manager('bare');
+  await m.wait(await m.mgr.proto.set({ socks: { on: true, port: 18080, user: 'usr', pass: 'password1' } }));   // любая правка пересобирает конфиг
+  const hy = m.read().inbounds.find((i) => i.tag === 'Hysteria2');
+  assert.deepEqual(hy.streamSettings.hysteriaSettings?.masquerade, undefined);   // у тестового входа нет hysteriaSettings: чужое описание не дополняем
+  const m2 = await manager('bare');
+  const c = m2.read(); c.inbounds[1].streamSettings.hysteriaSettings = { version: 2 };
+  writeFileSync(m2.cfgFile, JSON.stringify(c, null, 2));
+  await m2.wait(await m2.mgr.proto.set({ socks: { on: true, port: 18080, user: 'usr', pass: 'password1' } }));
+  assert.deepEqual(m2.read().inbounds.find((i) => i.tag === 'Hysteria2').streamSettings.hysteriaSettings, { version: 2, masquerade: { type: 'proxy', url: 'http://127.0.0.1:7380/_h3', rewriteHost: false } });
+  // свою прежнюю маскировку (без пометки /_h3) обновляем, чужую — нет
+  for (const [url, want] of [['http://127.0.0.1:7380', 'http://127.0.0.1:7380/_h3'], ['https://example.com', 'https://example.com']]) {
+    const m3 = await manager('bare');
+    const c3 = m3.read(); c3.inbounds[1].streamSettings.hysteriaSettings = { version: 2, masquerade: { type: 'proxy', url, rewriteHost: false } };
+    writeFileSync(m3.cfgFile, JSON.stringify(c3, null, 2));
+    await m3.wait(await m3.mgr.proto.set({ socks: { on: true, port: 18080, user: 'usr', pass: 'password1' } }));
+    assert.equal(m3.read().inbounds.find((i) => i.tag === 'Hysteria2').streamSettings.hysteriaSettings.masquerade.url, want);
+  }
+});
+
+test('смена домена: нода четвёртой версии получает адрес сервера и будущий адрес, старая — прежнюю строку', async () => {
+  const { createHash } = await import('node:crypto');
+  const db = openDb(join(mkdtempSync(join(tmpdir(), 'mp-nu-')), 'm.db'));
+  const { nodes } = nodesWith(db, null);
+  const key = 'k'.repeat(24), t = Math.floor(Date.now() / 1000);
+  db.prepare("INSERT INTO nodes (name, addr, key_hash, priv, pub, sid, link_uuid, created_at, seen_at) VALUES ('msk', '203.0.113.50', ?, 'p', 'NPUB', 'nsid', '22222222-2222-4222-8222-222222222222', 1, ?)").run(createHash('sha256').update(key).digest('hex'), t - 20);
+  const id = db.prepare('SELECT id FROM nodes').get().id;
+  const sync = async (body) => {
+    let out = '';
+    await nodes.http({ method: 'POST', headers: { 'x-node-key': `${id}.${key}` } }, {}, 'sync',
+      { send: (res, code, text) => { out = text }, readRaw: async () => JSON.stringify(body), ipOf: () => '203.0.113.50', changed: () => {} });
+    return out.split('\n')[0].split(' ');
+  };
+  let h = await sync({ v: 4, url: 'https://vpn.example.ru/s/_n', sig: '-' });
+  assert.equal(h.length, 5);
+  assert.deepEqual(h.slice(3), ['https://vpn.example.ru/s/_n', '-']);          // переезда нет
+  assert.equal((await sync({ v: 3, sig: '-' })).length, 3);                      // прежний агент: строка прежняя
+  // домен меняют: будущий адрес уходит ноде; «все узнали» — только когда отчёт пришёл после объявления и агент новый
+  setSetting(db, 'next_domain', 'new.example.ru');
+  const since = Math.floor(Date.now() / 1000);
+  db.prepare('UPDATE nodes SET seen_at = ?').run(since - 5);
+  assert.equal(nodes.announced(since), false);
+  h = await sync({ v: 4, url: 'https://vpn.example.ru/s/_n', sig: '-' });
+  assert.deepEqual(h.slice(3), ['https://vpn.example.ru/s/_n', 'https://new.example.ru/s/_n']);
+  assert.equal(nodes.announced(since), true);
+  await sync({ v: 3, sig: '-' });
+  assert.equal(nodes.announced(since), false);                                   // старый агент будущего адреса не понял
+  // нода не на связи переезду не мешает: ждать её незачем
+  db.prepare('UPDATE nodes SET seen_at = ?').run(since - 1000);
+  assert.equal(nodes.announced(since), true);
+  setSetting(db, 'next_domain', 'vpn.example.ru');                               // тот же домен — не переезд
+  assert.equal((await sync({ v: 4, sig: '-' }))[4], '-');
+});
+
+test('агент ноды: адрес сервера принимается только вида https://домен/s/_n', () => {
+  const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../server/node-agent.sh'), 'utf8');
+  const fn = src.split('\n').find((l) => l.startsWith('okurl() {'));
+  assert.ok(fn);
+  const ok = (u) => spawnSync('bash', ['-c', `${fn}\nokurl "$1"`, 'x', u], { timeout: 10000 }).status === 0;
+  assert.equal(ok('https://new.example.ru/s/_n'), true);
+  for (const bad of ['http://new.example.ru/s/_n', 'https://new.example.ru/s/_n/x', 'https://new.example.ru/s/_n;id', 'https://a b/s/_n', 'https://$(id)/s/_n', '-', '', 'https://new.example.ru|x/s/_n'])
+    assert.equal(ok(bad), false, bad);
 });

@@ -7,6 +7,14 @@ import { join } from 'node:path';
 
 export const EMAIL = id => `mp-${id}`;
 export const MAIN_TAG = 'vsRAWtlsVISION';   // основной вход, как его называет установка (и autoXRAY); чужой вход Reality своим не считаем
+// Переходный вход (мягкий переход на Reality): прежний Vision с сертификатом, но на внутреннем сокете. Reality отдаёт
+// ему всех, кто пришёл не как клиент Reality: и посторонних, и приложения со старой подпиской
+export const OLD_TAG = 'mp-vision-old', OLD_SOCK = '/dev/shm/monolit-old.sock';
+// Маскировка Hysteria2: кто пришёл на UDP 443 не как клиент, получает по HTTP/3 тот же сайт, что и на TCP 443.
+// Без неё Xray отвечал своей заглушкой «404 page not found» — готовая примета Hysteria2. Запрос приходит в админку
+// мимо nginx, поэтому с пометкой /_h3 в начале пути: по ней админка не верит заголовку X-Real-IP (main.mjs)
+export const H3_MARK = '/_h3';
+export const hyMasq = (port) => ({ type: 'proxy', url: `http://127.0.0.1:${port}${H3_MARK}`, rewriteHost: false });
 // mp-N — люди, mpn-N — ноды (ходят сюда за людей, пришедших по мосту)
 // mp-N-x<выход><d|b> — тот же человек на подключении с выходом через прокси (exits.mjs), mpn-N-x… — нода с такими людьми
 const isOurs = c => typeof c?.email === 'string' && /^mpn?-\d+(-x\d+[db])?$/.test(c.email);
@@ -19,7 +27,9 @@ export class Xray {
   // Какие входы есть и как к ним подключаться
   detect(cfg = this.read()) {
     const out = { vision: null, hy2: null, xhttp: null, api: !!cfg.api?.listen || !!cfg.api?.tag, stats: !!cfg.stats };
+    out.visionOld = (cfg.inbounds || []).some(i => i.tag === OLD_TAG);   // идёт мягкий переход на Reality
     for (const i of cfg.inbounds || []) {
+      if (i.tag === OLD_TAG) continue;   // переходный вход — не «основной вход Vision»
       const ss = i.streamSettings || {};
       // основной вход: Vision с сертификатом в самом Xray или Reality (тогда сертификат отдаёт nginx) — для людей это одно подключение
       if (i.protocol === 'vless' && (ss.network === 'raw' || ss.network === 'tcp' || !ss.network) && (ss.security === 'tls' || (ss.security === 'reality' && i.tag === MAIN_TAG)) && !out.vision)
@@ -56,6 +66,9 @@ export class Xray {
       const ib = cfg.inbounds.find(i => i.tag === tag);
       ib.settings ||= {}; ib.settings.clients ||= [];
       ib.settings.clients = ib.settings.clients.filter(c => !isOurs(c)).concat(this.withKeys(users).map(u => Xray.clientsFor(u, k)), k === 'vision' && this.linkClients ? this.linkClients() : []);
+      // переходный вход принимает тех же людей и те же ноды, что основной
+      const old = k === 'vision' && cfg.inbounds.find(i => i.tag === OLD_TAG);
+      if (old) { old.settings ||= {}; old.settings.clients = structuredClone(ib.settings.clients) }
     }
     return this.extra ? this.extra(cfg) : cfg;   // выходы через прокси (exits.mjs)
   }
@@ -138,6 +151,8 @@ export class Xray {
     const d = this.detect(), out = [], emails = [...(keep ? [] : [EMAIL(id)]), ...this.staleKeys({ id }, keep || [])];
     if (!emails.length) return '';
     for (const k of kinds) if (d[k]) out.push(await this.run(['api', 'rmu', `--server=${this.api}`, `-tag=${d[k].tag}`, ...emails]).catch(e => e.message));
+    // человека сняли — он не должен остаться в переходном входе до ближайшего перезапуска
+    if (kinds.includes('vision') && d.visionOld) out.push(await this.run(['api', 'rmu', `--server=${this.api}`, `-tag=${OLD_TAG}`, ...emails]).catch(e => e.message));
     return out.join('\n');
   }
 

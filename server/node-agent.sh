@@ -43,7 +43,7 @@ page() {
   command -v python3 >/dev/null || return 0
   mkdir -p "$LIB/www"
   [ -s "$LIB/www/index.html" ] || curl -fsS -m 20 "$MN_URL/page.html" -o "$LIB/www/index.html" || return 0
-  if [ ! -s "$LIB/mirror.py" ] || ! grep -qs mirror.py "$u"; then
+  if [ ! -s "$LIB/mirror.py" ] || ! grep -qsF "mirror.py ${MN_URL%/s/_n} " "$u"; then
     curl -fsS -m 20 "$MN_URL/mirror.py" -o "$DIR/mirror.new" && python3 -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$DIR/mirror.new" 2>/dev/null || return 0
     install -m 644 "$DIR/mirror.new" "$LIB/mirror.py"
     cat > "$u" <<UNIT
@@ -93,6 +93,20 @@ selfupdate() {
   install -m 755 "$DIR/agent.new" "$LIB/agent.sh" && exec "$LIB/agent.sh"
 }
 
+# Адрес основного сервера может смениться (другой домен). Основной сервер заранее называет будущий адрес, агент помнит
+# его как запасной: прежний перестал отвечать, а запасной отвечает — он становится основным. Без этого после смены
+# домена нода оставалась на прежнем адресе без связи, пока на ней не запустят команду установки заново
+ALT=$(cat "$DIR/url.alt" 2>/dev/null)
+okurl() { case "$1" in https://*/s/_n) case "${1#https://}" in *[!a-z0-9./_-]*) return 1 ;; esac; return 0 ;; esac; return 1; }
+set_url() {
+  okurl "$1" || return 1
+  sed -i "s|^MN_URL=.*|MN_URL=$1|" /etc/monolit-node.env || return 1
+  MN_URL=$1
+  [ "$ALT" = "$1" ] && { ALT=""; rm -f "$DIR/url.alt"; }
+  return 0
+}
+sync_to() { printf %s "$BODY" | curl -fsS -m 25 -X POST -H "x-node-key: $MN_KEY" -H 'content-type: application/json' --data-binary @- "$1/sync" -o "$DIR/resp" 2>"$DIR/curl.err"; }
+
 DOM=$(cat "$DIR/domain" 2>/dev/null || echo -)
 while true; do
   SIG=$(cat "$DIR/sig" 2>/dev/null || echo -)
@@ -111,10 +125,19 @@ while true; do
   ACTIVE=$(systemctl is-active xray 2>/dev/null)
   CERT=""
   if [ "$DOM" != "-" ]; then cert "$DOM" && { CERT=$DOM; page; }; fi
-  BODY="{\"v\":3,\"mirror\":$MIRROR,\"sig\":\"$SIG\",\"xray\":\"$VER\",\"load\":\"$LOAD\",\"active\":\"$ACTIVE\",\"err\":\"$(printf %s "$ERR" | base64 -w0)\",\"cert\":\"$CERT\",\"cert_err\":\"$(printf %s "$CERR" | base64 -w0)\",\"stats\":[$STATS],\"ips\":{$IPS}}"
-  if printf %s "$BODY" | curl -fsS -m 25 -X POST -H "x-node-key: $MN_KEY" -H 'content-type: application/json' --data-binary @- "$MN_URL/sync" -o "$DIR/resp" 2>"$DIR/curl.err"; then
+  BODY="{\"v\":4,\"url\":\"$MN_URL\",\"mirror\":$MIRROR,\"sig\":\"$SIG\",\"xray\":\"$VER\",\"load\":\"$LOAD\",\"active\":\"$ACTIVE\",\"err\":\"$(printf %s "$ERR" | base64 -w0)\",\"cert\":\"$CERT\",\"cert_err\":\"$(printf %s "$CERR" | base64 -w0)\",\"stats\":[$STATS],\"ips\":{$IPS}}"
+  USED=""
+  if sync_to "$MN_URL"; then USED=$MN_URL
+  elif [ -n "$ALT" ] && okurl "$ALT" && sync_to "$ALT"; then USED=$ALT; fi
+  if [ -n "$USED" ]; then
     : > "$DIR/spool"
-    read -r NEW NDOM ASIG < <(head -n 1 "$DIR/resp" | tr -d '\r')
+    read -r NEW NDOM ASIG CUR NEXT _ < <(head -n 1 "$DIR/resp" | tr -d '\r')
+    # прежний адрес не ответил, запасной ответил: основной сервер переехал
+    [ "$USED" != "$MN_URL" ] && set_url "$USED"
+    # сервер называет себя иначе, чем мы к нему ходим (домен сменили, прежний оставили запасным): перейти, если новый отвечает
+    if okurl "${CUR:-}" && [ "$CUR" != "$MN_URL" ] && curl -fsS -m 10 -o /dev/null "$CUR/page.html"; then set_url "$CUR"; fi
+    # будущий адрес (домен меняют прямо сейчас) — запомнить запасным
+    if okurl "${NEXT:-}" && [ "$NEXT" != "$MN_URL" ] && [ "$NEXT" != "$ALT" ]; then ALT=$NEXT; echo "$ALT" > "$DIR/url.alt"; fi
     case "${NDOM:--}" in *[!a-z0-9.-]*) NDOM=- ;; esac
     if [ "${NDOM:--}" != "$DOM" ]; then DOM=${NDOM:--}; echo "$DOM" > "$DIR/domain"; CTRY=0; CERR=""; fi
     if [ -n "$NEW" ] && [ "$NEW" != "$SIG" ] && [ "$(wc -c < "$DIR/resp")" -gt 60 ]; then

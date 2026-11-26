@@ -262,7 +262,7 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
     for (const [email, v] of Object.entries(b.ips || {})) { const m = /^mp-(\d+)(?:-\d+)?$/.exec(email); if (m) Object.assign(ips[m[1]] ||= {}, v?.ips || {}) }
     online.set(n.id, { at: t, ips });
     const un = (v) => v ? Buffer.from(String(v), 'base64').toString('utf8').slice(0, 400) : '';
-    db.prepare('UPDATE nodes SET seen_at = ?, info = ? WHERE id = ?').run(t, JSON.stringify({ xray: String(b.xray || '').slice(0, 20), load: String(b.load || '').slice(0, 8), active: b.active === 'active', err: un(b.err), cert: cleanHost(b.cert), cert_err: un(b.cert_err), v: Number(b.v) || 1, mirror: Number(b.mirror) === 1 }), n.id);
+    db.prepare('UPDATE nodes SET seen_at = ?, info = ? WHERE id = ?').run(t, JSON.stringify({ xray: String(b.xray || '').slice(0, 20), load: String(b.load || '').slice(0, 8), active: b.active === 'active', err: un(b.err), cert: cleanHost(b.cert), cert_err: un(b.cert_err), v: Number(b.v) || 1, mirror: Number(b.mirror) === 1, url: String(b.url || '').slice(0, 200) }), n.id);
   }
   // Кто сейчас подключён через ноды: добавляется к тем, кого видит Xray этого сервера
   function onlineMap() {
@@ -274,6 +274,10 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
   // ---------- что отдаём ноде ----------
   const script = (f) => readFileSync(new URL(f, import.meta.url), 'utf8');
   const base = () => `https://${server().domain}/s/_n`;
+  // Домен меняют: нодам заранее отдаём будущий адрес, иначе после смены они остались бы на прежнем без связи
+  const nextBase = () => { const d = cleanHost(getSetting(db, 'next_domain', '')); return d && d !== server().domain ? `https://${d}/s/_n` : '' };
+  // Все ноды, что на связи, уже получили будущий адрес? (отчёт пришёл после объявления)
+  const announced = (since) => all().filter((n) => joined(n) && now() - n.seen_at < SEEN).every((n) => n.seen_at >= since && (J(n.info, {}).v || 1) >= 4);
   const command = (tok) => `bash <(curl -fsSL ${base()}/install.sh) --join ${tok}`;
   async function http(req, res, sub, h) {
     const text = (code, body) => h.send(res, code, body, { 'content-type': 'text/plain; charset=utf-8' });
@@ -298,8 +302,10 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
       if (ip && ip !== n.addr) { db.prepare('UPDATE nodes SET addr = ? WHERE id = ?').run(ip, n.id); log(`нода «${n.name}»: адрес сменился на ${ip}`) }
       report(n, b);
       const cur = byId(n.id), cfg = JSON.stringify(nodeConfig(cur), null, 2), sig = sha(cfg).slice(0, 16);
-      // агент второй версии получает в первой строке ещё домен (для сертификата) и подпись свежего агента (обновится сам)
-      const head = b.v >= 2 ? `${sig} ${cur.domain || '-'} ${sha(script('./node-agent.sh')).slice(0, 16)}` : sig;
+      // агент второй версии получает в первой строке ещё домен (для сертификата) и подпись свежего агента (обновится сам),
+      // четвёртой — адрес этого сервера и адрес, на который он переезжает (смена домена): нода перейдёт сама
+      const head = b.v >= 4 ? `${sig} ${cur.domain || '-'} ${sha(script('./node-agent.sh')).slice(0, 16)} ${base()} ${nextBase() || '-'}`
+        : b.v >= 2 ? `${sig} ${cur.domain || '-'} ${sha(script('./node-agent.sh')).slice(0, 16)}` : sig;
       return text(200, sig === b.sig ? head : `${head}\n${cfg}`);
     }
     return text(404, 'not found');
@@ -423,5 +429,5 @@ export function createNodes({ db, xray, log, dayOf, server, users, awg, exits })
     return bad('Нет такого действия', 404);
   }
 
-  return { kindsOn, linkClients, exitGroups, userKeys, ensureLinks, render, links, linkList, onlineMap, http, api, state, kitOf, defKit, pickKit, nodeConfig, usable, wantsAwg, mirrors };
+  return { kindsOn, linkClients, exitGroups, userKeys, ensureLinks, render, links, linkList, onlineMap, http, api, state, kitOf, defKit, pickKit, nodeConfig, usable, wantsAwg, mirrors, announced, all: () => all().map((n) => ({ ...n, info: J(n.info, {}) })), joined };
 }

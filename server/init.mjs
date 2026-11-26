@@ -12,6 +12,7 @@
 import { writeFileSync, readFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { register } from './warp.mjs';
+import { hyMasq } from './xray.mjs';
 import { scan, toSockets, toIp, realIp, includeIn, has80, fromSockets, fromIp, excludeFrom, realitySite, realityGroups, SOCK_H1, SOCK_H2 } from './nginx.mjs';
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -112,7 +113,7 @@ const inbounds = [
     settings: { version: 2, clients: [] },
     streamSettings: { network: 'hysteria', security: 'tls',
       tlsSettings: { serverName: domain, alpn: ['h3'], certificates: certs.map((c) => ({ usage: 'encipherment', ...c })) },
-      hysteriaSettings: { version: 2 }, finalmask: { quicParams: { congestion: 'bbr' } } },
+      hysteriaSettings: { version: 2, masquerade: hyMasq(port) }, finalmask: { quicParams: { congestion: 'bbr' } } },
     sniffing: sniff },
 ];
 if (xhttpPort && xhttpPath) inbounds.push({ tag: 'vsXHTTPtls', listen: '127.0.0.1', port: xhttpPort, protocol: 'vless',

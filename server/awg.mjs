@@ -98,14 +98,18 @@ export function createAwg({ db, log, agent, domain, outIp, onReady }) {
 
   // Запуск один: включение из админки и сверка, пришедшая следом, ждут один и тот же вызов помощника
   // (два одновременных «awg on» мешали друг другу создавать сеть контейнера)
+  const key = (c) => `${c.port}|${outIp()}|${c.ip || ''}`;
+  // Куда подключаются приложения: выбранный адрес сервера цифрами, иначе домен (он смотрит на адрес VPN)
+  const host = (c = conf()) => c.ip || domain();
   let pending = null;
   function start(c) {
     if (pending) return pending;
     state = 'starting'; error = '';
     pending = (async () => {
-      const r = await agent(`awg on ${c.port}${outIp() ? ' ' + outIp() : ''}`, 15 * 60_000);   // первая сборка образа — несколько минут
+      // awg on ПОРТ ВЫХОД|- АДРЕС|-: адрес — на каком адресе сервера принимать подключения («-» — на всех)
+      const r = await agent(`awg on ${c.port} ${outIp() || '-'} ${c.ip || '-'}`, 15 * 60_000);   // первая сборка образа — несколько минут
       if (r.code !== 0) { state = 'error'; error = r.out.split('\n').slice(-3).join(' ') || 'AmneziaWG не запустился'; log('awg:', error); return false }
-      started = `${c.port}|${outIp()}`; state = 'on'; return true;
+      started = key(c); state = 'on'; return true;
     })().finally(() => { pending = null });
     return pending;
   }
@@ -117,7 +121,7 @@ export function createAwg({ db, log, agent, domain, outIp, onReady }) {
     if (state === 'error' && !full) return none;   // неудачный запуск повторяем раз в 10 минут, а не каждую минуту
     busy = true;
     try {
-      if (state !== 'on' || (full && started !== `${c.port}|${outIp()}`)) { if (!await start(c)) return none }
+      if (state !== 'on' || (full && started !== key(c))) { if (!await start(c)) return none }
       let got;
       try { got = parseGet(await uapi('get=1')) }
       catch (e) { if (!await start(c)) return none; got = parseGet(await uapi('get=1')) }
@@ -156,7 +160,7 @@ export function createAwg({ db, log, agent, domain, outIp, onReady }) {
     const c = conf(), ip = userIp(u0.id);
     if (!c.on || !c.priv || !ip) return null;
     const u = ensureUser(u0);
-    return { ip, priv: u.awg_priv, psk: u.awg_psk, server: c.pub, endpoint: `${domain()}:${c.port}`, params: clientParams(c) };
+    return { ip, priv: u.awg_priv, psk: u.awg_psk, server: c.pub, endpoint: `${host(c)}:${c.port}`, params: clientParams(c) };
   }
   // Выход Xray для клиента monolit: подключение wireguard с параметрами маскировки в settings.awg
   function outbound(u) {
@@ -177,18 +181,29 @@ export function createAwg({ db, log, agent, domain, outIp, onReady }) {
   function vpnLink(u, name) {
     const k = client(u); if (!k) return '';
     const c = conf(), text = confText(u, name);
-    const last = { config: text, hostName: domain(), port: c.port, client_priv_key: k.priv, client_ip: `${k.ip}/32`, psk_key: k.psk, server_pub_key: k.server,
+    const last = { config: text, hostName: host(c), port: c.port, client_priv_key: k.priv, client_ip: `${k.ip}/32`, psk_key: k.psk, server_pub_key: k.server,
       mtu: String(MTU), persistent_keep_alive: '25', allowed_ips: ['0.0.0.0/0'], ...k.params };
     const json = Buffer.from(JSON.stringify({
       containers: [{ container: 'amnezia-awg', awg: { last_config: JSON.stringify(last, null, 4), isThirdPartyConfig: true, port: String(c.port), transport_proto: 'udp' } }],
-      defaultContainer: 'amnezia-awg', description: String(name || '').replace(/[\r\n]/g, ' '), dns1: '1.1.1.1', dns2: '8.8.8.8', hostName: domain(),
+      defaultContainer: 'amnezia-awg', description: String(name || '').replace(/[\r\n]/g, ' '), dns1: '1.1.1.1', dns2: '8.8.8.8', hostName: host(c),
     }));
     const len = Buffer.alloc(4); len.writeUInt32BE(json.length);
     return 'vpn://' + Buffer.concat([len, deflateSync(json, { level: 8 })]).toString('base64url');
   }
 
-  async function set({ on, port }) {
+  async function set({ on, port, ip }) {
     let c = conf();
+    // Адрес: AmneziaWG по умолчанию слушает на всех адресах сервера, включая адрес входа Xray. Его можно увести на
+    // другой адрес, чтобы заметный UDP-трафик не шёл на адрес основного входа
+    if (ip !== undefined) {
+      ip = String(ip || '').trim();
+      if (ip && !/^(\d{1,3}\.){3}\d{1,3}$/.test(ip)) return { error: 'Выберите адрес из списка' };
+      if (ip !== (c.ip || '')) {
+        c = { ...c, ip }; save(c);
+        if (c.on) { state = 'starting'; error = ''; start(c).then((ok) => { if (ok) onReady?.() }).catch((e) => { state = 'error'; error = e.message }) }
+      }
+      if (on === undefined) return { ok: true };
+    }
     if (on) {
       const p = Number(port) || c.port || randomInt(40000, 60000);   // порт не спрашиваем: случайный, один раз
       if (!(p >= 1024 && p <= 65535)) return { error: 'Порт от 1024 до 65535' };
@@ -207,7 +222,7 @@ export function createAwg({ db, log, agent, domain, outIp, onReady }) {
     return r.code === 0 ? { ok: true } : { error: r.out || 'Не получилось остановить AmneziaWG' };
   }
 
-  const stateForAdmin = () => { const c = conf(); return { on: !!c.on, port: c.port || 0, state: c.on ? state : 'off', error } };
+  const stateForAdmin = () => { const c = conf(); return { on: !!c.on, port: c.port || 0, ip: c.ip || '', state: c.on ? state : 'off', error } };
   if (conf().on) state = 'starting';
   return { ready, sync, set, outbound, confText, vpnLink, dropKeys, stateForAdmin, conf };
 }

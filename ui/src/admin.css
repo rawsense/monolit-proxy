@@ -203,6 +203,8 @@ button.alist-row { width: 100%; border: 0; background: none; font: inherit; colo
 .mp-presets { flex-wrap: wrap; gap: var(--sp-2) }
 .mp-socks-f { display: grid; grid-template-columns: 96px minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-3) }
 @media (max-width: 520px) { .mp-socks-f { grid-template-columns: minmax(0, 1fr) } }
+/* то, что относится к переключателю выше, начинается от его текста, а не от самого переключателя */
+#mp-pr-soft, #mp-pr-awg-ip-f { margin-left: calc(36px + var(--sp-2)) }
 .mp-log pre { max-height: 60vh; overflow: auto; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere }
 .mp-hist-acts { flex-wrap: wrap; gap: var(--sp-1); margin-top: var(--sp-2) }
 .btn.mp-danger { color: var(--danger) }

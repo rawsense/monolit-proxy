@@ -7,6 +7,8 @@ import { dirname, join, basename } from 'node:path';
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { now, getSetting, setSetting } from './db.mjs';
 import { SOCK_TLS } from './nginx.mjs';
+import { hyMasq, OLD_TAG, OLD_SOCK } from './xray.mjs';
+const HY2_TAG = 'Hysteria2';   // свой вход Hysteria2, как его называет установка
 import * as warpApi from './warp.mjs';
 
 const SOCK = process.env.MP_AGENT_SOCK || '/run/monolit/agent.sock';
@@ -141,6 +143,8 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
   // Имена, под которыми отвечает сайт Reality: домен и запасные домены, у которых есть сертификат
   const realityNames = () => [getSetting(db, 'domain'), ...String(process.env.MP_ALT || '').replace(/^"|"$/g, '').split(/[,;]/).map((x) => x.split(/[:|]/)).filter(([d, c, k]) => d && c && k).map(([d]) => d)]
     .filter((d, i, a) => d && a.indexOf(d) === i);
+  // Идёт ли мягкий переход на Reality: включён, срок не вышел, прежний вид входа известен
+  const softOn = (s) => !!s.reality && !!s.stash?.tls && Number(getSetting(db, 'reality_soft_until', '0')) > now();
   // Вид основного входа Vision, который надо вернуть при выключении Reality
   const tlsOf = (cfg, d = xray.detect(cfg)) => { const i = d.vision && !d.vision.reality && cfg.inbounds.find((x) => x.tag === d.vision.tag); return i ? { streamSettings: structuredClone(i.streamSettings), fallbacks: structuredClone(i.settings?.fallbacks || []) } : null };
 
@@ -155,6 +159,10 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
       if (!s.proto[k] && tag) cfg.inbounds = cfg.inbounds.filter((i) => i.tag !== tag);
       if (s.proto[k] && !tag && s.stash[k]) cfg.inbounds.push(structuredClone(s.stash[k]));
     }
+    // Hysteria2 без маскировки (установки до 1.10): дописать, и в сохранённое описание выключенного входа тоже
+    const adminPort = Number(String(process.env.MP_LISTEN || '').split(':').pop()) || 7380;
+    for (const i of cfg.inbounds) if (i.protocol === 'hysteria' && i.tag === HY2_TAG && i.streamSettings?.hysteriaSettings && (!i.streamSettings.hysteriaSettings.masquerade?.type || ownMasq(i.streamSettings.hysteriaSettings.masquerade)))
+      i.streamSettings.hysteriaSettings.masquerade = hyMasq(adminPort);
     // Основной вход: Vision (TLS принимает Xray) или Reality (TLS принимает nginx, Xray узнаёт своих по ключу)
     const vi = d.vision && cfg.inbounds.find((i) => i.tag === d.vision.tag);
     if (vi && REALITY_MODES.includes(MODE)) {
@@ -166,6 +174,16 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
         vi.streamSettings = structuredClone(s.stash.tls.streamSettings);
         vi.settings = { ...vi.settings, fallbacks: structuredClone(s.stash.tls.fallbacks) };
       }
+      // Мягкий переход: пока приложения не обновили подписку, Reality отдаёт всех «не своих» прежнему Vision на
+      // внутреннем сокете — старые ключи продолжают работать. Цена: посторонним в это время отвечает TLS Xray, а не
+      // nginx, поэтому переход сам заканчивается (softDone), и dest становится сокетом nginx
+      cfg.inbounds = cfg.inbounds.filter((i) => i.tag !== OLD_TAG);
+      const soft = softOn(s), rs = vi.streamSettings?.realitySettings;
+      if (rs) rs.dest = soft ? OLD_SOCK : SOCK_TLS;
+      if (rs && soft) cfg.inbounds.push({ tag: OLD_TAG, listen: OLD_SOCK + ',0666', protocol: 'vless',
+        settings: { clients: [], decryption: 'none', fallbacks: structuredClone(s.stash.tls.fallbacks) },
+        streamSettings: { ...structuredClone(s.stash.tls.streamSettings), rawSettings: { acceptProxyProtocol: true } },
+        ...(vi.sniffing ? { sniffing: structuredClone(vi.sniffing) } : {}) });
     }
     // SOCKS5
     cfg.inbounds = cfg.inbounds.filter((i) => !isSocks(i) && i.tag !== 'mp-probe');
@@ -282,7 +300,7 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
       routes: s.routes, targets: TARGETS,
       warp: { on: s.warp, registered: !!s.warp_out, plus: !!s.warp_reg, account: s.warp_acc || 'free' },
       proto: { vision: true, hy2: s.proto.hy2, xhttp: s.proto.xhttp, hy2_known: !!(s.proto.hy2 || s.stash.hy2), xhttp_known: !!(s.proto.xhttp || s.stash.xhttp),
-        reality: s.reality, reality_can: REALITY_MODES.includes(MODE) },
+        reality: s.reality, reality_can: REALITY_MODES.includes(MODE), reality_soft: softOn(s) ? Number(getSetting(db, 'reality_soft_until', '0')) : 0 },
       out_ip: s.out_ip || '',
       socks: { on: s.socks.on, port: s.socks.port, user: s.socks.user, pass: s.socks.pass },
       mtg: process.env.MP_MTG_PORT ? { port: Number(process.env.MP_MTG_PORT), link: `tg://proxy?server=${getSetting(db, 'domain')}&port=${process.env.MP_MTG_PORT}&secret=${process.env.MP_MTG_SECRET || ''}` } : null,
@@ -377,7 +395,13 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
         } else if (!s.stash.tls) return { ok: false, error: 'Не помню, каким был вход Vision: верните его переустановкой' };
       }
       const reality = b.reality !== undefined ? !!b.reality : s.reality;
-      const r = await apply(reality !== s.reality ? (reality ? 'Основной вход: Reality' : 'Основной вход: Vision') : 'Протоколы', () => { put('proto', p); put('socks', so); put('stash', stash); setSetting(db, 'reality_on', reality ? '1' : '0') });
+      const turned = reality !== s.reality;
+      const r = await apply(turned ? (reality ? 'Основной вход: Reality' : 'Основной вход: Vision') : 'Протоколы', () => {
+        put('proto', p); put('socks', so); put('stash', stash); setSetting(db, 'reality_on', reality ? '1' : '0');
+        // переход: неделю Reality принимает и старые ключи Vision. Закончится раньше, когда все обновят подписку
+        if (turned) { setSetting(db, 'reality_soft_until', reality ? String(now() + SOFT_DAYS * 86400) : '0'); setSetting(db, 'reality_since', reality ? String(now()) : '0') }
+      });
+      if (!r.ok && turned) { setSetting(db, 'reality_soft_until', '0') }
       // Порт SOCKS в файрволе: открываем сами (если при установке не было --no-firewall) и сами же закрываем.
       // Закрываем только то, что открыли мы: правило, которое было до нас, не трогаем
       if (r.ok && process.env.MP_FIREWALL !== '0') {
@@ -486,16 +510,41 @@ export function createManager({ db, xray, queue, activeUsers, log, onRestart }) 
         const r = await apply('Маршруты после переустановки', null, { history: false });
         if (!r.ok) log('маршруты после переустановки не применились:', r.error);
       }
+    } else {
+      // обновление: у Hysteria2 ещё нет маскировки — дописать сейчас, не ждать первой правки в админке
+      const hy = (c) => (c.inbounds || []).filter((i) => i.protocol === 'hysteria').map((i) => i.streamSettings?.hysteriaSettings?.masquerade?.url || '').join();
+      const cfg = xray.read();
+      if (hy(cfg) !== hy(build(cfg, snapshot()))) { const r = await apply('Маскировка Hysteria2', null, { history: false }); if (!r.ok) log('маскировка Hysteria2 не применилась:', r.error) }
     }
   }
 
   // Перед сменой адреса: запомнить, что включено (start() вернёт это после переустановки)
   const keep = () => setSetting(db, 'pre_reconf', JSON.stringify({ at: now(), s: snapshot() }));
+  // Закончить мягкий переход: посторонним снова отвечает nginx. Сам — когда все активные люди уже взяли подписку
+  // после включения Reality (updated) или вышел срок; вручную — кнопкой
+  const soft = {
+    since: () => Number(getSetting(db, 'reality_since', '0')),
+    async end(why) {
+      if (!softOn(snapshot())) return { ok: true, same: true };
+      const until = getSetting(db, 'reality_soft_until', '0');
+      const r = await apply('Reality: переход закончен', () => setSetting(db, 'reality_soft_until', '0'));
+      if (!r.ok) setSetting(db, 'reality_soft_until', until); else log('мягкий переход на Reality закончен:', why);
+      return r;
+    },
+    // срок вышел сам: конфиг ещё с переходным входом — пересобрать
+    async tick(allUpdated) {
+      const s = snapshot(), until = Number(getSetting(db, 'reality_soft_until', '0'));
+      if (!s.reality || !until) return;
+      if (allUpdated && until > now()) return this.end('все обновили подписку');
+      if (until <= now() && xray.detect().visionOld) { const r = await apply('Reality: переход закончен', () => setSetting(db, 'reality_soft_until', '0')); if (r.ok) log('мягкий переход на Reality закончен: вышел срок') }
+    },
+  };
   // Ключ и короткий id основного входа Reality для подписок и мостов; null — вход Vision
   const reality = () => { const k = get('reality_keys', null); try { return k && xray.detect().vision?.reality ? { pub: k.pub, sid: k.sid } : null } catch { return null } };
-  return { stateForAdmin, routes, warp, proto, egress, inbound, reality, history, server, start, apply, keep };
+  return { stateForAdmin, routes, warp, proto, egress, inbound, reality, soft, history, server, start, apply, keep };
 }
 
+const SOFT_DAYS = 7;   // сколько Reality принимает старые ключи Vision после включения
 const REALITY_MODES = ['bare', 'ip2'];   // на 443 только monolit: за Xray один сайт, его и показываем посторонним
 export function realityKeys() {
   const { publicKey, privateKey } = generateKeyPairSync('x25519');
@@ -533,6 +582,27 @@ export function moveListen(cfg, from, to) {
 // Готовые наборы. Ничего не включено само: человек добавляет набор и видит, что в нём
 export const PRESETS = {
   ai: { name: 'Нейросети через WARP', to: 'warp', values: ['openai.com', 'chatgpt.com', 'oaistatic.com', 'oaiusercontent.com', 'claude.ai', 'anthropic.com', 'gemini.google.com', 'aistudio.google.com'] },
+  // российские сервисы видят адрес Cloudflare, а не адрес сервера: по нему его не запишут в список VPN
+  ru: { name: 'Российское через WARP', to: 'warp', values: ['geosite:category-ru', 'geoip:ru'] },
   ads: { name: 'Реклама в блок', to: 'block', values: ['geosite:category-ads-all'] },
   torrent: { name: 'Торренты в блок', to: 'block', values: ['bittorrent'] },
 };
+
+// Маскировка Hysteria2, которую поставили мы (на админку этого же сервера): её можно обновлять; чужую не трогаем
+const ownMasq = (m) => m?.type === 'proxy' && /^http:\/\/127\.0\.0\.1:\d+(\/_h3)?$/.test(m.url || '');
+
+// Сколько секунд беда должна продержаться, прежде чем о ней напишут в Telegram
+export const ALERT_AFTER = { xray: 180, node: 300, nodecfg: 300, exit: 600, awg: 600, update: 0, cert: 0 };
+// Что сообщить. cur: беда → [что случилось, что написать, когда прошло]. Пишем о беде, которая держится дольше порога,
+// и один раз о том, что она прошла (только если о ней писали)
+export function alertPlan(seen, cur, t, after = ALERT_AFTER) {
+  const next = {}, tell = [];
+  for (const [k, [text, ok]] of Object.entries(cur)) {
+    const was = seen[k] || { since: t, told: false };
+    const told = was.told || t - was.since >= (after[k.split(':')[0]] ?? 300);
+    if (told && !was.told) tell.push(text);
+    next[k] = { since: was.since, told, ok: ok || '' };
+  }
+  for (const [k, was] of Object.entries(seen)) if (!(k in cur) && was.told && was.ok) tell.push(was.ok);
+  return { next, tell };
+}

@@ -14,7 +14,7 @@
   const icon = (n) => `<i data-lucide="${n}"></i>`
   const icons = () => window.lucide?.createIcons()
 
-  let M = null, ST = null, PRESETS = []   // состояние управления, состояние сервера, готовые наборы
+  let M = null, ST = null, PRESETS = [], IPS = []   // состояние управления, состояние сервера, готовые наборы
 
   // ---------- демо ----------
   const demo = {
@@ -29,7 +29,8 @@
   async function demoApi(method, path, body) {
     await new Promise((r) => setTimeout(r, 400))
     const m = demo.M, hist = (note) => m.history.unshift({ id: (m.history[0]?.id || 0) + 1, at: Date.now() / 1000, note })
-    if (path === 'api/server') return { manage: m, status: demo.ST, presets: demo.P }
+    if (path === 'api/server') return { manage: m, status: demo.ST, presets: demo.P, ips: ['203.0.113.7', '203.0.113.8'] }
+    if (path === 'api/proto/soft-end') { m.proto.reality_soft = 0; hist('Reality: переход закончен'); return { ok: true, manage: m } }
     if (path.startsWith('api/server/journal')) return { text: '2026-11-13T14:55:42+00:00 xray[10903]: Xray 26.11.9 started\n2026-11-13T15:01:02+00:00 xray[10903]: [Warning] core: Xray 26.11.9 started' }
     if (path.startsWith('api/server/')) return { ok: true, text: 'Готово' }
     if (path.startsWith('api/routes/reach')) { const h = decodeURIComponent(path.split('host=')[1] || ''); await new Promise((r) => setTimeout(r, 900)); const blocked = /openai|chatgpt|claude|gemini/.test(h); return { host: h, server: blocked ? { code: 403, ms: 184, curl: 0 } : { code: 200, ms: 212, curl: 0 }, warp: m.warp.on ? { code: 200, ms: 347, curl: 0 } : undefined } }
@@ -45,7 +46,7 @@
     if (path === 'api/warp/check') return { ok: true, warp: 'on', ip: '104.28.0.7', loc: 'NL', colo: 'AMS' }
     if (path === 'api/warp/register') { hist('WARP: новая регистрация'); return { ok: true, manage: m } }
     if (path === 'api/warp/license') { m.warp.account = 'unlimited'; return { ok: true, account: 'unlimited', manage: m } }
-    if (path === 'api/proto') { if ('hy2' in body) m.proto.hy2 = body.hy2; if ('xhttp' in body) m.proto.xhttp = body.xhttp; if ('reality' in body) m.proto.reality = body.reality; if (body.socks) Object.assign(m.socks, body.socks); hist('Протоколы'); return { ok: true, manage: m } }
+    if (path === 'api/proto') { if ('hy2' in body) m.proto.hy2 = body.hy2; if ('xhttp' in body) m.proto.xhttp = body.xhttp; if ('reality' in body) { m.proto.reality = body.reality; m.proto.reality_soft = body.reality ? Math.floor(Date.now() / 1000) + 7 * 86400 : 0 } if (body.socks) Object.assign(m.socks, body.socks); hist('Протоколы'); return { ok: true, manage: m } }
     if (path === 'api/mtg') { demo.ST.mtg = body.on ? 'running' : 'exited'; return { ok: true, manage: m } }
     if (/history\/\d+\/rollback/.test(path)) { hist('Возврат к прошлой версии'); return { ok: true, manage: m } }
     if (/history\/\d+$/.test(path)) return { inbounds: [], outbounds: [], routing: { rules: [] } }
@@ -77,7 +78,7 @@
   }
 
   async function load() {
-    const r = await api('GET', 'api/server'); M = r.manage; ST = r.status; PRESETS = r.presets || []
+    const r = await api('GET', 'api/server'); M = r.manage; ST = r.status; PRESETS = r.presets || []; IPS = r.ips || []
     paintAll()
   }
   let loading = null
@@ -362,7 +363,11 @@
     }
     const rs = $('mp-pr-reality'); rs.checked = !!M.proto.reality; rs.disabled = !M.proto.reality_can
     $('mp-pr-main').textContent = M.proto.reality ? 'Reality' : 'Vision'
-    if (!M.proto.reality_can) $('mp-pr-reality-h').textContent = 'Включается, когда на 443 только monolit: без сайтов рядом'
+    const soft = M.proto.reality_soft || 0
+    $('mp-pr-reality-h').textContent = !M.proto.reality_can ? 'Включается, когда на 443 только monolit: без сайтов рядом'
+      : soft ? `Старые подключения Vision работают до ${new Date(soft * 1000).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })} или пока все не обновят подписку`
+        : 'Посторонним на 443 отвечает nginx, а не Xray'
+    $('mp-pr-soft').hidden = !soft
     const s = M.socks
     if (document.activeElement?.form !== sForm) { sForm.on.checked = s.on; sForm.port.value = s.port; sForm.user.value = s.user; sForm.pass.value = s.pass }
     $('mp-socks-cf').hidden = !s.on
@@ -380,10 +385,16 @@
   // Основной вход: Vision или Reality. Ключи у людей те же, но подключение в подписке другое — приложениям нужно её обновить
   $('mp-pr-reality').addEventListener('change', async (e) => {
     const on = e.target.checked
-    if (!await window.mpAdmin.confirm(on ? 'Включить Reality?' : 'Вернуть Vision?', 'Подключения к основному входу оборвутся и не вернутся, пока приложения не обновят подписку. Ноды переключатся сами за минуту', on ? 'Включить' : 'Вернуть')) { e.target.checked = !on; return }
+    if (!await window.mpAdmin.confirm(on ? 'Включить Reality?' : 'Вернуть Vision?', on ? 'Старые подключения проработают ещё неделю, за это время приложения обновят подписку сами. Ноды переключатся за минуту'
+      : 'Подключения к основному входу оборвутся и не вернутся, пока приложения не обновят подписку. Ноды переключатся сами за минуту', on ? 'Включить' : 'Вернуть')) { e.target.checked = !on; return }
     e.target.disabled = true
-    try { take(await run('PATCH', 'api/proto', { reality: on })); paintAll(); window.mpAdmin.refresh?.(); toast({ type: 'success', title: on ? 'Основной вход: Reality' : 'Основной вход: Vision', text: 'Обновите подписку в приложениях' }) }
+    try { take(await run('PATCH', 'api/proto', { reality: on })); paintAll(); window.mpAdmin.refresh?.(); toast({ type: 'success', title: on ? 'Основной вход: Reality' : 'Основной вход: Vision', text: on ? 'Старые подключения работают ещё неделю' : 'Обновите подписку в приложениях' }) }
     catch (err) { e.target.checked = !on; fail(err) } finally { e.target.disabled = !M.proto.reality_can }
+  })
+  $('mp-pr-soft-end').addEventListener('click', async (e) => {
+    if (!await window.mpAdmin.confirm('Закончить переход?', 'Те, кто не обновил подписку, отключатся от основного входа', 'Закончить')) return
+    e.currentTarget.disabled = true
+    try { take(await run('POST', 'api/proto/soft-end', {})); paintAll(); toast({ type: 'success', title: 'Переход закончен' }) } catch (err) { fail(err) } finally { $('mp-pr-soft-end').disabled = false }
   })
   // AmneziaWG ставится отдельным контейнером: первая сборка идёт несколько минут, состояние приходит с общим состоянием админки
   const AWG_HINT = 'Отдельный сервер по UDP. Для monolit client и AmneziaVPN'
@@ -394,6 +405,11 @@
     sw.disabled = a.state === 'starting'   // пока ставится — не трогать; причина написана строкой ниже
     $('mp-pr-awg-h').textContent = a.state === 'starting' ? 'Ставится. В первый раз это несколько минут'
       : a.state === 'error' ? a.error || 'Не запустился' : a.state === 'on' ? `UDP ${a.port}. Добавьте его в набор подключений` : AWG_HINT
+    // адрес выбирают, когда их на сервере несколько: AmneziaWG можно увести с адреса основного входа
+    const sel = $('mp-pr-awg-ip'), list = [...new Set([...IPS, ...(a.ip ? [a.ip] : [])])]
+    $('mp-pr-awg-ip-f').hidden = !a.on || list.length < 2
+    if (document.activeElement !== sel) { sel.replaceChildren(...[['', 'Все адреса сервера'], ...list.map((x) => [x, x])].map(([v, t]) => new Option(t, v))); sel.value = a.ip || '' }
+    sel.disabled = a.state === 'starting'
     clearInterval(awgPoll)
     if (a.state === 'starting' && !window.mpAdmin.demo()) awgPoll = setInterval(async () => { await window.mpAdmin.refresh(); paintAwg() }, 4000)
   }
@@ -404,6 +420,14 @@
       else window.mpAdmin.setState(await window.mpAdmin.api('PATCH', 'api/awg', { on }))
       toast({ type: 'success', title: on ? 'AmneziaWG включается' : 'AmneziaWG выключен' })
     } catch (err) { e.target.checked = !on; fail(err) } finally { e.target.disabled = false; paintAwg() }
+  })
+  $('mp-pr-awg-ip').addEventListener('change', async (e) => {
+    const ip = e.target.value
+    try {
+      if (window.mpAdmin.demo()) { const s = window.mpAdmin.state(); s.awg = { ...s.awg, ip }; window.mpAdmin.setState(s) }
+      else window.mpAdmin.setState(await window.mpAdmin.api('PATCH', 'api/awg', { ip }))
+      toast({ type: 'success', title: 'Адрес AmneziaWG изменён', text: 'Обновите подписку в приложениях' })
+    } catch (err) { fail(err) } finally { e.target.blur(); paintAwg() }
   })
   // поля нужны только включённому SOCKS5
   sForm.on.addEventListener('change', () => { $('mp-socks-f').hidden = !sForm.on.checked; if (!sForm.on.checked) $('mp-socks-cf').hidden = true })
