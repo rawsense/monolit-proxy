@@ -5599,9 +5599,12 @@ var qrcode = function() {
       txt = !dnsA.length ? `${dom} пока никуда не смотрит. Добавьте A-запись на ${want.join(' или ')}` : hit ? `Смотрит на ${dnsA.join(', ')}, это ${mode === 'ip2' ? 'выбранный IP' : 'этот сервер'}` : `Смотрит на ${dnsA.join(', ')}, а нужно на ${want.join(' или ')}`
       warn = !hit
     } else if (dom && dom !== dnsFor) txt = 'Проверяем DNS'
+    // Cloudflare подключён и домен в его зоне: запись админка поменяет сама, спрашивать про несовпадение незачем
+    if (warn && cfCan(dom)) { txt = `${dnsA.length ? 'Смотрит на ' + dnsA.join(', ') : 'Пока никуда не смотрит'}. Cloudflare поменяет запись на ${want[0]} сам`; warn = false }
     h.textContent = txt; h.classList.toggle('mp-warn', warn)
     $('mp-a-force-f').hidden = !warn
   }
+  const cfCan = (dom) => { const z = D.cf?.on && !D.cf.error && !D.cf.proxied && !D.cf.many ? D.cf.zone : ''; return !!z && (dom === z || dom.endsWith('.' + z)) }
   async function checkDns() {
     const dom = F.domain.value.trim().toLowerCase()
     if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(dom)) { dnsA = null; dnsFor = ''; syncForm(); return }

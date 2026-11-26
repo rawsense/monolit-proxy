@@ -558,8 +558,16 @@ async function adminApi(req, res, path) {
     if (mode === 'ip2' && !/^(\d{1,3}\.){3}\d{1,3}$/.test(ip2)) return json(res, 400, { error: 'Выберите второй IP для Xray' });
     const drop = b.drop ? cleanDomain(b.drop) : '-';
     if (b.drop && !drop) return json(res, 400, { error: 'Нет такого запасного домена' });
+    // Cloudflare подключён: A-запись домена ставим сами до переустановки (сертификат выпускается по ней).
+    // Сервер ещё может помнить старый ответ DNS, поэтому установщику говорим проверку DNS пропустить
+    let force = !!b.force;
+    if (cf.on() && !b.drop) {
+      const want = mode === 'ip2' ? ip2 : (await netLook())?.ip1 || '';
+      try { if (want) { await cf.setA(domain, want); force = true } }
+      catch (e) { if (!b.force) return json(res, 400, { error: e.message }) }
+    }
     mgr.keep();
-    const r = await agent(`reconf ${mode} ${domain} ${ip2} ${b.keep_old && domain !== cur.domain ? 1 : 0} ${b.force ? 1 : 0} ${drop}`, 30000);
+    const r = await agent(`reconf ${mode} ${domain} ${ip2} ${b.keep_old && domain !== cur.domain ? 1 : 0} ${force ? 1 : 0} ${drop}`, 30000);
     if (r.code === 0) { log('смена адреса:', cur.mode, cur.domain, '→', mode, domain, ip2); return json(res, 200, { ok: true }) }
     setSetting(db, 'pre_reconf', '');
     return json(res, r.code < 0 ? 503 : 400, { error: r.code === 2 && /нет такой команды/.test(r.out) ? 'Помощник на сервере старый: обновите monolit' : r.out || 'Не запустилось' });
