@@ -426,8 +426,8 @@ a.hm-li:focus-visible { outline-color: var(--focus) }
 /* в ряду карточки одной высоты: строки делят свободное место поровну, а не оставляют пустоту внизу */
 .hm-card > .hm-li, .hm-list > .hm-li { flex: 1 0 auto }
 .hm-list { display: flex; flex-direction: column; flex: 1 0 auto }
-/* «Требует внимания» — по высоте своих строк: одна строка «Всё работает» не висит посреди пустой карточки во всю высоту соседней */
-.hm-todo { align-self: start }
+/* «Требует внимания»: карточка той же высоты, что соседняя, а строки стоят сверху своей высотой. Иначе одна строка
+   «Всё работает» растягивалась и висела посреди пустой карточки */
 .hm-todo .hm-list > .hm-li { flex: 0 0 auto }
 .hm-list > .hm-li + .hm-li::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: var(--border-subtle) }
 .hm-list > a.hm-li + a.hm-li::before { left: var(--sp-2); right: var(--sp-2) }
