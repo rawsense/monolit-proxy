@@ -177,7 +177,7 @@
     if ($('mp-a-boot').hidden) return
     $('mp-a-boot-t').textContent = miss.length ? 'После перезагрузки адрес пропадёт' : 'В настройках сети старый адрес'
     $('mp-a-boot-p').textContent = n.manual || (miss.length && stale.length ? `В настройках сети записан ${stale.join(', ')}, а работает ${miss.join(', ')}`
-      : miss.length ? `${miss.join(', ')} не записан в настройках сети` : `После перезагрузки сервер возьмёт себе ${stale.join(', ')}, которого у него уже нет`)
+      : miss.length ? `${miss.join(', ')} не записан в настройках сети` : `После перезагрузки сервер взял бы ${stale.join(', ')}, которого у него уже нет: уберём сами через 5 минут`)
     $('mp-a-boot-act').hidden = n.tool === 'none'
     $('mp-a-boot-fix').disabled = running
   }

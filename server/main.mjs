@@ -6,7 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openDb, now, token, newUuid, getSetting, setSetting, hashPassword, checkPassword, userState, nextReset } from './db.mjs';
 import { Xray } from './xray.mjs';
 import { AUTOXRAY_URL, parseAutoXray, hashOf, renderAll } from './template.mjs';
-import { createManager, PRESETS, agent, staleFwd } from './manage.mjs';
+import { createManager, PRESETS, agent, staleFwd, netsaveDue } from './manage.mjs';
 import { createWatch, tgSend, tgFindChat, resolve4 } from './watch.mjs';
 import { createNodes } from './nodes.mjs';
 import { createAwg } from './awg.mjs';
@@ -273,6 +273,22 @@ async function netsave(op) {
   let state = null; try { state = JSON.parse(lines.at(-1)) } catch {}
   return { code: r.code, state: r.code === 2 ? null : state, text: lines.filter((l) => !l.startsWith('{')).at(-1) || '' };
 }
+// Настройки сети админка правит сама: рабочий адрес, которого в них нет, дописывает сразу; адрес, которого на сервере
+// уже нет, убирает, если его нет и через 5 минут (хостер мог снять адрес на время работ). Кнопка «Исправить» остаётся
+// для случая, когда сама не смогла
+async function netsaveAuto() {
+  const c = await netsave('check'), st = c.state;
+  const due = netsaveDue(st, Number(getSetting(db, 'netsave_stale_at', '')) || 0, now());
+  if (due === 'none') { setSetting(db, 'netsave_stale_at', ''); return st }
+  if (due === 'mark') { setSetting(db, 'netsave_stale_at', String(now())); return st }
+  if (due === 'wait') return st;
+  const r = await netsave('fix');
+  setSetting(db, 'netsave_stale_at', '');
+  if (r.code === 0) { log('настройки сети исправлены:', r.text); return r.state }
+  log('настройки сети сами не исправились:', r.state?.manual || r.text);
+  return r.state || st;
+}
+
 // Запасные входы: админка и подписки по адресам, которые не блокируются вместе с адресом VPN.
 // Сайт nginx на основном адресе (способ «Второй IP», выбирают в «Адрес») и ноды с доменом: их страница пересылает запросы сюда
 const entryHost = () => env('MP_MODE', '') === 'ip2' ? getSetting(db, 'entry', env('MP_ENTRY', '')) : '';
@@ -547,7 +563,7 @@ async function adminApi(req, res, path) {
     const net = await agent('netinfo', 30000);
     let info = null; try { info = net.code === 0 ? JSON.parse(net.out.split('\n').pop() || '{}') : null } catch {}
     if (info) netNow = { ips: info.ips, ip1: info.ip1, fwd: info.fwd || '' };
-    return json(res, 200, { ...addrState(), cf: await cf.state(getSetting(db, 'domain')), fresh: freshIps(), fwd: netNow?.fwd || '', net: info, net_error: info ? '' : net.out || 'Помощник не ответил', dns: await resolve(getSetting(db, 'domain')), netsave: (await netsave('check')).state });
+    return json(res, 200, { ...addrState(), cf: await cf.state(getSetting(db, 'domain')), fresh: freshIps(), fwd: netNow?.fwd || '', net: info, net_error: info ? '' : net.out || 'Помощник не ответил', dns: await resolve(getSetting(db, 'domain')), netsave: await netsaveAuto() });
   }
   if (path === '/api/addr/netsave' && M === 'POST') {
     const r = await netsave('fix');
@@ -732,6 +748,7 @@ http.listen(Number(PORT), HOST, async () => {
   setTimeout(() => checkUpdate(), 30_000);
   watch.start();
   if (env('MP_MODE', '') === 'ip2') { netLook().catch(() => {}); setInterval(() => netLook().catch(() => {}), 5 * 60_000) }
+  if (env('MP_MODE', '') && env('MP_MODE', '') !== 'existing') { setTimeout(() => netsaveAuto().catch(() => {}), 60_000); setInterval(() => netsaveAuto().catch(() => {}), 5 * 60_000) }
   // Адрес меняли из админки: после перезапуска сообщить итог в Telegram и проверить новый адрес
   const job = addrState().job;
   if (job && job.state !== 'running' && String(job.at) !== getSetting(db, 'reconf_seen', '')) {

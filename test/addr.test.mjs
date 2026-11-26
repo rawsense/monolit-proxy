@@ -127,3 +127,19 @@ test('API Xray включается вместе с RoutingService: правил
   assert.deepEqual(JSON.parse(readFileSync(f, 'utf8')).api, { tag: 'monolit-api', listen: '127.0.0.1:10085', services: ['HandlerService', 'StatsService', 'RoutingService'] });
   assert.equal(x.ensureApi('127.0.0.1:10085'), false);   // второй раз менять нечего
 });
+
+test('настройки сети правятся сами: рабочий адрес дописывается сразу, пропавший убирается через 5 минут', async () => {
+  const { netsaveDue } = await import('../server/manage.mjs');
+  const st = (o) => ({ tool: 'ifupdown', missing: [], stale: [], manual: '', ...o });
+  assert.equal(netsaveDue(st({}), 0, 1000), 'none');
+  assert.equal(netsaveDue(st({ missing: ['203.0.113.9'] }), 0, 1000), 'fix');
+  assert.equal(netsaveDue(st({ missing: ['203.0.113.9'], stale: ['203.0.113.8'] }), 0, 1000), 'fix');
+  // 26.11.2026: хостер забрал адрес — в настройках он остался. Убираем, только если его нет и через 5 минут
+  assert.equal(netsaveDue(st({ stale: ['31.59.153.210'] }), 0, 1000), 'mark');
+  assert.equal(netsaveDue(st({ stale: ['31.59.153.210'] }), 1000, 1200), 'wait');
+  assert.equal(netsaveDue(st({ stale: ['31.59.153.210'] }), 1000, 1300), 'fix');
+  // сами не можем: сеть настроена незнакомым способом или нужна ручная правка
+  assert.equal(netsaveDue(st({ tool: 'none', missing: ['203.0.113.9'] }), 0, 1000), 'none');
+  assert.equal(netsaveDue(st({ manual: 'поправьте сами', stale: ['203.0.113.8'] }), 0, 1000), 'none');
+  assert.equal(netsaveDue(null, 0, 1000), 'none');
+});

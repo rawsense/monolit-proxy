@@ -471,6 +471,14 @@ export function listenOf(cfg, xray) {
   const l = xray.detect(cfg).vision?.listen || '';
   return /^(\d{1,3}\.){3}\d{1,3}$/.test(l) && l !== '0.0.0.0' && !l.startsWith('127.') ? l : '';
 }
+// Что делать с настройками сети по итогу проверки (agent/netsave.sh check): none — всё в порядке или сами не можем,
+// fix — править сейчас, mark — лишний адрес увидели впервые, wait — ждём, не вернётся ли он. since — когда увидели
+export function netsaveDue(st, since, t, wait = 300) {
+  if (!st || st.tool === 'none' || st.manual || !(st.missing?.length || st.stale?.length)) return 'none';
+  if (st.missing?.length) return 'fix';   // рабочий адрес не записан: после перезагрузки VPN пропал бы
+  return !since ? 'mark' : t - since < wait ? 'wait' : 'fix';
+}
+
 // Почему пересылку «старый>новый» пора снять, или '' — она на месте
 export const staleFwd = (fwd, listen) => { const [from, to] = String(fwd || '').split('>'); return !from || !to || !listen ? '' : listen === from ? 'Xray снова слушает на этом адресе' : listen !== to ? `Xray слушает на ${listen}` : '' };
 
