@@ -3375,8 +3375,9 @@ button.alist-row { width: 100%; border: 0; background: none; font: inherit; colo
    Без этого прокрутка середины .dialog-scroll не работала бы: форма росла бы по содержимому */
 .dialog-scroll > form { display: flex; flex-direction: column; flex: 1; min-height: 0 }
 /* закрытые списки полей лежали под окном невидимыми и удлиняли прокрутку середины: колесо уводило поля вверх, над кнопками пустота.
-   Открытый список система и так показывает в верхнем слое (popover), а закрытый из потока убираем */
-.dialog-scroll .select-ui > .listbox:not(:popover-open) { display: none }
+   Открытый список система и так показывает в верхнем слое (popover), а закрытый из потока убираем.
+   То же на страницах: закрытый список под полем внизу страницы удлинял её, страница прокручивалась вместе с меню в пустоту (26.11.2026) */
+.select-ui > .listbox:not(.open):not(:popover-open) { display: none }
 
 /* Ноды и подписки */
 .mp-page { transition: opacity var(--dur-swap-in) var(--ease-out) }
@@ -3567,7 +3568,12 @@ a.hm-li:focus-visible { outline-color: var(--focus) }
 .select-ui > .listbox { min-width: 0 }
 /* список выбора не двигается: края и верх стоят на месте, он разворачивается вниз от поля (вверх — если открыт вверх) и проявляется */
 .select-ui > .listbox, .select-ui > .listbox:not(.open) { transform: none }
-.select-ui > .listbox { clip-path: inset(0 -32px 100% -32px round var(--r-md)); transition: opacity var(--dur-exit) var(--ease-out), clip-path var(--dur-exit) var(--ease-out), visibility 0s linear var(--dur-exit) }
+.select-ui > .listbox { clip-path: inset(0 -32px 100% -32px round var(--r-md)); transition: opacity var(--dur-exit) var(--ease-out), clip-path var(--dur-exit) var(--ease-out), visibility 0s linear var(--dur-exit), display var(--dur-exit) allow-discrete }
+/* закрытый список убран из потока (display: none), поэтому раскрытие начинается с этих значений */
+@starting-style {
+  .select-ui > .listbox.open { opacity: 0; clip-path: inset(0 -32px 100% -32px round var(--r-md)) }
+  .select-ui > .listbox.up.open { opacity: 0; clip-path: inset(100% -32px 0 -32px round var(--r-md)) }
+}
 .select-ui > .listbox.up { clip-path: inset(100% -32px 0 -32px round var(--r-md)) }
 .select-ui > .listbox.open { clip-path: inset(0 -32px -32px -32px round var(--r-md)); transition: opacity 200ms var(--ease-out), clip-path 220ms var(--ease-out), visibility 0s }
 .select-ui > .listbox.up.open { clip-path: inset(-32px -32px 0 -32px round var(--r-md)) }
