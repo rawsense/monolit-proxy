@@ -25,7 +25,7 @@
     mode: 'ip2', domain: 'vpn.example.ru', ip2: '203.0.113.8', out_ip: '', alt: ['old.example.ru'], admin: '/adm', job: null, dns: ['203.0.113.8'],
     cf: { on: false }, fresh: ['203.0.113.9'], fwd: '', entry: '', entries: [{ kind: 'node', name: 'Moscow', host: 'msk.example.ru', url: 'https://msk.example.ru/adm/' }],
     netsave: { tool: 'ifupdown', dev: 'ens3', file: '/etc/network/interfaces', missing: ['203.0.113.8'], stale: ['198.51.100.4'], manual: '' }, netsave_failed: true,
-    net: { ips: ['203.0.113.7', '203.0.113.8', '203.0.113.9'], ip1: '203.0.113.7', sites: [{ names: ['example.ru', 'www.example.ru'] }] },
+    net: { ips: ['203.0.113.7', '203.0.113.8', '203.0.113.9'], ip1: '203.0.113.7', sites: [{ names: ['example.ru', 'www.example.ru'] }, ...['shop', 'blog', 'docs', 'api', 'chat', 'mail', 'status', 'cdn', 'go'].map((n) => ({ names: [n + '.example.ru'] }))] },
     watch: { state: 'blocked', at: now() - 600, since: now() - 4000, ip: '203.0.113.7', on: true, every: 60, error: '',
       ru: [{ node: 'ru1', city: 'Moscow', ok: false, healthy: false, answered: true }, { node: 'ru2', city: 'Moscow', ok: false, healthy: true, answered: true }],
       abroad: [{ node: 'de1', city: 'Nuremberg', ok: true, ms: 38 }, { node: 'de2', city: 'Langen', ok: true, ms: 27 }, { node: 'de4', city: 'Frankfurt', ok: true, ms: 31 }] },

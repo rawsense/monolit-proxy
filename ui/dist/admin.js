@@ -1682,8 +1682,13 @@
       if (sel.disabled || isOpen()) return;
       // открываем вверх, если снизу не помещается
       const r = btn.getBoundingClientRect();
-      const up = innerHeight - r.bottom < Math.min(296, list.scrollHeight + 16) && r.top > innerHeight - r.bottom;
+      // закрытый список убран из потока (display: none), чтобы не удлинять страницу: на время замера возвращаем
+      const was = list.style.display; list.style.display = 'block'; list.style.maxHeight = '';
+      const need = Math.min(296, list.scrollHeight + 16); list.style.display = was;
+      const up = innerHeight - r.bottom < need && r.top > innerHeight - r.bottom;
       list.classList.toggle('up', up);
+      // не выше свободного места на экране: иначе список уходил за край страницы и удлинял её
+      list.style.maxHeight = Math.min(280, Math.max(96, (up ? r.top : innerHeight - r.bottom) - 16)) + 'px';
       // В окне с прокруткой середины (.dialog-scroll) список обрезался бы краем середины и самого окна:
       // показываем его в верхнем слое (popover) и ставим по экрану под полем
       if (btn.closest('.dialog-scroll') && list.showPopover) {
@@ -5364,7 +5369,7 @@ var qrcode = function() {
     mode: 'ip2', domain: 'vpn.example.ru', ip2: '203.0.113.8', out_ip: '', alt: ['old.example.ru'], admin: '/adm', job: null, dns: ['203.0.113.8'],
     cf: { on: false }, fresh: ['203.0.113.9'], fwd: '', entry: '', entries: [{ kind: 'node', name: 'Moscow', host: 'msk.example.ru', url: 'https://msk.example.ru/adm/' }],
     netsave: { tool: 'ifupdown', dev: 'ens3', file: '/etc/network/interfaces', missing: ['203.0.113.8'], stale: ['198.51.100.4'], manual: '' }, netsave_failed: true,
-    net: { ips: ['203.0.113.7', '203.0.113.8', '203.0.113.9'], ip1: '203.0.113.7', sites: [{ names: ['example.ru', 'www.example.ru'] }] },
+    net: { ips: ['203.0.113.7', '203.0.113.8', '203.0.113.9'], ip1: '203.0.113.7', sites: [{ names: ['example.ru', 'www.example.ru'] }, ...['shop', 'blog', 'docs', 'api', 'chat', 'mail', 'status', 'cdn', 'go'].map((n) => ({ names: [n + '.example.ru'] }))] },
     watch: { state: 'blocked', at: now() - 600, since: now() - 4000, ip: '203.0.113.7', on: true, every: 60, error: '',
       ru: [{ node: 'ru1', city: 'Moscow', ok: false, healthy: false, answered: true }, { node: 'ru2', city: 'Moscow', ok: false, healthy: true, answered: true }],
       abroad: [{ node: 'de1', city: 'Nuremberg', ok: true, ms: 38 }, { node: 'de2', city: 'Langen', ok: true, ms: 27 }, { node: 'de4', city: 'Frankfurt', ok: true, ms: 31 }] },

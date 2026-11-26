@@ -90,8 +90,13 @@
       if (sel.disabled || isOpen()) return;
       // открываем вверх, если снизу не помещается
       const r = btn.getBoundingClientRect();
-      const up = innerHeight - r.bottom < Math.min(296, list.scrollHeight + 16) && r.top > innerHeight - r.bottom;
+      // закрытый список убран из потока (display: none), чтобы не удлинять страницу: на время замера возвращаем
+      const was = list.style.display; list.style.display = 'block'; list.style.maxHeight = '';
+      const need = Math.min(296, list.scrollHeight + 16); list.style.display = was;
+      const up = innerHeight - r.bottom < need && r.top > innerHeight - r.bottom;
       list.classList.toggle('up', up);
+      // не выше свободного места на экране: иначе список уходил за край страницы и удлинял её
+      list.style.maxHeight = Math.min(280, Math.max(96, (up ? r.top : innerHeight - r.bottom) - 16)) + 'px';
       // В окне с прокруткой середины (.dialog-scroll) список обрезался бы краем середины и самого окна:
       // показываем его в верхнем слое (popover) и ставим по экрану под полем
       if (btn.closest('.dialog-scroll') && list.showPopover) {
