@@ -5338,7 +5338,7 @@ var qrcode = function() {
   // ---------- демо ----------
   const demo = {
     mode: 'ip2', domain: 'vpn.example.ru', ip2: '203.0.113.8', out_ip: '', alt: ['old.example.ru'], admin: '/adm', job: null, dns: ['203.0.113.8'],
-    fresh: ['203.0.113.9'], fwd: '', entry: '', entries: [{ kind: 'node', name: 'Moscow', host: 'msk.example.ru', url: 'https://msk.example.ru/adm/' }],
+    cf: { on: false }, fresh: ['203.0.113.9'], fwd: '', entry: '', entries: [{ kind: 'node', name: 'Moscow', host: 'msk.example.ru', url: 'https://msk.example.ru/adm/' }],
     netsave: { tool: 'ifupdown', dev: 'ens3', file: '/etc/network/interfaces', missing: ['203.0.113.8'], stale: ['198.51.100.4'], manual: '' },
     net: { ips: ['203.0.113.7', '203.0.113.8', '203.0.113.9'], ip1: '203.0.113.7', sites: [{ names: ['example.ru', 'www.example.ru'] }] },
     watch: { state: 'blocked', at: now() - 600, since: now() - 4000, ip: '203.0.113.7', on: true, every: 60, error: '',
@@ -5361,6 +5361,8 @@ var qrcode = function() {
     }
     if (path === 'api/addr/netsave') { await sleep(800); demo.netsave = { ...demo.netsave, missing: [], stale: [] }; return { ok: true, text: 'заменил 198.51.100.4 на 203.0.113.8', netsave: demo.netsave } }
     if (path === 'api/addr/ip') { demo.fwd = `${demo.ip2}>${body.ip}`; demo.ip2 = body.ip; demo.fresh = []; return { ok: true } }
+    if (path === 'api/addr/cf') { if (body.token && body.token.length < 20) throw new Error('Cloudflare не принял токен: проверьте, что он скопирован целиком'); demo.cf = body.token ? { on: true, zone: 'example.ru', ip: demo.dns.join(', '), proxied: false, many: false, error: '' } : { on: false }; return { cf: demo.cf } }
+    if (path === 'api/addr/cf/sync') { demo.dns = [demo.ip2]; demo.cf.ip = demo.ip2; return { cf: demo.cf, ip: demo.ip2 } }
     if (path === 'api/addr/unfwd') { demo.fwd = ''; return { ok: true, fwd: '' } }
     if (path === 'api/addr/entry') { demo.entry = body.domain; demo.entries = [...(body.domain ? [{ kind: 'site', name: '', host: body.domain, url: `https://${body.domain}/adm/` }] : []), ...demo.entries.filter((e) => e.kind === 'node')]; return { ok: true, entry: demo.entry, entries: demo.entries } }
     if (path === 'api/egress') { await sleep(1000); demo.out_ip = body.ip; return { ok: true, seen: body.ip || demo.net.ip1 } }
@@ -5437,6 +5439,7 @@ var qrcode = function() {
     // домен ещё смотрит на прежний адрес: что именно поменять в DNS
     const need = D.mode === 'ip2' && D.ip2 && D.dns?.length && on.length && !D.dns.includes(D.ip2)
     $('mp-a-rec').hidden = !need
+    $('mp-a-rec-act').hidden = !D.cf?.on
     if (need) { $('mp-a-rec-t').textContent = `${D.domain} смотрит на ${D.dns.join(', ')}, а VPN работает на этом адресе`; $('mp-a-rec-ip').value = D.ip2; $('mp-a-rec-copy').dataset.copy = D.ip2 }
   }
   $('mp-a-new').addEventListener('click', async (e) => {
@@ -5447,7 +5450,7 @@ var qrcode = function() {
       try {
         await waitJob(await api('POST', 'api/addr/ip', { ip }))
         await load()
-        toast({ type: 'success', title: 'VPN переведён на ' + ip, text: D.dns?.includes(ip) ? 'Домен уже смотрит на этот адрес' : `Поменяйте A-запись ${D.domain} на ${ip}` })
+        toast({ type: 'success', title: 'VPN переведён на ' + ip, text: D.dns?.includes(ip) ? 'Домен уже смотрит на этот адрес' : D.cf?.on ? 'A-запись в Cloudflare меняется, это до минуты' : `Поменяйте A-запись ${D.domain} на ${ip}` })
         A().refresh?.()
       } catch (err) { fail(err); load().catch(() => {}) }
     })
@@ -5502,7 +5505,51 @@ var qrcode = function() {
     })
   })
 
-  const paint = () => { paintWatch(); paintAddr(); paintEntries() }
+  // ---------- Cloudflare: A-запись домена меняется сама ----------
+  const zoneGuess = () => D.cf?.zone || String(D.domain || '').split('.').slice(-2).join('.')
+  function paintCf() {
+    const c = D.cf || { on: false }, box = $('mp-a-cf')
+    box.hidden = !D.domain || !D.mode || D.mode === 'existing'
+    const sub = !c.on ? 'A-запись домена меняете вы' : c.error ? c.error : c.proxied ? 'У записи включён прокси Cloudflare: переключите её на DNS only' : c.many ? 'У домена несколько A-записей: оставьте одну' : 'Сам меняет A-запись домена'
+    box.innerHTML = `<div class="alist-row"><span class="alist-ic"><i data-lucide="cloud"></i></span><span class="alist-tx"><b>Cloudflare</b><span${c.on && (c.error || c.proxied || c.many) ? ' class="mp-warn"' : ''}>${esc(sub)}</span></span>
+      <button class="btn btn-secondary btn-sm" type="button" id="mp-cf-open"><span>${c.on ? 'Изменить' : 'Подключить'}</span></button></div>`
+    window.lucide?.createIcons()
+  }
+  const cfForm = $('mp-cf-form'), cfDlg = $('mp-cf-dlg')
+  $('mp-a-cf').addEventListener('click', (e) => {
+    if (!e.target.closest('#mp-cf-open')) return
+    cfForm.reset(); window.fieldError?.(cfForm.token, '')
+    $('mp-cf-zone').textContent = zoneGuess()
+    $('mp-cf-off').hidden = !D.cf?.on
+    cfDlg.showModal()
+  })
+  cfForm.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const token = cfForm.token.value.trim()
+    if (!token) { window.fieldError?.(cfForm.token, 'Вставьте токен из Cloudflare'); return }
+    window.fieldError?.(cfForm.token, '')
+    await busy(cfForm.querySelector('[type="submit"]'), async () => {
+      try {
+        const r = await api('POST', 'api/addr/cf', { token })
+        D.cf = r.cf; paintAddr(); paintCf(); cfDlg.close()
+        toast({ type: 'success', title: 'Cloudflare подключён', text: `Зона ${r.cf.zone}` + (r.cf.ip ? `, запись смотрит на ${r.cf.ip}` : '') })
+      } catch (err) { window.fieldError?.(cfForm.token, err.message) }
+    })
+  })
+  $('mp-cf-off').addEventListener('click', async (e) => {
+    await busy(e.currentTarget, async () => {
+      try { const r = await api('POST', 'api/addr/cf', { token: '' }); D.cf = r.cf; paintAddr(); paintCf(); cfDlg.close(); toast({ title: 'Cloudflare отключён', text: 'Токен стёрт с сервера' }) } catch (err) { fail(err) }
+    })
+  })
+  $('mp-a-rec-cf').addEventListener('click', (e) => busy(e.currentTarget, async () => {
+    try {
+      const r = await api('POST', 'api/addr/cf/sync')
+      D.cf = r.cf; D.dns = [r.ip]; paintAddr(); paintCf()
+      toast({ type: 'success', title: 'A-запись изменена', text: `${D.domain} смотрит на ${r.ip}` })
+    } catch (err) { fail(err) }
+  }))
+
+  const paint = () => { paintWatch(); paintAddr(); paintEntries(); paintCf() }
 
   async function load() { D = await api('GET', 'api/addr'); paint(); if (D.job?.state === 'running' && now() - D.job.at < 900) follow() }
   // страница «Адрес» открылась — свежие данные

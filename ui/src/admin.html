@@ -382,12 +382,14 @@
         <div class="alert alert-warning" id="mp-a-foreign" hidden><i data-lucide="triangle-alert"></i><div><b>Xray настроен через autoXRAY</b><span>Адрес меняется переустановкой: bash install.sh --reconfigure --replace-autoxray</span></div></div>
         <div id="mp-a-new" hidden></div>
         <div class="alert alert-warning mp-alert" id="mp-a-rec" hidden><i data-lucide="triangle-alert"></i><div><b>Поменяйте A-запись домена</b><span id="mp-a-rec-t"></span>
-          <span class="copy-field mp-alert-cf"><input class="input" readonly id="mp-a-rec-ip" aria-label="Адрес для A-записи"><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать адрес" id="mp-a-rec-copy" data-copy=""></button></span></div></div>
+          <span class="copy-field mp-alert-cf"><input class="input" readonly id="mp-a-rec-ip" aria-label="Адрес для A-записи"><button class="icon-btn icon-btn-sm" type="button" aria-label="Скопировать адрес" id="mp-a-rec-copy" data-copy=""></button></span>
+          <div class="btn-row mp-alert-act" id="mp-a-rec-act" hidden><button class="btn btn-secondary btn-sm" type="button" id="mp-a-rec-cf"><span>Поменять в Cloudflare</span></button></div></div></div>
         <dl class="mp-kv" id="mp-a-kv"></dl>
         <dl class="mp-kv" id="mp-o-kv" hidden></dl>
         <div class="alert alert-warning mp-alert" id="mp-a-boot" hidden><i data-lucide="triangle-alert"></i><div><b id="mp-a-boot-t">После перезагрузки адрес пропадёт</b><span id="mp-a-boot-p"></span>
           <div class="btn-row mp-alert-act" id="mp-a-boot-act"><button class="btn btn-secondary btn-sm" type="button" id="mp-a-boot-fix"><span>Исправить</span></button></div></div></div>
         <div class="alist" id="mp-a-alt" hidden></div>
+        <div class="alist" id="mp-a-cf" hidden></div>
         <div class="btn-row"><button class="btn btn-primary" type="button" id="mp-a-edit"><i data-lucide="pencil"></i><span>Изменить адрес</span></button><button class="btn btn-secondary" type="button" id="mp-o-edit" hidden><i data-lucide="pencil"></i><span>Изменить исходящий</span></button></div>
       </div>
     </div>
@@ -615,6 +617,19 @@
   <div class="dialog-foot"><button type="button" class="btn btn-ghost" data-close>Отмена</button><button class="btn btn-primary" type="submit"><span>Применить</span></button></div>
 </form></dialog>
 
+<dialog class="dialog dialog-md dialog-scroll" id="mp-cf-dlg" aria-labelledby="mp-cf-t"><form novalidate id="mp-cf-form">
+  <div class="dialog-head"><div><h2 id="mp-cf-t">Cloudflare</h2><p>Админка сама поменяет A-запись домена, когда вы переводите VPN на другой адрес</p></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+  <div class="dialog-main mp-form">
+    <ol class="tl" id="mp-cf-steps">
+      <li><span class="tl-mark mp-n">1</span><div class="tl-body"><p><b>Откройте токены Cloudflare</b></p><p>Значок профиля справа вверху, My Profile, API Tokens: <a class="link" href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener">dash.cloudflare.com/profile/api-tokens</a></p></div></li>
+      <li><span class="tl-mark mp-n">2</span><div class="tl-body"><p><b>Create Token</b></p><p>В строке шаблона «Edit zone DNS» нажмите Use template</p></div></li>
+      <li><span class="tl-mark mp-n">3</span><div class="tl-body"><p><b>Zone Resources</b></p><p>Выберите Include, Specific zone, <span id="mp-cf-zone"></span>. Остальное на странице не меняйте</p></div></li>
+      <li><span class="tl-mark mp-n">4</span><div class="tl-body"><p><b>Continue to summary, Create Token</b></p><p>Скопируйте токен сразу: Cloudflare показывает его один раз</p></div></li>
+    </ol>
+    <label class="field"><span class="label">Токен</span><input class="input" name="token" type="password" autocomplete="off" spellcheck="false" autocapitalize="none"><span class="hint" id="mp-cf-h">У токена одно право: менять DNS этой зоны</span></label>
+  </div>
+  <div class="dialog-foot"><button type="button" class="btn btn-ghost mp-danger" id="mp-cf-off" hidden><span>Отключить</span></button><button type="button" class="btn btn-ghost" data-close>Отмена</button><button class="btn btn-primary" type="submit"><span>Проверить и сохранить</span></button></div>
+</form></dialog>
 <dialog class="dialog dialog-md dialog-scroll" id="mp-a-dlg" aria-labelledby="mp-ad-t"><form novalidate id="mp-a-form">
   <div class="dialog-head"><div><h2 id="mp-ad-t">Домен и IP</h2><p>Перед сменой сохраним копии настроек. Не поднимется, вернём как было</p></div><button class="icon-btn icon-btn-sm" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
   <div class="dialog-main mp-form">

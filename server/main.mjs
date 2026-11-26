@@ -11,6 +11,7 @@ import { createWatch, tgSend, tgFindChat, resolve4 } from './watch.mjs';
 import { createNodes } from './nodes.mjs';
 import { createAwg } from './awg.mjs';
 import { createExits, parseProxy, checkProxy, flagOf } from './exits.mjs';
+import { createCf } from './cf.mjs';
 
 const env = (k, d) => process.env[k] ?? d;
 const DATA = env('MP_DATA', '/data');
@@ -63,6 +64,7 @@ const userById = id => db.prepare('SELECT * FROM users WHERE id = ?').get(id);
 // AmneziaWG — отдельный сервер рядом с Xray; после его запуска сразу сверяем пользователей
 const awg = createAwg({ db, log, agent, domain: () => getSetting(db, 'domain'), outIp: () => getSetting(db, 'out_ip', ''), onReady: () => { queueSync({ full: true }) } });
 const exits = createExits({ db, log });
+const cf = createCf({ db, log });   // A-запись домена в Cloudflare: меняется сама при переводе VPN на другой адрес
 const nodes = createNodes({ db, xray, log, dayOf, server: serverCtx, users, awg, exits });
 exits.migrate();
 xray.linkClients = nodes.linkClients;
@@ -314,7 +316,12 @@ async function afterMove(jobId, from, to) {
   await netsave('fix').then((r) => log('настройки сети после смены адреса:', r.state?.manual || r.text)).catch((e) => log('настройки сети:', e.message));
   await netLook();
   const domain = getSetting(db, 'domain'), dns = await resolve(domain);
-  await watch.notify(`VPN принимает подключения на ${to}.` + (dns.includes(to) ? '' : ` Поменяйте A-запись ${domain} на ${to}`));
+  let rec = dns.includes(to) ? '' : ` Поменяйте A-запись ${domain} на ${to}`;
+  if (cf.on()) {
+    try { await cf.setA(domain, to); rec = ` A-запись ${domain} в Cloudflare изменена` }
+    catch (e) { log('Cloudflare:', e.message); rec = ` A-запись в Cloudflare не изменилась: ${e.message}. Поменяйте её на ${to} сами` }
+  }
+  await watch.notify(`VPN принимает подключения на ${to}.` + rec);
   setTimeout(() => watch.check(false, to), 20_000);   // открывается ли новый адрес из России — придёт отдельным сообщением, если нет
 }
 
@@ -530,7 +537,7 @@ async function adminApi(req, res, path) {
     const net = await agent('netinfo', 30000);
     let info = null; try { info = net.code === 0 ? JSON.parse(net.out.split('\n').pop() || '{}') : null } catch {}
     if (info) netNow = { ips: info.ips, ip1: info.ip1, fwd: info.fwd || '' };
-    return json(res, 200, { ...addrState(), fresh: freshIps(), fwd: netNow?.fwd || '', net: info, net_error: info ? '' : net.out || 'Помощник не ответил', dns: await resolve(getSetting(db, 'domain')), netsave: (await netsave('check')).state });
+    return json(res, 200, { ...addrState(), cf: await cf.state(getSetting(db, 'domain')), fresh: freshIps(), fwd: netNow?.fwd || '', net: info, net_error: info ? '' : net.out || 'Помощник не ответил', dns: await resolve(getSetting(db, 'domain')), netsave: (await netsave('check')).state });
   }
   if (path === '/api/addr/netsave' && M === 'POST') {
     const r = await netsave('fix');
@@ -569,6 +576,17 @@ async function adminApi(req, res, path) {
     const r = await mgr.inbound.set(to);
     if (r.ok && r.pending) afterMove(r.job, from, to).catch((e) => log('смена входящего адреса:', e.message));
     return done(r);
+  }
+  // Cloudflare: подключить токеном (пустой — отключить) и поменять A-запись на входящий адрес сейчас
+  if (path === '/api/addr/cf' && M === 'POST') {
+    try { return json(res, 200, { cf: await cf.connect((await readBody(req)).token, getSetting(db, 'domain')) }) }
+    catch (e) { return json(res, 400, { error: e.message }) }
+  }
+  if (path === '/api/addr/cf/sync' && M === 'POST') {
+    const d = getSetting(db, 'domain'), want = ip2() || netNow?.ip1 || '';
+    if (!want) return json(res, 400, { error: 'Не знаю адрес сервера: откройте страницу ещё раз' });
+    try { await cf.setA(d, want); return json(res, 200, { cf: await cf.state(d), ip: want }) }
+    catch (e) { return json(res, 400, { error: e.message }) }
   }
   if (path === '/api/addr/unfwd' && M === 'POST') { const r = await agent('ipmove unfwd', 15000); await netLook(); return r.code === 0 ? json(res, 200, { ok: true, fwd: netNow?.fwd || '' }) : json(res, 400, { error: r.out.trim() || 'Не получилось' }) }
   // Запасной вход в сайте nginx на основном адресе: домен сайта или пусто — убрать
