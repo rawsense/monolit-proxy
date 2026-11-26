@@ -45,7 +45,7 @@
       return structuredClone(demo)
     }
     if (path === 'api/addr/netsave') { await sleep(800); demo.netsave = { ...demo.netsave, missing: [], stale: [] }; return { ok: true, text: 'заменил 198.51.100.4 на 203.0.113.8', netsave: demo.netsave } }
-    if (path === 'api/addr/ip') { demo.fwd = `${demo.ip2}>${body.ip}`; demo.ip2 = body.ip; demo.fresh = []; return { ok: true } }
+    if (path === 'api/addr/ip') { demo.fwd = `${demo.ip2}>${body.ip}`; demo.ip2 = body.ip; demo.fresh = []; if (demo.cf.on) demo.cf.ip = body.ip; return { ok: true } }
     if (path === 'api/addr/cf') { if (body.token && body.token.length < 20) throw new Error('Cloudflare не принял токен: проверьте, что он скопирован целиком'); demo.cf = body.token ? { on: true, zone: 'example.ru', ip: demo.dns.join(', '), proxied: false, many: false, error: '' } : { on: false }; return { cf: demo.cf } }
     if (path === 'api/addr/cf/sync') { demo.dns = [demo.ip2]; demo.cf.ip = demo.ip2; return { cf: demo.cf, ip: demo.ip2 } }
     if (path === 'api/addr/unfwd') { demo.fwd = ''; return { ok: true, fwd: '' } }
@@ -90,10 +90,11 @@
     $('mp-a-fail').hidden = !failed || running
     if (failed) $('mp-a-fail-t').textContent = job.text + '. Настройки остались прежними'
     const on = ips(), dnsOk = !D.dns?.length ? null : D.dns.some((a) => (D.mode === 'ip2' ? [D.ip2] : on).includes(a))
+    const cfDone = dnsOk === false && cfSet()
     paintMove(running, on)
     $('mp-a-kv').innerHTML = kv([
       ['Домен', D.domain],
-      ['Смотрит на', D.dns?.length ? D.dns.join(', ') + (dnsOk === false && on.length ? (D.dns.some((a) => on.includes(a)) ? ', это не входящий адрес' : ', это не этот сервер') : '') : 'никуда', dnsOk === false ? 'mp-warn' : ''],
+      ['Смотрит на', cfDone ? `${D.cf.ip}, обновляется, до минуты` : D.dns?.length ? D.dns.join(', ') + (dnsOk === false && on.length ? (D.dns.some((a) => on.includes(a)) ? ', это не входящий адрес' : ', это не этот сервер') : '') : 'никуда', dnsOk === false && !cfDone ? 'mp-warn' : ''],
       MODES[D.mode] ? ['Способ', MODES[D.mode][0]] : null,
       D.mode === 'ip2' ? ['Входящий IP', D.ip2] : null,
       on.length ? [on.length > 1 ? 'Адреса сервера' : 'Адрес сервера', on.join(', ')] : null,
@@ -114,6 +115,8 @@
     $('mp-o-kv').innerHTML = kv([['Исходящий IP', D.out_ip || 'как решает сервер' + (D.net?.ip1 ? `, ${D.net.ip1}` : '')]])
     $('mp-o-edit').disabled = foreign || running || !D.net
   }
+  // Cloudflare подключён, и в записи уже входящий адрес: остальной интернет увидит его, когда истечёт прежнее время жизни записи
+  const cfSet = () => !!D.cf?.on && !D.cf.error && D.mode === 'ip2' && !!D.ip2 && D.cf.ip === D.ip2
   // ---------- свободный адрес сервера: перевести на него VPN одной кнопкой ----------
   // Хостер добавил IP: Xray переезжает на него без переустановки, старый адрес пересылает на новый, пока расходится DNS
   function paintMove(running, on) {
@@ -122,7 +125,7 @@
     box.innerHTML = fresh.map((ip) => `<div class="alert alert-info mp-alert"><i data-lucide="map-pin"></i><div><b>На сервере свободный адрес ${esc(ip)}</b><span>VPN переедет на него без переустановки</span>
       <div class="btn-row mp-alert-act"><button class="btn btn-secondary btn-sm" type="button" data-ipmove="${esc(ip)}"${running ? ' disabled' : ''}><span>Перевести VPN</span></button></div></div></div>`).join('')
     // домен ещё смотрит на прежний адрес: что именно поменять в DNS
-    const need = D.mode === 'ip2' && D.ip2 && D.dns?.length && on.length && !D.dns.includes(D.ip2)
+    const need = D.mode === 'ip2' && D.ip2 && D.dns?.length && on.length && !D.dns.includes(D.ip2) && !cfSet()
     $('mp-a-rec').hidden = !need
     $('mp-a-rec-act').hidden = !D.cf?.on
     if (need) { $('mp-a-rec-t').textContent = `${D.domain} смотрит на ${D.dns.join(', ')}, а VPN работает на этом адресе`; $('mp-a-rec-ip').value = D.ip2; $('mp-a-rec-copy').dataset.copy = D.ip2 }
@@ -135,7 +138,8 @@
       try {
         await waitJob(await api('POST', 'api/addr/ip', { ip }))
         await load()
-        toast({ type: 'success', title: 'VPN переведён на ' + ip, text: D.dns?.includes(ip) ? 'Домен уже смотрит на этот адрес' : D.cf?.on ? 'A-запись в Cloudflare меняется, это до минуты' : `Поменяйте A-запись ${D.domain} на ${ip}` })
+        if (D.cf?.on) for (const ms of [5000, 20000, 60000]) setTimeout(() => load().catch(() => {}), ms)
+        toast({ type: 'success', title: 'VPN переведён на ' + ip, text: D.dns?.includes(ip) ? 'Домен уже смотрит на этот адрес' : D.cf?.on ? 'A-запись в Cloudflare меняется сама, это до минуты' : `Поменяйте A-запись ${D.domain} на ${ip}` })
         A().refresh?.()
       } catch (err) { fail(err); load().catch(() => {}) }
     })
