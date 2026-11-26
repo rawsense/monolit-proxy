@@ -24,7 +24,7 @@
   const demo = {
     mode: 'ip2', domain: 'vpn.example.ru', ip2: '203.0.113.8', out_ip: '', alt: ['old.example.ru'], admin: '/adm', job: null, dns: ['203.0.113.8'],
     cf: { on: false }, fresh: ['203.0.113.9'], fwd: '', entry: '', entries: [{ kind: 'node', name: 'Moscow', host: 'msk.example.ru', url: 'https://msk.example.ru/adm/' }],
-    netsave: { tool: 'ifupdown', dev: 'ens3', file: '/etc/network/interfaces', missing: ['203.0.113.8'], stale: ['198.51.100.4'], manual: '' },
+    netsave: { tool: 'ifupdown', dev: 'ens3', file: '/etc/network/interfaces', missing: ['203.0.113.8'], stale: ['198.51.100.4'], manual: '' }, netsave_failed: true,
     net: { ips: ['203.0.113.7', '203.0.113.8', '203.0.113.9'], ip1: '203.0.113.7', sites: [{ names: ['example.ru', 'www.example.ru'] }] },
     watch: { state: 'blocked', at: now() - 600, since: now() - 4000, ip: '203.0.113.7', on: true, every: 60, error: '',
       ru: [{ node: 'ru1', city: 'Moscow', ok: false, healthy: false, answered: true }, { node: 'ru2', city: 'Moscow', ok: false, healthy: true, answered: true }],
@@ -180,11 +180,13 @@
   const bootOk = () => !!ns() && (D.mode === 'ip2' || D.out_ip) && !ns().missing.length && !ns().stale.length
   function paintBoot(running) {
     const n = ns(), miss = n?.missing || [], stale = n?.stale || []
-    $('mp-a-boot').hidden = !miss.length && !stale.length
+    // настройки сети админка правит сама: предупреждение показываем, только когда сама не смогла или не умеет
+    const self = !!n && n.tool !== 'none' && !n.manual && !D.netsave_failed
+    $('mp-a-boot').hidden = (!miss.length && !stale.length) || self
     if ($('mp-a-boot').hidden) return
     $('mp-a-boot-t').textContent = miss.length ? 'После перезагрузки адрес пропадёт' : 'В настройках сети старый адрес'
     $('mp-a-boot-p').textContent = n.manual || (miss.length && stale.length ? `В настройках сети записан ${stale.join(', ')}, а работает ${miss.join(', ')}`
-      : miss.length ? `${miss.join(', ')} не записан в настройках сети` : `После перезагрузки сервер взял бы ${stale.join(', ')}, которого у него уже нет: уберём сами через 5 минут`)
+      : miss.length ? `${miss.join(', ')} не записан в настройках сети` : `В настройках сети остался ${stale.join(', ')}, которого на сервере уже нет`)
     $('mp-a-boot-act').hidden = n.tool === 'none'
     $('mp-a-boot-fix').disabled = running
   }

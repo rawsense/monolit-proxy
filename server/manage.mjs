@@ -514,7 +514,7 @@ export const freshKeep = (k, t, ttl = 3600) => k && k.s && k.at && t - k.at < tt
 
 // Что делать с настройками сети по итогу проверки (agent/netsave.sh check): none — всё в порядке или сами не можем,
 // fix — править сейчас, mark — лишний адрес увидели впервые, wait — ждём, не вернётся ли он. since — когда увидели
-export function netsaveDue(st, since, t, wait = 300) {
+export function netsaveDue(st, since, t, wait = 240) {   // чуть меньше шага сверки (5 минут): вторая же сверка и уберёт
   if (!st || st.tool === 'none' || st.manual || !(st.missing?.length || st.stale?.length)) return 'none';
   if (st.missing?.length) return 'fix';   // рабочий адрес не записан: после перезагрузки VPN пропал бы
   return !since ? 'mark' : t - since < wait ? 'wait' : 'fix';
