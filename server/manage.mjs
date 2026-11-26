@@ -49,12 +49,14 @@ export const TARGETS = ['direct', 'warp', 'block'];
 function routeRules(r, tags) {
   const by = { domain: [], ip: [], port: [], protocol: [] };
   for (const v of r.values) { const c = classify(v); if (c) by[c[0]].push(c[1]) }
-  const outboundTag = tags[r.to], base = { type: 'field', outboundTag, ruleTag: 'mp-r' + r.id };
+  // Одно правило админки — до четырёх правил Xray (сайты, адреса, порты, протоколы). Имя у каждого своё: одинаковые
+  // ruleTag Xray не принимает («duplicate ruleTag»), и правило с сайтами и адресами сразу не применялось вовсе
+  const outboundTag = tags[r.to], base = (k) => ({ type: 'field', outboundTag, ruleTag: 'mp-r' + r.id + k });
   const out = [];
-  if (by.domain.length) out.push({ ...base, domain: by.domain });
-  if (by.ip.length) out.push({ ...base, ip: by.ip });
-  if (by.port.length) out.push({ ...base, port: by.port.join(',') });
-  if (by.protocol.length) out.push({ ...base, protocol: by.protocol });
+  if (by.domain.length) out.push({ ...base(''), domain: by.domain });
+  if (by.ip.length) out.push({ ...base('-ip'), ip: by.ip });
+  if (by.port.length) out.push({ ...base('-port'), port: by.port.join(',') });
+  if (by.protocol.length) out.push({ ...base('-proto'), protocol: by.protocol });
   return out;
 }
 

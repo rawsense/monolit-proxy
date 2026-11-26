@@ -327,3 +327,11 @@ test('агент ноды: адрес сервера принимается то
   for (const bad of ['http://new.example.ru/s/_n', 'https://new.example.ru/s/_n/x', 'https://new.example.ru/s/_n;id', 'https://a b/s/_n', 'https://$(id)/s/_n', '-', '', 'https://new.example.ru|x/s/_n'])
     assert.equal(ok(bad), false, bad);
 });
+
+test('маршрут с сайтами, адресами и портами: у каждого правила Xray своё имя', async () => {
+  const m = await manager('bare');
+  await m.wait(await m.mgr.routes.add({ name: 'смешанное', to: 'block', values: ['geosite:category-ru', 'geoip:ru', 'example.com', '203.0.113.0/24', '25'] }));
+  const tags = m.read().routing.rules.map((r) => r.ruleTag).filter((t) => String(t).startsWith('mp-r'));
+  assert.equal(tags.length, 3);
+  assert.equal(new Set(tags).size, 3);   // одинаковые имена Xray не принимает: «duplicate ruleTag»
+});
