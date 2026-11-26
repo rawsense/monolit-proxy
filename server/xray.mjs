@@ -87,7 +87,9 @@ export class Xray {
   // Включить API и статистику по пользователям. Возвращает true, если конфиг поменялся (нужен перезапуск Xray)
   ensureApi(listen = '127.0.0.1:10085') {
     const cfg = this.read(); let changed = false;
-    if (!cfg.api || cfg.api.listen !== listen) { cfg.api = { tag: 'monolit-api', listen, services: ['HandlerService', 'StatsService'] }; changed = true; }
+    // RoutingService — чтобы правила выходов менялись в работающем Xray, без перезапуска (liveRules)
+    const services = ['HandlerService', 'StatsService', 'RoutingService'];
+    if (!cfg.api || cfg.api.listen !== listen || services.some(s => !(cfg.api.services || []).includes(s))) { cfg.api = { tag: cfg.api?.tag || 'monolit-api', listen, services }; changed = true; }
     if (!cfg.stats) { cfg.stats = {}; changed = true; }
     cfg.policy ||= {}; cfg.policy.levels ||= {}; const l0 = cfg.policy.levels['0'] ||= {};
     if (!l0.statsUserUplink || !l0.statsUserDownlink) { l0.statsUserUplink = true; l0.statsUserDownlink = true; changed = true; }

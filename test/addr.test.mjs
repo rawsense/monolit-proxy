@@ -107,3 +107,23 @@ test('запасной вход: сайта с таким именем нет �
   assert.equal(init(dir, 'entry', '--domain', 'nope.example.ru').status, 4);
   assert.equal(readFileSync(join(dir, 'conf.d', 'sites.conf'), 'utf8'), SITE);
 });
+
+// 26.11.2026: адрес вернули окном «Изменить адрес», а пересылка «старый → новый» осталась и уводила все подключения
+// на адрес, где Xray уже не слушал
+test('пересылка со старого адреса снимается, когда Xray слушает не там, куда она ведёт', async () => {
+  const { staleFwd } = await import('../server/manage.mjs');
+  assert.equal(staleFwd('203.0.113.8>203.0.113.9', '203.0.113.9'), '');                 // всё на месте
+  assert.match(staleFwd('203.0.113.8>203.0.113.9', '203.0.113.8'), /снова слушает/);    // вернулись на старый адрес
+  assert.match(staleFwd('203.0.113.8>203.0.113.9', '203.0.113.7'), /слушает на 203\.0\.113\.7/);   // ушли на третий
+  assert.equal(staleFwd('', '203.0.113.9'), '');
+  assert.equal(staleFwd('203.0.113.8>203.0.113.9', ''), '');                            // адрес неизвестен — не трогаем
+});
+
+test('API Xray включается вместе с RoutingService: правила выходов меняются без перезапуска', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mp-api-')), f = join(dir, 'config.json');
+  writeFileSync(f, JSON.stringify({ api: { tag: 'monolit-api', listen: '127.0.0.1:10085', services: ['HandlerService', 'StatsService'] }, stats: {}, policy: { levels: { 0: { statsUserUplink: true, statsUserDownlink: true, statsUserOnline: true } } }, inbounds: [] }));
+  const x = new Xray({ config: f });
+  assert.equal(x.ensureApi('127.0.0.1:10085'), true);    // старая установка: сервис дописывается
+  assert.deepEqual(JSON.parse(readFileSync(f, 'utf8')).api, { tag: 'monolit-api', listen: '127.0.0.1:10085', services: ['HandlerService', 'StatsService', 'RoutingService'] });
+  assert.equal(x.ensureApi('127.0.0.1:10085'), false);   // второй раз менять нечего
+});

@@ -6,7 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openDb, now, token, newUuid, getSetting, setSetting, hashPassword, checkPassword, userState, nextReset } from './db.mjs';
 import { Xray } from './xray.mjs';
 import { AUTOXRAY_URL, parseAutoXray, hashOf, renderAll } from './template.mjs';
-import { createManager, PRESETS, agent } from './manage.mjs';
+import { createManager, PRESETS, agent, staleFwd } from './manage.mjs';
 import { createWatch, tgSend, tgFindChat, resolve4 } from './watch.mjs';
 import { createNodes } from './nodes.mjs';
 import { createAwg } from './awg.mjs';
@@ -187,7 +187,9 @@ async function sync({ full = false } = {}) {
       const r = xray.writeUsers(all.filter(u => want.has(u.id)), ['vision', 'hy2', 'xhttp'].filter(k => xray.detect()[k]));
       // правила выходов поменялись (выход назначили, сняли, человек выключился): живому Xray без перезапуска.
       // Не вышло (старый Xray без RoutingService) — перезапуск, конфиг уже записан
-      await xray.liveRules(r.was, r.now).catch(e => { log('правила выходов без перезапуска не легли:', e.message.slice(0, 200)); return mgr.server.restart() });
+      // Перезапуск не ждём: он встаёт в ту же очередь, что и эта сверка. Ожидание останавливало админку целиком:
+      // после смены адреса она не возвращала Reality и маршруты (26.11.2026)
+      await xray.liveRules(r.was, r.now).catch(e => { log('правила выходов без перезапуска не легли:', e.message.slice(0, 200)); mgr.server.restart() });
     }
     applied = want; lastSync = t; syncError = '';
   } catch (e) { syncError = e.message; log('sync:', e.message); }
@@ -282,6 +284,14 @@ let netNow = null;
 async function netLook() {
   const r = await agent('ips', 15000);
   try { if (r.code === 0) netNow = JSON.parse(r.out.split('\n').pop() || 'null') } catch {}
+  // Пересылка «старый адрес → новый» верна, только пока Xray слушает на новом. Адрес сменили другим путём
+  // (окно «Изменить адрес», откат в «Истории») — правила уводили бы подключения туда, где никто не слушает (26.11.2026)
+  const stale = staleFwd(netNow?.fwd, ip2());
+  if (stale) {
+    const u = await agent('ipmove unfwd', 15000);
+    log('пересылка', netNow.fwd, 'снята:', stale, u.code === 0 ? '' : u.out);
+    if (u.code === 0) netNow.fwd = '';
+  }
   // когда адрес увидели впервые: те, что были при первом взгляде, новыми не считаются
   if (netNow?.ips) {
     const had = getSetting(db, 'ips_seen', ''), seen = had ? JSON.parse(had) : null, next = { ...(seen || {}) };
@@ -293,7 +303,7 @@ async function netLook() {
 // на главную — только адрес, который появился недавно: давно лежащий свободный адрес не напоминание
 const newIps = () => { let seen = {}; try { seen = JSON.parse(getSetting(db, 'ips_seen', '') || '{}') } catch {} return freshIps().filter((a) => seen[a] > 0 && now() - seen[a] < 3 * 86400) };
 const PRIVATE = /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/;   // внутренние сети: снаружи на такой адрес не подключиться
-const freshIps = () => env('MP_MODE', '') !== 'ip2' || !netNow ? [] : (netNow.ips || []).filter((a) => !PRIVATE.test(a) && a !== netNow.ip1 && a !== ip2() && a !== getSetting(db, 'out_ip', '') && a !== (netNow.fwd || '').split('>')[0]);
+const freshIps = () => env('MP_MODE', '') !== 'ip2' || !netNow ? [] : (netNow.ips || []).filter((a) => !PRIVATE.test(a) && a !== netNow.ip1 && a !== ip2() && a !== getSetting(db, 'out_ip', ''));
 
 // Перевод VPN на другой адрес сервера без переустановки. Xray перезапускается в фоне; когда поднялся —
 // адрес в настройки установки и сети, пересылка со старого адреса (пока расходится DNS), проверка из России, Telegram
@@ -712,6 +722,7 @@ http.listen(Number(PORT), HOST, async () => {
   if (!activeTpl()) await checkTemplate();
   await queueSync({ full: true });
   await mgr.start().catch(e => log('manage:', e.message));
+  syncIpEnv().catch(() => {});   // адрес сменили переустановкой: запомнить его как текущий
   setInterval(() => queueSync(), 60_000);
   setInterval(() => queueSync({ full: true }), 10 * 60_000);    // если Xray перезапускали — вернуть пользователей
   setInterval(() => exits.checkAll().catch(e => log('выходы:', e.message)), 5 * 60_000);   // прокси отвечает? IP, страна, UDP

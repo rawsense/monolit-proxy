@@ -471,6 +471,9 @@ export function listenOf(cfg, xray) {
   const l = xray.detect(cfg).vision?.listen || '';
   return /^(\d{1,3}\.){3}\d{1,3}$/.test(l) && l !== '0.0.0.0' && !l.startsWith('127.') ? l : '';
 }
+// Почему пересылку «старый>новый» пора снять, или '' — она на месте
+export const staleFwd = (fwd, listen) => { const [from, to] = String(fwd || '').split('>'); return !from || !to || !listen ? '' : listen === from ? 'Xray снова слушает на этом адресе' : listen !== to ? `Xray слушает на ${listen}` : '' };
+
 // Конфиг, где все входы с адреса from слушают на to
 export function moveListen(cfg, from, to) {
   cfg = structuredClone(cfg);
