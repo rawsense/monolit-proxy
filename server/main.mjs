@@ -428,6 +428,16 @@ async function lostAddrs() {
       watch.notify(`адрес VPN ${live} пропал с сервера. ${free.length ? 'Свободные адреса: ' + free.join(', ') : 'Свободных адресов нет'}. Откройте «Адрес»\n${entries().map((e) => e.url).join('\n')}`.trim());
     }
   }
+  // AmneziaWG привязан к адресу, которого больше нет: после перезапуска контейнер не поднимется. Переводим на адрес VPN.
+  // Если пропал и адрес VPN, сюда не дойдём или переведём на все адреса; при переводе VPN привязку поправит afterMoved
+  const wg = awg.conf().ip || '';
+  if (goneFor('awg_gone_at', !!wg && !ips.includes(wg))) {
+    setSetting(db, 'awg_gone_at', '');
+    const to = live && ips.includes(live) ? live : '';
+    const ok = await awg.moved(wg, to);
+    log('адрес AmneziaWG', wg, 'пропал с сервера:', ok ? 'переведён на ' + (to || 'все адреса') : 'перевести не получилось');
+    if (ok) watch.notify(`адрес ${wg}, на котором работал AmneziaWG, пропал с сервера. AmneziaWG переведён на ${to || 'все адреса сервера'}, в приложениях обновите подписку`);
+  }
 }
 // A-запись в Cloudflare — на адрес, где слушает Xray. Закрывает и сбой переустановки (запись уже сменили, а адрес
 // остался прежним), и откат в «Истории»
@@ -467,6 +477,8 @@ async function afterMoved(from, to) {
   const f = await agent(`ipmove fwd ${from} ${to}`, 15000);
   const fwd = f.code === 0 ? `${from} пока пересылается на новый адрес` : `${from} подключения больше не принимает`;
   log('входящий адрес:', from, '→', to, f.code === 0 ? 'старый пересылается на новый' : 'старый отключён: ' + f.out.trim());
+  // AmneziaWG жил на адресе VPN — переезжает вместе с ним: пересылка со старого адреса его порт не покрывает
+  if (await awg.moved(from, to)) log('AmneziaWG переведён вслед за VPN:', from, '→', to);
   await reconcile(); await reconcile();   // вторая — если первая уже шла и начала раньше перезапуска
   const domain = getSetting(db, 'domain'), dns = await resolve(domain);
   const rec = cf.on() ? ((await cf.state(domain)).ip === to ? ` A-запись ${domain} в Cloudflare изменена.` : ` A-запись в Cloudflare не изменилась: поменяйте её на ${to} сами.`)

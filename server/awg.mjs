@@ -222,7 +222,14 @@ export function createAwg({ db, log, agent, domain, outIp, onReady }) {
     return r.code === 0 ? { ok: true } : { error: r.out || 'Не получилось остановить AmneziaWG' };
   }
 
+  // Адрес, к которому привязан AmneziaWG, перестал годиться: VPN перевели с него на другой или хостер его забрал.
+  // Привязка переезжает следом, иначе сервер молча перестанет принимать подключения. Чужую привязку не трогаем
+  async function moved(from, to) {
+    if (!from || (conf().ip || '') !== from) return false;
+    return !!(await set({ ip: to || '' })).ok;
+  }
+
   const stateForAdmin = () => { const c = conf(); return { on: !!c.on, port: c.port || 0, ip: c.ip || '', state: c.on ? state : 'off', error } };
   if (conf().on) state = 'starting';
-  return { ready, sync, set, outbound, confText, vpnLink, dropKeys, stateForAdmin, conf };
+  return { ready, sync, set, moved, outbound, confText, vpnLink, dropKeys, stateForAdmin, conf };
 }

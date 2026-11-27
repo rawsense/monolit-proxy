@@ -205,6 +205,22 @@ test('свой адрес: помощник получает его, прило�
   assert.equal(awg.outbound(u).settings.peers[0].endpoint, 'vpn.example.com:46200');
 });
 
+test('VPN перевели на другой адрес или адрес пропал — привязка AmneziaWG переезжает следом, чужую не трогаем', async () => {
+  await awg.set({ ip: '203.0.113.8' }); await tick(); calls.length = 0;
+  assert.equal(await awg.moved('203.0.113.99', '203.0.113.20'), false);   // привязан к другому адресу
+  await tick();
+  assert.equal(calls.length, 0);
+  assert.equal(await awg.moved('203.0.113.8', '203.0.113.20'), true);
+  await tick();
+  assert.deepEqual(calls, ['awg on 46200 198.51.100.9 203.0.113.20']);
+  assert.equal(awg.outbound(users()[1]).settings.peers[0].endpoint, '203.0.113.20:46200');
+  calls.length = 0;
+  assert.equal(await awg.moved('203.0.113.20', ''), true);   // нового адреса нет — слушаем на всех
+  await tick();
+  assert.deepEqual(calls, ['awg on 46200 198.51.100.9 -']);
+  assert.equal(await awg.moved('', '203.0.113.20'), false);   // привязки нет — переносить нечего
+});
+
 test('включение и сверка одновременно — помощник вызывается один раз', async () => {
   await awg.set({ on: false }); calls.length = 0;
   let release; const slow = new Promise((ok) => { release = ok });
