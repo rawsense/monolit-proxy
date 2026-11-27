@@ -56,7 +56,8 @@ while [ $# -gt 0 ]; do case "$1" in
   --status) ACTION=status; shift ;;
   --uninstall) ACTION=uninstall; shift ;;
   --reconfigure) ACTION=reconfigure; shift ;;
-  -h|--help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  # при запуске «bash <(curl …)» файл уже прочитан, перечитать его нельзя: даём ссылку
+  -h|--help) if [ -f "$0" ]; then sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; else echo "Ключи описаны в начале install.sh: https://github.com/rawsense/monolit-proxy/blob/main/install.sh"; fi; exit 0 ;;
   *) echo "Неизвестный параметр: $1 (bash install.sh --help)"; exit 1 ;;
 esac; done
 
@@ -146,9 +147,24 @@ fi
 
 # ================= исходники =================
 if [ ! -f "$SRC/server/main.mjs" ] || [ ! -f "$SRC/ui/dist/admin.html" ]; then
-  [ -n "${MP_SOURCE_URL:-}" ] || die "Рядом нет server/ и ui/dist/. Запускайте из папки monolit или задайте MP_SOURCE_URL (архив .tar.gz)"
-  mkdir -p /opt/monolit-src; curl -fsSL "$MP_SOURCE_URL" | tar xz -C /opt/monolit-src --strip-components=1 || die "Не скачался $MP_SOURCE_URL"
-  exec bash /opt/monolit-src/install.sh "${ARGS[@]}"
+  # Запуск одной командой (bash <(curl …/install.sh)): исходников рядом нет, берём последний релиз с GitHub.
+  # Свой архив .tar.gz можно задать в MP_SOURCE_URL. Папка та же, откуда потом обновляет кнопка в админке.
+  REPO=${MP_REPO:-rawsense/monolit-proxy}; DEST=${MP_SRC:-/opt/monolit-proxy}; URL=${MP_SOURCE_URL:-}
+  if [ -z "$URL" ]; then
+    TAG=$(curl -fsSLI -m 30 -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest" | sed -n 's#.*/tag/##p')
+    [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "Не узнал последнюю версию: GitHub не ответил. Скачайте вручную: git clone https://github.com/$REPO.git"
+    URL="https://github.com/$REPO/archive/refs/tags/$TAG.tar.gz"
+  fi
+  info "Скачиваю monolit${TAG:+ $TAG} в $DEST"
+  TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+  curl -fsSL -m 180 "$URL" -o "$TMP/r.tgz" || die "Не скачался $URL"
+  mkdir "$TMP/new" && tar xzf "$TMP/r.tgz" -C "$TMP/new" --strip-components=1 || die "Архив не распаковался: $URL"
+  [ -f "$TMP/new/install.sh" ] && [ -f "$TMP/new/server/main.mjs" ] || die "В архиве нет monolit: $URL"
+  # прежняя папка остаётся рядом как .prev
+  if [ -e "$DEST" ]; then rm -rf "$DEST.prev"; mv "$DEST" "$DEST.prev"; fi
+  mkdir -p "$(dirname "$DEST")" && mv "$TMP/new" "$DEST" || die "Не получилось положить monolit в $DEST"
+  rm -rf "$TMP"; trap - EXIT
+  exec bash "$DEST/install.sh" ${ARGS[@]+"${ARGS[@]}"}
 fi
 
 # ================= 1. проверка сервера =================
